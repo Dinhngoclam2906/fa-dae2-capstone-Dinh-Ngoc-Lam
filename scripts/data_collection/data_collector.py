@@ -14,6 +14,7 @@ import ijson
 import argparse
 from datetime import datetime, timedelta
 from wordcloud import WordCloud
+from textblob import TextBlob
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -21,6 +22,20 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+
+# Try to import nltk for stopwords, with fallback to custom list
+try:
+    from nltk.corpus import stopwords
+    STOPWORDS = set(stopwords.words('english'))
+    logger.info("Using NLTK stopwords for word cloud")
+except (ImportError, LookupError) as e:
+    logger.warning(f"NLTK stopwords not available ({e}), using custom stopwords list")
+    STOPWORDS = {
+        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he',
+        'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were', 'will',
+        'with', 'this', 'but', 'or', 'not', 'all', 'any', 'some', 'such', 'no', 'only',
+        'own', 'so', 'than', 'too', 'very', 'can', 'just', 'should', 'now'
+    }
 
 class APIDataCollector:
     def __init__(self, api_name: str, from_date: Optional[str] = None):
@@ -43,8 +58,10 @@ class APIDataCollector:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.analysis_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_file = self.data_dir / "checkpoint.json"
+        self.temp_checkpoint = self.data_dir / "temp_checkpoint.json"
         self.temp_dir = self.data_dir / "temp"
         self.temp_dir.mkdir(parents=True, exist_ok=True)
+        self.request_times = []
         
         # Reset checkpoint if from_date doesn't match
         if self.checkpoint_file.exists():
@@ -63,7 +80,8 @@ class APIDataCollector:
                     logger.error(f"Failed to reset checkpoint: {e}")
                     break
             else:
-                logger.warning("Unable to reset checkpoint file due to persistent lock, proceeding without reset")
+                logger.warning("Unable to reset checkpoint file due to persistent lock, using temp checkpoint")
+                self.checkpoint_file = self.temp_checkpoint
         
         # Log environment variables for debugging
         logger.info(f"API_URL: {self.api_url}")
@@ -98,17 +116,18 @@ class APIDataCollector:
 
     def _clean_checkpoint(self) -> None:
         """Remove checkpoint file and temp directory after completion or error."""
-        for _ in range(3):  # Retry up to 3 times
-            try:
-                if self.checkpoint_file.exists():
-                    self.checkpoint_file.unlink()
-                    logger.info("Checkpoint file removed")
-                break
-            except PermissionError:
-                logger.warning("Checkpoint file is locked, retrying...")
-                time.sleep(1)
-        else:
-            logger.warning("Unable to remove checkpoint file due to persistent lock")
+        for checkpoint in [self.checkpoint_file, self.temp_checkpoint]:
+            for _ in range(3):  # Retry up to 3 times
+                try:
+                    if checkpoint.exists():
+                        checkpoint.unlink()
+                        logger.info(f"Checkpoint file {checkpoint} removed")
+                    break
+                except PermissionError:
+                    logger.warning(f"Checkpoint file {checkpoint} is locked, retrying...")
+                    time.sleep(1)
+            else:
+                logger.warning(f"Unable to remove checkpoint file {checkpoint} due to persistent lock")
         
         for temp_file in self.temp_dir.glob("*.json"):
             try:
@@ -164,8 +183,10 @@ class APIDataCollector:
                     logger.info(f"Fetching data from {url}, page {page}")
                     
                     start_time = time.time()
-                    response = requests.get(url, params=params, timeout=60)  # Increased timeout
+                    timeout = max(30, sum(self.request_times) / max(1, len(self.request_times)) * 2) if self.request_times else 60
+                    response = requests.get(url, params=params, timeout=timeout)
                     request_time = time.time() - start_time
+                    self.request_times.append(request_time)
                     
                     if response.status_code == 429:  # Rate limit exceeded
                         logger.warning("Rate limit exceeded, waiting 60 seconds")
@@ -287,7 +308,7 @@ class APIDataCollector:
             print("\nPublication Trends by Year:")
             print(yearly_counts)
         
-        # Strategy 4: Text Content Analysis (Enhanced with Keyword Frequency)
+        # Strategy 4: Text Content Analysis (Enhanced with Keyword Frequency and Sentiment)
         word_counts = df['fields'].apply(lambda x: len(x.get('bodyText', '').split()) if isinstance(x, dict) else 0)
         print(f"\nText Analysis:\n- Min Word Count: {word_counts.min() if total_articles > 0 else 0}\n- Max Word Count: {word_counts.max() if total_articles > 0 else 0}\n- Median Word Count: {word_counts.median() if total_articles > 0 else 0}\n")
         
@@ -300,6 +321,12 @@ class APIDataCollector:
         print("Technology Keyword Frequency:")
         for keyword, count in keyword_counts.items():
             print(f"- {keyword}: {count}")
+        
+        # Sentiment Analysis
+        if total_articles > 0:
+            sentiments = df['fields'].apply(lambda x: TextBlob(x.get('bodyText', '')).sentiment.polarity if isinstance(x, dict) else 0)
+            avg_sentiment = sentiments.mean()
+            print(f"\nSentiment Analysis:\n- Average Sentiment Polarity: {avg_sentiment:.2f} (Positive > 0, Negative < 0)")
         
         # Strategy 5: Visualization
         if total_articles > 0:
@@ -326,13 +353,15 @@ class APIDataCollector:
             plt.close()
             print(f"Saved publication trends chart to {trend_path}")
             
-            # Word Cloud for Top Words
+            # Word Cloud for Top Words (Excluding Stopwords)
             if all_text:
-                wordcloud = WordCloud(width=800, height=400, background_color='white').generate(all_text)
+                # Remove stopwords
+                words = ' '.join(word for word in all_text.split() if word.lower() not in STOPWORDS)
+                wordcloud = WordCloud(width=800, height=400, background_color='white').generate(words)
                 plt.figure(figsize=(10, 5))
                 plt.imshow(wordcloud, interpolation='bilinear')
                 plt.axis('off')
-                plt.title('Word Cloud of Technology Article Content')
+                plt.title('Word Cloud of Technology Article Content (Stopwords Excluded)')
                 wordcloud_path = self.analysis_dir / f"wordcloud_{time.strftime('%Y%m%d_%H%M%S')}.png"
                 plt.savefig(wordcloud_path)
                 plt.close()
