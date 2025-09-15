@@ -26,16 +26,26 @@ load_dotenv()
 # Try to import nltk for stopwords, with fallback to custom list
 try:
     from nltk.corpus import stopwords
-    STOPWORDS = set(stopwords.words('english'))
-    logger.info("Using NLTK stopwords for word cloud")
+    NLTK_STOPWORDS = set(stopwords.words('english'))
+    logger.info("Using NLTK stopwords as base for word cloud")
 except (ImportError, LookupError) as e:
     logger.warning(f"NLTK stopwords not available ({e}), using custom stopwords list")
-    STOPWORDS = {
-        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he',
-        'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were', 'will',
-        'with', 'this', 'but', 'or', 'not', 'all', 'any', 'some', 'such', 'no', 'only',
-        'own', 'so', 'than', 'too', 'very', 'can', 'just', 'should', 'now'
-    }
+    NLTK_STOPWORDS = set()
+
+# Extended custom stopwords list including "said" and other non-meaningful terms
+CUSTOM_STOPWORDS = {
+    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he',
+    'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were', 'will',
+    'with', 'this', 'but', 'or', 'not', 'all', 'any', 'some', 'such', 'no', 'only',
+    'own', 'so', 'than', 'too', 'very', 'can', 'just', 'should', 'now', 'said',
+    'also', 'would', 'like', 'could', 'new', 'one', 'two', 'get', 'use', 'first',
+    'last', 'many', 'more', 'most', 'other', 'our', 'their', 'there', 'what', 'when',
+    'where', 'which', 'who', 'why', 'how', 'been', 'being', 'have', 'had', 'do',
+    'does', 'did', 'doing'
+}
+
+# Combine stopwords
+STOPWORDS = NLTK_STOPWORDS | CUSTOM_STOPWORDS
 
 class APIDataCollector:
     def __init__(self, api_name: str, from_date: Optional[str] = None):
