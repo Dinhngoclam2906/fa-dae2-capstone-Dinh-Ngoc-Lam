@@ -157,11 +157,17 @@ class APIDataCollector:
         page = self._load_checkpoint()
         total_records = 0
         total_available = float('inf')
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        output_file = self.data_dir / f"guardian_technology_articles_{timestamp}.json"
+        base_filename = "guardian_technology_articles"
+        output_json_file = self.data_dir / f"{base_filename}.json"
+        output_csv_file = self.data_dir / f"{base_filename}.csv"
+        # counter = 1
+        # while output_json_file.exists():  # Prevent overwriting
+        #     output_json_file = self.data_dir / f"{base_filename}_{counter}.json"
+        #     output_csv_file = self.data_dir / f"{base_filename}_{counter}.csv"
+        #     counter += 1
         
-        # Initialize output file
-        with open(output_file, 'w', encoding='utf-8') as f:
+        # Initialize output JSON file
+        with open(output_json_file, 'w', encoding='utf-8') as f:
             json.dump([], f)
         
         # Calculate total pages needed
@@ -183,7 +189,7 @@ class APIDataCollector:
                         'api-key': self.api_key,
                         'page': page,
                         'page-size': self.batch_size,
-                        'show-fields': 'all',
+                        'show-fields': 'bodyText',  # Prioritize bodyText for RAG
                         'show-tags': 'all',
                         'section': 'technology'
                     }
@@ -226,6 +232,11 @@ class APIDataCollector:
                         logger.info("No more results to fetch")
                         break
                         
+                    # Add crawlTimestamp to each result
+                    crawl_timestamp = datetime.now().isoformat()
+                    for result in results:
+                        result['crawlTimestamp'] = crawl_timestamp
+                    
                     # Validate and filter results
                     valid_results = [
                         r for r in results
@@ -235,8 +246,8 @@ class APIDataCollector:
                         collected_ids.add(r['id'])
                     
                     if valid_results:
-                        # Append batch to final file using streaming
-                        with open(output_file, 'r+', encoding='utf-8') as f:
+                        # Append batch to JSON file
+                        with open(output_json_file, 'r+', encoding='utf-8') as f:
                             existing_data = json.load(f)
                             existing_data.extend(valid_results)
                             f.seek(0)
@@ -271,40 +282,73 @@ class APIDataCollector:
         if total_records < self.max_records:
             logger.warning(f"Collected only {total_records} articles, less than requested MAX_RECORDS={self.max_records} due to date filter or API limits")
         
-        logger.info(f"Final data saved to {output_file}")
+        # Convert JSON to CSV with prioritized fields for PostgreSQL/Snowflake
+        with open(output_json_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # Flatten data for key dimensions
+        rows = []
+        for article in data:
+            row = {
+                'crawlTimestamp': article.get('crawlTimestamp', ''),  # First column
+                'id': article.get('id', ''),
+                'webPublicationDate': article.get('webPublicationDate', ''),
+                'webTitle': article.get('webTitle', ''),
+                'bodyText': article.get('fields', {}).get('bodyText', ''),
+                'tags': json.dumps([{
+                    'id': tag.get('id', ''),
+                    'type': tag.get('type', ''),
+                    'webTitle': tag.get('webTitle', '')
+                } for tag in article.get('tags', [])]),  # Store as JSON string
+                'webUrl': article.get('webUrl', ''),
+                'sectionName': article.get('sectionName', '')
+            }
+            rows.append(row)
+        
+        # Create DataFrame and save to CSV
+        df = pd.DataFrame(rows)
+        # Reorder columns to ensure crawlTimestamp is first
+        df = df[['crawlTimestamp', 'id', 'webPublicationDate', 'webTitle', 'bodyText', 'tags', 'webUrl', 'sectionName']]
+        df.to_csv(output_csv_file, index=False, encoding='utf-8')
+        logger.info(f"Converted JSON to CSV with prioritized fields: {output_csv_file}")
         
         # Clean up
         self._clean_checkpoint()
-        return output_file
+        return output_csv_file
 
     def analyze_data(self, file_path: Path) -> None:
-        """Analyze the collected data using prioritized strategies."""
+        """Analyze the collected data, focusing on prioritized fields for RAG."""
         logger.info(f"Starting analysis on {file_path}")
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            df = pd.read_csv(file_path, encoding='utf-8')
         except PermissionError:
             logger.error(f"Cannot read {file_path} due to file lock")
             return
         
         # Strategy 1: Basic Statistics
-        df = pd.DataFrame(data)
         df['webPublicationDate'] = pd.to_datetime(df['webPublicationDate'], errors='coerce')
+        df['crawlTimestamp'] = pd.to_datetime(df['crawlTimestamp'], errors='coerce')
         total_articles = len(df)
         date_range = f"{df['webPublicationDate'].min().date()} to {df['webPublicationDate'].max().date()}" if total_articles > 0 else "No articles"
-        avg_word_count = df['fields'].apply(lambda x: len(x.get('bodyText', '').split()) if isinstance(x, dict) else 0).mean() if total_articles > 0 else 0
-        unique_contributors = len(df['tags'].apply(lambda tags: [t['webTitle'] for t in tags if t['type'] == 'contributor']).explode().unique()) if total_articles > 0 else 0
-        print(f"Basic Statistics:\n- Total Articles: {total_articles}\n- Date Range: {date_range}\n- Average Word Count: {avg_word_count:.2f}\n- Unique Contributors: {unique_contributors}\n")
+        crawl_range = f"{df['crawlTimestamp'].min()} to {df['crawlTimestamp'].max()}" if total_articles > 0 else "No crawls"
+        avg_word_count = df['bodyText'].apply(lambda x: len(str(x).split())).mean() if total_articles > 0 else 0
+        unique_contributors = len(df['tags'].apply(lambda x: [t['webTitle'] for t in json.loads(x) if t['type'] == 'contributor']).explode().unique()) if total_articles > 0 else 0
+        print(f"Basic Statistics:\n- Total Articles: {total_articles}\n- Publication Date Range: {date_range}\n- Crawl Timestamp Range: {crawl_range}\n- Average Word Count: {avg_word_count:.2f}\n- Unique Contributors: {unique_contributors}\n")
         
         # Strategy 2: Tag and Contributor Analysis
-        all_tags = [tag['webTitle'] for article in data for tag in article.get('tags', []) if tag['type'] == 'keyword']
+        all_tags = []
+        all_contributors = []
+        for tags_json in df['tags']:
+            tags = json.loads(tags_json)
+            all_tags.extend([tag['webTitle'] for tag in tags if tag['type'] == 'keyword'])
+            all_contributors.extend([tag['webTitle'] for tag in tags if tag['type'] == 'contributor'])
+        
         tag_counts = Counter(all_tags)
         top_tags = tag_counts.most_common(10)
         print("Top 10 Tags:")
         for tag, count in top_tags:
             print(f"- {tag}: {count}")
         
-        all_contributors = [tag['webTitle'] for article in data for tag in article.get('tags', []) if tag['type'] == 'contributor']
         contributor_counts = Counter(all_contributors)
         top_contributors = contributor_counts.most_common(10)
         print("\nTop 10 Contributors:")
@@ -318,61 +362,75 @@ class APIDataCollector:
             print("\nPublication Trends by Year:")
             print(yearly_counts)
         
-        # Strategy 4: Text Content Analysis (Enhanced with Keyword Frequency and Sentiment)
-        word_counts = df['fields'].apply(lambda x: len(x.get('bodyText', '').split()) if isinstance(x, dict) else 0)
-        print(f"\nText Analysis:\n- Min Word Count: {word_counts.min() if total_articles > 0 else 0}\n- Max Word Count: {word_counts.max() if total_articles > 0 else 0}\n- Median Word Count: {word_counts.median() if total_articles > 0 else 0}\n")
-        
-        # Keyword frequency for key tech terms
-        tech_keywords = ['artificial intelligence', 'blockchain', 'cybersecurity', 'cloud computing', 'machine learning']
-        keyword_counts = Counter()
-        all_text = ' '.join(article.get('fields', {}).get('bodyText', '').lower() for article in data)
-        for keyword in tech_keywords:
-            keyword_counts[keyword] = all_text.count(keyword.lower())
-        print("Technology Keyword Frequency:")
-        for keyword, count in keyword_counts.items():
-            print(f"- {keyword}: {count}")
-        
-        # Sentiment Analysis
+        # Strategy 4: Text Content Analysis
         if total_articles > 0:
-            sentiments = df['fields'].apply(lambda x: TextBlob(x.get('bodyText', '')).sentiment.polarity if isinstance(x, dict) else 0)
+            word_counts = df['bodyText'].apply(lambda x: len(str(x).split()))
+            print(f"\nText Analysis:\n- Min Word Count: {word_counts.min()}\n- Max Word Count: {word_counts.max()}\n- Median Word Count: {word_counts.median()}\n")
+        
+            # Keyword frequency for key tech terms
+            tech_keywords = ['artificial intelligence', 'blockchain', 'cybersecurity', 'cloud computing', 'machine learning']
+            keyword_counts = Counter()
+            all_text = ' '.join(df['bodyText'].astype(str).str.lower())
+            for keyword in tech_keywords:
+                keyword_counts[keyword] = all_text.count(keyword.lower())
+            print("Technology Keyword Frequency:")
+            for keyword, count in keyword_counts.items():
+                print(f"- {keyword}: {count}")
+        
+            # Sentiment Analysis
+            sentiments = df['bodyText'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
             avg_sentiment = sentiments.mean()
             print(f"\nSentiment Analysis:\n- Average Sentiment Polarity: {avg_sentiment:.2f} (Positive > 0, Negative < 0)")
         
         # Strategy 5: Visualization
         if total_articles > 0:
             # Top Tags Bar Chart
+            base_filename = "top_tags"
+            plot_path = self.analysis_dir / f"{base_filename}.png"
+            counter = 1
+            while plot_path.exists():
+                plot_path = self.analysis_dir / f"{base_filename}_{counter}.png"
+                counter += 1
             tags_df = pd.DataFrame(top_tags, columns=['Tag', 'Count'])
             tags_df.plot(kind='bar', x='Tag', y='Count', figsize=(10, 6), color='#1f77b4')
             plt.title('Top 10 Tags in Technology Articles')
             plt.xlabel('Tag')
             plt.ylabel('Count')
             plt.tight_layout()
-            plot_path = self.analysis_dir / f"top_tags_{time.strftime('%Y%m%d_%H%M%S')}.png"
             plt.savefig(plot_path)
             plt.close()
             print(f"Saved top tags chart to {plot_path}")
             
             # Publication Trends Line Chart
+            base_filename = "publication_trends"
+            trend_path = self.analysis_dir / f"{base_filename}.png"
+            counter = 1
+            while trend_path.exists():
+                trend_path = self.analysis_dir / f"{base_filename}_{counter}.png"
+                counter += 1
             yearly_counts.plot(kind='line', marker='o', figsize=(10, 6), color='#ff7f0e')
             plt.title('Articles Published by Year')
             plt.xlabel('Year')
             plt.ylabel('Number of Articles')
             plt.tight_layout()
-            trend_path = self.analysis_dir / f"publication_trends_{time.strftime('%Y%m%d_%H%M%S')}.png"
             plt.savefig(trend_path)
             plt.close()
             print(f"Saved publication trends chart to {trend_path}")
             
             # Word Cloud for Top Words (Excluding Stopwords)
             if all_text:
-                # Remove stopwords
+                base_filename = "wordcloud"
+                wordcloud_path = self.analysis_dir / f"{base_filename}.png"
+                counter = 1
+                while wordcloud_path.exists():
+                    wordcloud_path = self.analysis_dir / f"{base_filename}_{counter}.png"
+                    counter += 1
                 words = ' '.join(word for word in all_text.split() if word.lower() not in STOPWORDS)
                 wordcloud = WordCloud(width=800, height=400, background_color='white').generate(words)
                 plt.figure(figsize=(10, 5))
                 plt.imshow(wordcloud, interpolation='bilinear')
                 plt.axis('off')
                 plt.title('Word Cloud of Technology Article Content (Stopwords Excluded)')
-                wordcloud_path = self.analysis_dir / f"wordcloud_{time.strftime('%Y%m%d_%H%M%S')}.png"
                 plt.savefig(wordcloud_path)
                 plt.close()
                 print(f"Saved word cloud to {wordcloud_path}")
@@ -380,7 +438,7 @@ class APIDataCollector:
 def main():
     """Main function to demonstrate API data collection and analysis."""
     # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Collect and analyze Guardian API data")
+    parser = argparse.ArgumentParser(description="Collect and analyze Guardian API data for RAG")
     parser.add_argument('--from-date', type=str, help="Start date for articles (YYYY-MM-DD)")
     parser.add_argument('--test', action='store_true', help="Test API connectivity")
     args = parser.parse_args()
@@ -421,7 +479,7 @@ def test_api():
             'api-key': api_key,
             'page': 1,
             'page-size': 10,
-            'show-fields': 'all',
+            'show-fields': 'bodyText',
             'show-tags': 'all',
             'section': 'technology',
             'from-date': from_date
