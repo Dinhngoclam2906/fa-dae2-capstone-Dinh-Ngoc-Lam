@@ -27,3 +27,15 @@ venv/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Ignore large data files
+data/external/*.csv
+data/external/*.json
+data/batch/*.csv
+data/batch/*.zip
+data/analysis/*.png
+# Ignore Python virtual environment
+.venv/
+# Ignore other temporary files
+*.pyc
+__pycache__/
