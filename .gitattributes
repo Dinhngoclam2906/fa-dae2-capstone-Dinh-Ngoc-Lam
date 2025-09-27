@@ -1,0 +1,8 @@
+# Ensure Python-related config files use LF to match cross-platform standards
+*.toml text eol=lf
+*.lock text eol=lf
+*.py text eol=lf
+*.csv text eol=lf
+# Binary files (e.g., images) should not have line ending conversion
+*.png binary
+*.jpg binary
