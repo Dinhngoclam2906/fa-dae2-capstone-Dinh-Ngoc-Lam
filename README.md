@@ -1,7 +1,8 @@
 # News Analytics System Project 
 
 ## Overview
-An end-to-end AI-powered data analytics system that processes real-time and historical news data from The Guardian to provide insights into news trends and sentiment. This enables users to analyze current and historical news trends, identify sentiment patterns, and query insights using a natural language AI interface
+An end-to-end AI-powered data analytics system that processes real-time and historical news data from The Guardian to provide insights into news trends and sentiment. This enables users to analyze current and historical news trends, identify sentiment patterns, and query insights using a natural language AI interface.
+
 **Success Metrics (Quantitative):**  
 * Real-time pipeline processes 500+ articles daily with <5% error rate.  
 * Batch pipeline processes 10,000+ historical articles with >95% data completeness.  
@@ -61,11 +62,12 @@ The rapid pace of news publication requires real-time ingestion and analysis to 
 capstone/
 ├── .env                          # Environment variables
 ├── docker/                       # Docker configs (PostgreSQL, Kafka, Airflow)
-├── ingestion/                    # Data collection scripts
-│   ├── collect_realtime.py       # Guardian API ingestion
-│   ├── collect_batch.py          # Kaggle CSV ingestion
-│   ├── load_to_postgres.py       # Load to PostgreSQL
-│   ├── load_to_snowflake.py      # Load to Snowflake
+├── scripts/  
+|   ├──data_collection            # Data collection scripts
+|      ├── real_time_data_collector.py    # Guardian API ingestion
+|      ├── batch_data_collector.py        # Kaggle CSV ingestion
+|   ├── load_to_postgres.py       # Load to PostgreSQL
+|   ├── load_to_snowflake.py      # Load to Snowflake
 ├── postgres/                     # PostgreSQL schema definitions
 ├── snowflake/                    # Snowflake utilities and scripts
 ├── dbt/                          # dbt project for transformations
@@ -101,9 +103,10 @@ docker-compose -f docker/compose.yml up -d
 **5. Run Pipelines:**
 
 Real-time: 
-```python ingestion/collect_realtime.py && python ingestion/load_to_postgres.py```
+```python scripts/data_collection/real_time_data_collector.py && python scripts/load_to_postgres.py```
+
 Batch: 
-```python ingestion/collect_batch.py && python ingestion/load_to_snowflake.py```
+```python scripts/data_collection/batch_data_collector && python scripts/load_to_snowflake.py```
 
 
 **6. Verify Data:** 
