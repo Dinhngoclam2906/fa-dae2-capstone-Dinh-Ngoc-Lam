@@ -1,7 +1,7 @@
-# News Analytics System Project 
+# Daily News Summarization Project 
 
 ## Overview
-An end-to-end AI-powered data analytics system that processes real-time and historical news data from The Guardian to provide insights into news trends and sentiment. This enables users to analyze current and historical news trends, identify sentiment patterns, and query insights using a natural language AI interface.
+An end-to-end AI-powered data analytics system that processes real-time and historical news data from The Guardian to summarize and provide insights into news trends and sentiment. This enables users to receive updates from current and historical news trends and query insights using a natural language AI interface.
 
 **Success Metrics (Quantitative):**  
 * Real-time pipeline processes 500+ articles daily with <5% error rate.  
@@ -60,23 +60,20 @@ The rapid pace of news publication requires real-time ingestion and analysis to 
 **Project Structure:**
 ```
 capstone/
-├── .env                          # Environment variables
-├── docker/                       # Docker configs (PostgreSQL, Kafka, Airflow)
 ├── scripts/  
 |   ├──data_collection            # Data collection scripts
 |      ├── real_time_data_collector.py    # Guardian API ingestion
 |      ├── batch_data_collector.py        # Kaggle CSV ingestion
 |   ├── load_to_postgres.py       # Load to PostgreSQL
 |   ├── load_to_snowflake.py      # Load to Snowflake
-├── postgres/                     # PostgreSQL schema definitions
-├── snowflake/                    # Snowflake utilities and scripts
-├── dbt/                          # dbt project for transformations
-├── airflow/                      # Airflow DAGs and configs
-├── kafka/                        # Kafka producer/consumer scripts
-├── agent/                        # LangGraph AI chatbot with RAG
-└── docs/                         # Documentation
-    ├── DATASOURCE.md             # Data source details
-    ├── execution_plan.md         # Implementation plan
+├── .gitattributes/                    
+├── .gitignore/                    
+├── .python-version/                          
+├── docker-compose.yml/                      
+├── main.py/                        
+├── pyproject.toml/ 
+├── uv.lock/                       
+└── README.md                     # Documentation
 ```
 
 **Setup Instructions:**
@@ -91,16 +88,12 @@ git clone https://github.com/Dinhngoclam2906/fa-dae2-capstone-Dinh-Ngoc-Lam/
 uv sync
 ```
 
-
-**3. Set Up Environment:** Copy .env.example to .env and fill in credentials (Guardian API key, Snowflake credentials, etc.).
-
-**4. Start Docker Services:**
+**3. Start Docker Services:**
 ```  
 docker-compose -f docker/compose.yml up -d
 ```
 
-
-**5. Run Pipelines:**
+**4. Run Pipelines:**
 
 Real-time: 
 ```python scripts/data_collection/real_time_data_collector.py && python scripts/load_to_postgres.py```
@@ -108,6 +101,5 @@ Real-time:
 Batch: 
 ```python scripts/data_collection/batch_data_collector && python scripts/load_to_snowflake.py```
 
-
-**6. Verify Data:** 
+**5. Verify Data:** 
 Check PostgreSQL and Snowflake for loaded data (500+ rows for batch, continuous updates for real-time).
