@@ -381,59 +381,6 @@ class APIDataCollector:
             sentiments = df['bodyText'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
             avg_sentiment = sentiments.mean()
             print(f"\nSentiment Analysis:\n- Average Sentiment Polarity: {avg_sentiment:.2f} (Positive > 0, Negative < 0)")
-        
-        # Strategy 5: Visualization
-        if total_articles > 0:
-            # Top Tags Bar Chart
-            base_filename = "top_tags"
-            plot_path = self.analysis_dir / f"{base_filename}.png"
-            counter = 1
-            while plot_path.exists():
-                plot_path = self.analysis_dir / f"{base_filename}_{counter}.png"
-                counter += 1
-            tags_df = pd.DataFrame(top_tags, columns=['Tag', 'Count'])
-            tags_df.plot(kind='bar', x='Tag', y='Count', figsize=(10, 6), color='#1f77b4')
-            plt.title('Top 10 Tags in Technology Articles')
-            plt.xlabel('Tag')
-            plt.ylabel('Count')
-            plt.tight_layout()
-            plt.savefig(plot_path)
-            plt.close()
-            print(f"Saved top tags chart to {plot_path}")
-            
-            # Publication Trends Line Chart
-            base_filename = "publication_trends"
-            trend_path = self.analysis_dir / f"{base_filename}.png"
-            counter = 1
-            while trend_path.exists():
-                trend_path = self.analysis_dir / f"{base_filename}_{counter}.png"
-                counter += 1
-            yearly_counts.plot(kind='line', marker='o', figsize=(10, 6), color='#ff7f0e')
-            plt.title('Articles Published by Year')
-            plt.xlabel('Year')
-            plt.ylabel('Number of Articles')
-            plt.tight_layout()
-            plt.savefig(trend_path)
-            plt.close()
-            print(f"Saved publication trends chart to {trend_path}")
-            
-            # Word Cloud for Top Words (Excluding Stopwords)
-            if all_text:
-                base_filename = "wordcloud"
-                wordcloud_path = self.analysis_dir / f"{base_filename}.png"
-                counter = 1
-                while wordcloud_path.exists():
-                    wordcloud_path = self.analysis_dir / f"{base_filename}_{counter}.png"
-                    counter += 1
-                words = ' '.join(word for word in all_text.split() if word.lower() not in STOPWORDS)
-                wordcloud = WordCloud(width=800, height=400, background_color='white').generate(words)
-                plt.figure(figsize=(10, 5))
-                plt.imshow(wordcloud, interpolation='bilinear')
-                plt.axis('off')
-                plt.title('Word Cloud of Technology Article Content (Stopwords Excluded)')
-                plt.savefig(wordcloud_path)
-                plt.close()
-                print(f"Saved word cloud to {wordcloud_path}")
 
 def main():
     """Main function to demonstrate API data collection and analysis."""
