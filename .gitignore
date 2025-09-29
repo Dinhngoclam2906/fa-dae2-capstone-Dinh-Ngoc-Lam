@@ -34,6 +34,7 @@ data/external/*.json
 data/batch/*.csv
 data/batch/*.zip
 data/analysis/*.png
+
 # Ignore Python virtual environment
 .venv/
 # Ignore other temporary files
