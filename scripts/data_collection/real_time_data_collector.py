@@ -1,20 +1,23 @@
-import json
 import logging
 import os
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
+import aiohttp
+import asyncio
 import requests
 from dotenv import load_dotenv
 from tqdm import tqdm
 import pandas as pd
 from collections import Counter
-import matplotlib.pyplot as plt
-import ijson
 import argparse
 from datetime import datetime, timedelta
 from wordcloud import WordCloud
 from textblob import TextBlob
+import orjson
+import random
+import glob
+import ijson
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -23,16 +26,7 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# Try to import nltk for stopwords, with fallback to custom list
-try:
-    from nltk.corpus import stopwords
-    NLTK_STOPWORDS = set(stopwords.words('english'))
-    logger.info("Using NLTK stopwords as base for word cloud")
-except (ImportError, LookupError) as e:
-    logger.warning(f"NLTK stopwords not available ({e}), using custom stopwords list")
-    NLTK_STOPWORDS = set()
-
-# Extended custom stopwords list including "said" and other non-meaningful terms
+# Custom stopwords list
 CUSTOM_STOPWORDS = {
     'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he',
     'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were', 'will',
@@ -44,18 +38,14 @@ CUSTOM_STOPWORDS = {
     'does', 'did', 'doing'
 }
 
-# Combine stopwords
-STOPWORDS = NLTK_STOPWORDS | CUSTOM_STOPWORDS
-
 class APIDataCollector:
     def __init__(self, api_name: str, from_date: Optional[str] = None):
         self.api_name = api_name
         self.api_url = os.getenv("API_URL", "https://content.guardianapis.com")
         self.api_key = os.getenv("API_KEY")
         self.max_records = int(os.getenv("MAX_RECORDS", 1000))
-        self.batch_size = int(os.getenv("BATCH_SIZE", 100))
+        self.batch_size = int(os.getenv("BATCH_SIZE", 200))
         self.max_retries = int(os.getenv("MAX_RETRIES", 3))
-        # Set default from_date to one year ago if not provided
         default_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
         self.from_date = os.getenv("FROM_DATE", default_date) if from_date is None else from_date
         try:
@@ -73,12 +63,20 @@ class APIDataCollector:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.request_times = []
         
-        # Reset checkpoint if from_date doesn't match
+        try:
+            from nltk.corpus import stopwords
+            self.stopwords = set(stopwords.words('english'))
+            logger.info("Using NLTK stopwords as base for word cloud")
+        except (ImportError, LookupError) as e:
+            logger.warning(f"NLTK stopwords not available ({e}), using custom stopwords list")
+            self.stopwords = set()
+        self.stopwords |= CUSTOM_STOPWORDS
+        
         if self.checkpoint_file.exists():
-            for _ in range(3):  # Retry up to 3 times
+            for _ in range(3):
                 try:
                     with open(self.checkpoint_file, 'r', encoding='utf-8') as f:
-                        checkpoint = json.load(f)
+                        checkpoint = orjson.loads(f.read())
                     if checkpoint.get('from_date') != self.from_date:
                         logger.info("from_date changed, resetting checkpoint")
                         self.checkpoint_file.unlink()
@@ -93,7 +91,6 @@ class APIDataCollector:
                 logger.warning("Unable to reset checkpoint file due to persistent lock, using temp checkpoint")
                 self.checkpoint_file = self.temp_checkpoint
         
-        # Log environment variables for debugging
         logger.info(f"API_URL: {self.api_url}")
         logger.info(f"API_KEY: {'Set' if self.api_key else 'Not set'}")
         logger.info(f"FROM_DATE: {self.from_date}")
@@ -105,11 +102,10 @@ class APIDataCollector:
             raise ValueError(f"Invalid API_URL: {self.api_url}. Must be https://content.guardianapis.com")
 
     def _load_checkpoint(self) -> int:
-        """Load the last page from checkpoint file, if it exists."""
         if self.checkpoint_file.exists():
             try:
-                with open(self.checkpoint_file, 'r', encoding='utf-8') as f:
-                    checkpoint = json.load(f)
+                with open(self.checkpoint_file, 'rb') as f:
+                    checkpoint = orjson.loads(f.read())
                 return checkpoint.get('last_page', 1)
             except PermissionError:
                 logger.warning("Checkpoint file is locked, starting from page 1")
@@ -117,207 +113,267 @@ class APIDataCollector:
         return 1
 
     def _save_checkpoint(self, page: int) -> None:
-        """Save the current page and from_date to checkpoint file."""
         try:
-            with open(self.checkpoint_file, 'w', encoding='utf-8') as f:
-                json.dump({'last_page': page, 'from_date': self.from_date}, f)
+            with open(self.checkpoint_file, 'wb') as f:
+                f.write(orjson.dumps({'last_page': page, 'from_date': self.from_date}))
         except PermissionError:
             logger.warning("Unable to write checkpoint file due to lock, continuing without saving checkpoint")
 
-    def _clean_checkpoint(self) -> None:
-        """Remove checkpoint file and temp directory after completion or error."""
-        for checkpoint in [self.checkpoint_file, self.temp_checkpoint]:
-            for _ in range(3):  # Retry up to 3 times
+    def _clean_checkpoint(self) -> bool:
+        """
+        Clean up checkpoint files and cached JSON files in temp_dir, with retries for file locks.
+
+        Returns:
+            bool: True if all files and directory were successfully removed or didn't exist, False otherwise.
+        """
+        success = True
+        initial_delay = 0.5  # Initial retry delay in seconds
+        files_to_delete = [self.checkpoint_file, self.temp_checkpoint] + list(self.temp_dir.glob("*.*"))
+
+        for file_path in files_to_delete:
+            if not file_path.exists():
+                logger.debug(f"File {file_path} does not exist, skipping")
+                continue
+            for attempt in range(self.max_retries):
                 try:
-                    if checkpoint.exists():
-                        checkpoint.unlink()
-                        logger.info(f"Checkpoint file {checkpoint} removed")
+                    file_path.unlink()
+                    logger.info(f"File {file_path} successfully removed")
                     break
-                except PermissionError:
-                    logger.warning(f"Checkpoint file {checkpoint} is locked, retrying...")
-                    time.sleep(1)
-            else:
-                logger.warning(f"Unable to remove checkpoint file {checkpoint} due to persistent lock")
-        
-        for temp_file in self.temp_dir.glob("*.json"):
-            try:
-                temp_file.unlink()
-            except PermissionError:
-                logger.warning(f"Unable to remove temp file {temp_file} due to lock")
+                except PermissionError as e:
+                    if attempt < self.max_retries - 1:
+                        delay = initial_delay * (2 ** attempt)  # Exponential backoff
+                        logger.warning(f"Permission denied for {file_path} (attempt {attempt + 1}/{self.max_retries}): {e}, retrying after {delay:.2f}s")
+                        time.sleep(delay)
+                    else:
+                        logger.error(f"Failed to remove {file_path} after {self.max_retries} attempts: {e}")
+                        success = False
+                except OSError as e:
+                    logger.error(f"Failed to remove {file_path}: {e}")
+                    success = False
+                    break
+                except Exception as e:
+                    logger.error(f"Unexpected error while removing {file_path}: {e}")
+                    success = False
+                    break
+
+        # Attempt to remove temp_dir if empty
         if self.temp_dir.exists():
             try:
                 self.temp_dir.rmdir()
-                logger.info("Temporary directory removed")
-            except OSError:
-                logger.warning("Unable to remove temp directory due to remaining files or lock")
+                logger.info(f"Temporary directory {self.temp_dir} removed")
+            except OSError as e:
+                logger.warning(f"Failed to remove temporary directory {self.temp_dir}: {e}")
+                success = False
 
-    def collect_data(self, endpoint: str, query_params: Optional[Dict] = None) -> Path:
-        """Collect data from The Guardian API endpoint, filtering for Technology section."""
+        return success
+
+    def _load_cached_page(self, page: int) -> Optional[List[Dict]]:
+        cache_file = self.temp_dir / f"page_{page}.jsonl"
+        if cache_file.exists():
+            try:
+                with open(cache_file, 'rb') as f:
+                    data = [orjson.loads(line) for line in f]
+                logger.info(f"Loaded cached data for page {page} from {cache_file}")
+                return data
+            except (PermissionError, orjson.JSONDecodeError) as e:
+                logger.warning(f"Failed to load cached page {page}: {e}")
+        return None
+
+    async def _fetch_page(self, session: aiohttp.ClientSession, url: str, params: Dict, page: int, retry: int = 0) -> List[Dict]:
+        cache_file = self.temp_dir / f"page_{page}.jsonl"
+        cached_data = self._load_cached_page(page)
+        if cached_data:
+            return cached_data
+
+        params['page'] = page
+        try:
+            start_time = time.time()
+            async with session.get(url, params=params, timeout=30) as response:
+                remaining = response.headers.get('X-RateLimit-Remaining', 'Unknown')
+                reset_time = response.headers.get('X-RateLimit-Reset', 'Unknown')
+                logger.info(f"Rate limit status for page {page}: Remaining={remaining}, Reset={reset_time}")
+                if response.status == 429:
+                    delay = int(reset_time) - time.time() if reset_time != 'Unknown' and reset_time.isdigit() else min(5 * (2 ** retry), 60)
+                    logger.warning(f"Rate limit exceeded, waiting {delay:.2f} seconds")
+                    await asyncio.sleep(max(delay, 1))
+                    if retry < self.max_retries:
+                        return await self._fetch_page(session, url, params, page, retry + 1)
+                    raise ValueError(f"Max retries ({self.max_retries}) reached after 429 error")
+                if response.status == 400:
+                    logger.warning(f"400 Bad Request on page {page}: {await response.text()}")
+                    return []
+                response.raise_for_status()
+
+                network_time = time.time() - start_time
+                logger.info(f"Page {page} network time: {network_time:.2f}s")
+                start_process = time.time()
+                text = await response.text()
+                data = orjson.loads(text)
+                process_time = time.time() - start_process
+                logger.info(f"Page {page} JSON processing time: {process_time:.2f}s")
+
+                if not isinstance(data, dict) or 'response' not in data or 'results' not in data['response']:
+                    logger.error(f"Invalid response structure for page {page}")
+                    raise ValueError(f"Unexpected API response format for page {page}")
+                request_time = time.time() - start_time
+                self.request_times.append(request_time)
+                results = data['response']['results']
+                if not isinstance(results, list):
+                    logger.warning(f"Results for page {page} is not a list: {type(results)}")
+                    return []
+                try:
+                    with open(cache_file, 'wb') as f:
+                        for result in results:
+                            f.write(orjson.dumps(result) + b'\n')
+                except PermissionError:
+                    logger.warning(f"Unable to cache page {page} due to file lock")
+                return results
+        except aiohttp.ClientError as e:
+            if retry < self.max_retries:
+                logger.warning(f"Retry {retry + 1}/{self.max_retries} for page {page} after error: {e}")
+                await asyncio.sleep(min(2 ** retry, 10))
+                return await self._fetch_page(session, url, params, page, retry + 1)
+            logger.error(f"Failed to fetch page {page} after {self.max_retries} retries: {e}")
+            raise
+
+    async def collect_data(self, endpoint: str, query_params: Optional[Dict] = None) -> Path:
         collected_ids = set()
         page = self._load_checkpoint()
         total_records = 0
         total_available = float('inf')
-        base_filename = "guardian_technology_articles"
-        output_json_file = self.data_dir / f"{base_filename}.json"
+        base_filename = "guardian_all_articles"
         output_csv_file = self.data_dir / f"{base_filename}.csv"
-        # counter = 1
-        # while output_json_file.exists():  # Prevent overwriting
-        #     output_json_file = self.data_dir / f"{base_filename}_{counter}.json"
-        #     output_csv_file = self.data_dir / f"{base_filename}_{counter}.csv"
-        #     counter += 1
         
-        # Initialize output JSON file
-        with open(output_json_file, 'w', encoding='utf-8') as f:
-            json.dump([], f)
-        
-        # Calculate total pages needed
         max_pages = (self.max_records + self.batch_size - 1) // self.batch_size
-        
-        # Ensure query_params includes from_date
         query_params = query_params or {}
         query_params['from-date'] = self.from_date
         
-        for page in tqdm(range(page, max_pages + 1), initial=page-1, total=max_pages, desc="Fetching pages"):
-            if total_records >= self.max_records or page > (total_available + self.batch_size - 1) // self.batch_size:
-                break
-            retries = 0
-            results = []  # Initialize results to avoid UnboundLocalError
-            while retries < self.max_retries:
-                try:
-                    # Construct URL with required and custom parameters
-                    params = {
-                        'api-key': self.api_key,
-                        'page': page,
-                        'page-size': self.batch_size,
-                        'show-fields': 'bodyText',  # Prioritize bodyText for RAG
-                        'show-tags': 'all',
-                        'section': 'technology'
-                    }
-                    params.update(query_params)
-                    
-                    url = f"{self.api_url}{endpoint}"
-                    logger.info(f"Fetching data from {url}, page {page}")
-                    
-                    start_time = time.time()
-                    timeout = max(30, sum(self.request_times) / max(1, len(self.request_times)) * 2) if self.request_times else 60
-                    response = requests.get(url, params=params, timeout=timeout)
-                    request_time = time.time() - start_time
-                    self.request_times.append(request_time)
-                    
-                    if response.status_code == 429:  # Rate limit exceeded
-                        logger.warning("Rate limit exceeded, waiting 60 seconds")
-                        time.sleep(60)
-                        continue
-                        
-                    if response.status_code == 400:  # Bad Request, possibly no more results
-                        logger.warning(f"400 Bad Request on page {page}: {response.text}")
-                        results = []
-                        break
-                        
-                    response.raise_for_status()
-                    
-                    data = response.json()
-                    if 'response' not in data or 'results' not in data['response']:
-                        logger.error(f"Invalid API response: {data}")
-                        raise ValueError("Unexpected API response format")
-                    
-                    # Update total available results and max_records
-                    total_available = min(total_available, data['response'].get('total', float('inf')))
-                    self.max_records = min(self.max_records, total_available)
-                    max_pages = (self.max_records + self.batch_size - 1) // self.batch_size
-                    
-                    results = data['response']['results']
-                    
-                    if not results:
-                        logger.info("No more results to fetch")
-                        break
-                        
-                    # Add crawlTimestamp to each result
-                    crawl_timestamp = datetime.now().isoformat()
+        semaphore = asyncio.Semaphore(14)
+        connector = aiohttp.TCPConnector(limit=50)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            async def fetch_with_semaphore(p):
+                async with semaphore:
+                    return p, await self._fetch_page(session, f"{self.api_url}{endpoint}", params, p)
+            
+            tasks = []
+            page_results = {}  # To store results by page for ordered processing
+            for p in tqdm(range(page, max_pages + 1), initial=page-1, total=max_pages, desc="Fetching pages"):
+                if total_records >= self.max_records or p > (total_available + self.batch_size - 1) // self.batch_size:
+                    break
+                params = {
+                    'api-key': self.api_key,
+                    'page-size': self.batch_size,
+                    'show-fields': 'bodyText',
+                    'show-tags': 'all',
+                    **query_params
+                }
+                tasks.append(fetch_with_semaphore(p))
+                if len(tasks) >= 14:  # Align with semaphore
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    tasks = []
                     for result in results:
-                        result['crawlTimestamp'] = crawl_timestamp
-                    
-                    # Validate and filter results
+                        if isinstance(result, Exception):
+                            logger.error(f"Error fetching page: {result}")
+                            continue
+                        current_page, page_data = result
+                        page_results[current_page] = page_data
+                    # Process in order
+                    for sorted_page in sorted(page_results.keys()):
+                        result = page_results.pop(sorted_page)
+                        if not result:
+                            logger.info("No more results to fetch")
+                            break
+                        if sorted_page == page and isinstance(result, list) and result and 'response' in result[0] and 'total' in result[0]['response']:
+                            total_available = min(total_available, result[0]['response']['total'])
+                            self.max_records = min(self.max_records, total_available)
+                            max_pages = (self.max_records + self.batch_size - 1) // self.batch_size
+                        crawl_timestamp = datetime.now().isoformat()
+                        for r in result:
+                            r['crawlTimestamp'] = crawl_timestamp
+                        valid_results = [
+                            r for r in result
+                            if r.get('id') not in collected_ids
+                        ]
+                        for r in valid_results:
+                            collected_ids.add(r['id'])
+                        jsonl_file = self.temp_dir / f"collected_{sorted_page}.jsonl"
+                        with open(jsonl_file, 'wb') as f:
+                            for vr in valid_results:
+                                f.write(orjson.dumps(vr) + b'\n')
+                        total_records += len(valid_results)
+                        logger.info(f"Collected {total_records} records (page {sorted_page})")
+                        if total_records >= self.max_records:
+                            break
+                        logger.info(f"Request times: Avg={sum(self.request_times)/len(self.request_times):.2f}s, Min={min(self.request_times):.2f}s, Max={max(self.request_times):.2f}s")
+                        await asyncio.sleep(random.uniform(0.1, 0.5))
+                        self._save_checkpoint(sorted_page + 1)
+            if tasks:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for result in results:
+                    if isinstance(result, Exception):
+                        logger.error(f"Error fetching page: {result}")
+                        continue
+                    current_page, page_data = result
+                    page_results[current_page] = page_data
+                for sorted_page in sorted(page_results.keys()):
+                    result = page_results.pop(sorted_page)
+                    if not result:
+                        break
+                    if sorted_page == page and isinstance(result, list) and result and 'response' in result[0] and 'total' in result[0]['response']:
+                        total_available = min(total_available, result[0]['response']['total'])
+                        self.max_records = min(self.max_records, total_available)
+                        max_pages = (self.max_records + self.batch_size - 1) // self.batch_size
+                    crawl_timestamp = datetime.now().isoformat()
+                    for r in result:
+                        r['crawlTimestamp'] = crawl_timestamp
                     valid_results = [
-                        r for r in results
-                        if r.get('sectionId') == 'technology' and r.get('id') not in collected_ids
+                        r for r in result
+                        if r.get('id') not in collected_ids
                     ]
                     for r in valid_results:
                         collected_ids.add(r['id'])
-                    
-                    if valid_results:
-                        # Append batch to JSON file
-                        with open(output_json_file, 'r+', encoding='utf-8') as f:
-                            existing_data = json.load(f)
-                            existing_data.extend(valid_results)
-                            f.seek(0)
-                            f.truncate()
-                            json.dump(existing_data[:self.max_records], f, indent=2)
-                    
+                    jsonl_file = self.temp_dir / f"collected_{sorted_page}.jsonl"
+                    with open(jsonl_file, 'wb') as f:
+                        for vr in valid_results:
+                            f.write(orjson.dumps(vr) + b'\n')
                     total_records += len(valid_results)
-                    logger.info(f"Collected {total_records} records (page {page})")
-                    
-                    if total_records >= self.max_records:
-                        break
-                        
-                    # Dynamic delay to stay under 12 requests/second
-                    min_delay = max(0, 0.083 - request_time)  # 12 req/s = 0.083s/req
-                    time.sleep(min_delay)
-                    break
-                    
-                except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError) as e:
-                    retries += 1
-                    if retries == self.max_retries:
-                        logger.error(f"Failed to fetch data after {self.max_retries} retries: {e}")
-                        raise
-                    logger.warning(f"Retry {retries}/{self.max_retries} after error: {e}")
-                    time.sleep(2 ** retries)  # Exponential backoff
-                
-            if not results or total_records >= self.max_records:
-                break
-        
-            # Save checkpoint
-            self._save_checkpoint(page + 1)
+                    logger.info(f"Collected {total_records} records (page {sorted_page})")
+                    self._save_checkpoint(sorted_page + 1)
         
         if total_records < self.max_records:
-            logger.warning(f"Collected only {total_records} articles, less than requested MAX_RECORDS={self.max_records} due to date filter or API limits")
+            logger.warning(f"Collected only {total_records} articles, less than requested MAX_RECORDS={self.max_records}")
         
-        # Convert JSON to CSV with prioritized fields for PostgreSQL/Snowflake
-        with open(output_json_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        # Flatten data for key dimensions
+        # Merge JSONL files using ijson for streaming
         rows = []
-        for article in data:
-            row = {
-                'crawlTimestamp': article.get('crawlTimestamp', ''),  # First column
-                'id': article.get('id', ''),
-                'webPublicationDate': article.get('webPublicationDate', ''),
-                'webTitle': article.get('webTitle', ''),
-                'bodyText': article.get('fields', {}).get('bodyText', ''),
-                'tags': json.dumps([{
-                    'id': tag.get('id', ''),
-                    'type': tag.get('type', ''),
-                    'webTitle': tag.get('webTitle', '')
-                } for tag in article.get('tags', [])]),  # Store as JSON string
-                'webUrl': article.get('webUrl', ''),
-                'sectionName': article.get('sectionName', '')
-            }
-            rows.append(row)
+        jsonl_files = sorted(glob.glob(str(self.temp_dir / "collected_*.jsonl")))
+        for jsonl_file in jsonl_files:
+            with open(jsonl_file, 'rb') as f:
+                for article in ijson.items(f, '', multiple_values=True):
+                    row = {
+                        'crawlTimestamp': article.get('crawlTimestamp', ''),
+                        'id': article.get('id', ''),
+                        'webPublicationDate': article.get('webPublicationDate', ''),
+                        'webTitle': article.get('webTitle', ''),
+                        'bodyText': article.get('fields', {}).get('bodyText', ''),
+                        'tags': orjson.dumps([{
+                            'id': tag.get('id', ''),
+                            'type': tag.get('type', ''),
+                            'webTitle': tag.get('webTitle', '')
+                        } for tag in article.get('tags', [])]).decode('utf-8'),
+                        'webUrl': article.get('webUrl', ''),
+                        'sectionName': article.get('sectionName', '')
+                    }
+                    rows.append(row)
         
-        # Create DataFrame and save to CSV
         df = pd.DataFrame(rows)
-        # Reorder columns to ensure crawlTimestamp is first
         df = df[['crawlTimestamp', 'id', 'webPublicationDate', 'webTitle', 'bodyText', 'tags', 'webUrl', 'sectionName']]
         df.to_csv(output_csv_file, index=False, encoding='utf-8')
         logger.info(f"Converted JSON to CSV with prioritized fields: {output_csv_file}")
         
-        # Clean up
         self._clean_checkpoint()
         return output_csv_file
 
     def analyze_data(self, file_path: Path) -> None:
-        """Analyze the collected data, focusing on prioritized fields for RAG."""
         logger.info(f"Starting analysis on {file_path}")
         try:
             df = pd.read_csv(file_path, encoding='utf-8')
@@ -325,23 +381,42 @@ class APIDataCollector:
             logger.error(f"Cannot read {file_path} due to file lock")
             return
         
-        # Strategy 1: Basic Statistics
         df['webPublicationDate'] = pd.to_datetime(df['webPublicationDate'], errors='coerce')
         df['crawlTimestamp'] = pd.to_datetime(df['crawlTimestamp'], errors='coerce')
         total_articles = len(df)
         date_range = f"{df['webPublicationDate'].min().date()} to {df['webPublicationDate'].max().date()}" if total_articles > 0 else "No articles"
         crawl_range = f"{df['crawlTimestamp'].min()} to {df['crawlTimestamp'].max()}" if total_articles > 0 else "No crawls"
-        avg_word_count = df['bodyText'].apply(lambda x: len(str(x).split())).mean() if total_articles > 0 else 0
-        unique_contributors = len(df['tags'].apply(lambda x: [t['webTitle'] for t in json.loads(x) if t['type'] == 'contributor']).explode().unique()) if total_articles > 0 else 0
-        print(f"Basic Statistics:\n- Total Articles: {total_articles}\n- Publication Date Range: {date_range}\n- Crawl Timestamp Range: {crawl_range}\n- Average Word Count: {avg_word_count:.2f}\n- Unique Contributors: {unique_contributors}\n")
         
-        # Strategy 2: Tag and Contributor Analysis
-        all_tags = []
-        all_contributors = []
-        for tags_json in df['tags']:
-            tags = json.loads(tags_json)
-            all_tags.extend([tag['webTitle'] for tag in tags if tag['type'] == 'keyword'])
-            all_contributors.extend([tag['webTitle'] for tag in tags if tag['type'] == 'contributor'])
+        # Vectorized computations
+        df['word_count'] = df['bodyText'].astype(str).str.split().str.len()
+        df['sentiment'] = df['bodyText'].astype(str).apply(lambda x: TextBlob(x).sentiment.polarity)
+        
+        # Tags and contributors extraction
+        def extract_tags(tags_str):
+            try:
+                tags = orjson.loads(tags_str.encode('utf-8'))
+                return [tag['webTitle'] for tag in tags if tag['type'] == 'keyword']
+            except:
+                return []
+        
+        def extract_contributors(tags_str):
+            try:
+                tags = orjson.loads(tags_str.encode('utf-8'))
+                return [tag['webTitle'] for tag in tags if tag['type'] == 'contributor']
+            except:
+                return []
+        
+        df['keywords'] = df['tags'].apply(extract_tags)
+        df['contributors'] = df['tags'].apply(extract_contributors)
+        
+        word_counts = df['word_count'].tolist()
+        sentiments = df['sentiment'].tolist()
+        all_tags = df['keywords'].explode().tolist()
+        all_contributors = df['contributors'].explode().tolist()
+        
+        avg_word_count = df['word_count'].mean() if total_articles > 0 else 0
+        unique_contributors = len(set(all_contributors))
+        print(f"Basic Statistics:\n- Total Articles: {total_articles}\n- Publication Date Range: {date_range}\n- Crawl Timestamp Range: {crawl_range}\n- Average Word Count: {avg_word_count:.2f}\n- Unique Contributors: {unique_contributors}\n")
         
         tag_counts = Counter(all_tags)
         top_tags = tag_counts.most_common(10)
@@ -355,39 +430,11 @@ class APIDataCollector:
         for contrib, count in top_contributors:
             print(f"- {contrib}: {count}")
         
-        # Strategy 3: Publication Trends Over Time
-        if total_articles > 0:
-            df['year'] = df['webPublicationDate'].dt.year
-            yearly_counts = df.groupby('year').size()
-            print("\nPublication Trends by Year:")
-            print(yearly_counts)
-        
-        # Strategy 4: Text Content Analysis
-        if total_articles > 0:
-            word_counts = df['bodyText'].apply(lambda x: len(str(x).split()))
-            print(f"\nText Analysis:\n- Min Word Count: {word_counts.min()}\n- Max Word Count: {word_counts.max()}\n- Median Word Count: {word_counts.median()}\n")
-        
-            # Keyword frequency for key tech terms
-            tech_keywords = ['artificial intelligence', 'blockchain', 'cybersecurity', 'cloud computing', 'machine learning']
-            keyword_counts = Counter()
-            all_text = ' '.join(df['bodyText'].astype(str).str.lower())
-            for keyword in tech_keywords:
-                keyword_counts[keyword] = all_text.count(keyword.lower())
-            print("Technology Keyword Frequency:")
-            for keyword, count in keyword_counts.items():
-                print(f"- {keyword}: {count}")
-        
-            # Sentiment Analysis
-            sentiments = df['bodyText'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
-            avg_sentiment = sentiments.mean()
-            print(f"\nSentiment Analysis:\n- Average Sentiment Polarity: {avg_sentiment:.2f} (Positive > 0, Negative < 0)")
-
 def main():
-    """Main function to demonstrate API data collection and analysis."""
-    # Parse command-line arguments
     parser = argparse.ArgumentParser(description="Collect and analyze Guardian API data for RAG")
     parser.add_argument('--from-date', type=str, help="Start date for articles (YYYY-MM-DD)")
     parser.add_argument('--test', action='store_true', help="Test API connectivity")
+    parser.add_argument('--test-cache', action='store_true', help="Test cache by simulating partial run")
     args = parser.parse_args()
     
     if args.test:
@@ -396,23 +443,22 @@ def main():
     
     collector = APIDataCollector("guardian_api", from_date=args.from_date)
     try:
-        # Example query parameters (optional)
-        query_params = {
-            # 'q': 'artificial intelligence',  # Uncomment to filter for AI articles
-        }
-        # Collect data from the search endpoint
-        output_path = collector.collect_data("/search", query_params=query_params)
-        print(f"Data collection completed successfully! Saved to {output_path}")
-        
-        # Analyze the collected data
+        if args.test_cache:
+            original_max_records = collector.max_records
+            collector.max_records = min(500, original_max_records)
+            output_path = asyncio.run(collector.collect_data("/search", query_params={}))
+            print(f"Cache test completed with {collector.max_records} records! Saved to {output_path}")
+            collector.max_records = original_max_records
+        else:
+            output_path = asyncio.run(collector.collect_data("/search", query_params={}))
+            print(f"Data collection completed successfully! Saved to {output_path}")
         collector.analyze_data(output_path)
     except Exception as e:
-        print(f"Data collection or analysis failed: {e}")
+        logger.error(f"Data collection or analysis failed: {e}", exc_info=True)
         collector._clean_checkpoint()
         raise
 
 def test_api():
-    """Test the API with a single request to verify connectivity and response."""
     api_url = os.getenv("API_URL", "https://content.guardianapis.com")
     api_key = os.getenv("API_KEY")
     from_date = os.getenv("FROM_DATE", (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"))
@@ -425,10 +471,9 @@ def test_api():
         params = {
             'api-key': api_key,
             'page': 1,
-            'page-size': 10,
+            'page-size': 200,
             'show-fields': 'bodyText',
             'show-tags': 'all',
-            'section': 'technology',
             'from-date': from_date
         }
         response = requests.get(f"{api_url}/search", params=params, timeout=60)
@@ -436,7 +481,7 @@ def test_api():
             print(f"400 Bad Request: {response.text}")
             return
         response.raise_for_status()
-        data = response.json()
+        data = orjson.loads(response.content)
         total = data['response'].get('total', 0)
         results = data['response'].get('results', [])
         print(f"API Test: Successfully fetched {len(results)} articles, total available: {total}")
