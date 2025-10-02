@@ -2,14 +2,24 @@ import logging
 import os
 import zipfile
 from pathlib import Path
-import pandas as pd
 from datetime import datetime
 import json
 from ast import literal_eval
-from tqdm import tqdm
 import warnings
+import pandas as pd
+import multiprocessing
 
-# Suppress pandas unrecognized timezone warnings
+# Detect CPU count and set thread pool size before importing Polars
+cpu_count = multiprocessing.cpu_count()
+print(f"Detected {cpu_count} CPU cores.")
+# os.environ['POLARS_MAX_THREADS'] = str(min(cpu_count, 32))  # Cap at 32 to avoid overhead
+os.environ['POLARS_MAX_THREADS'] = '12'  # Cap at 32 to avoid overhead
+
+# Now import Polars
+import polars as pl
+import cProfile
+
+# Suppress warnings if needed
 warnings.filterwarnings("ignore", message=".*un-recognized timezone.*")
 
 # Configure logging
@@ -20,12 +30,12 @@ class BatchDataCollector:
     def __init__(self):
         self.data_dir = Path("data/batch")
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.output_csv = self.data_dir / "guardian_historical_preprocessed.csv"
+        self.output_parquet = self.data_dir / "guardian_historical_preprocessed.parquet"
+        self.output_csv_legacy = self.data_dir / "guardian_historical_preprocessed.csv"  # For exclusion
         self.kaggle_dataset = "kiet21042003/news-articles-of-the-guardian-112015-23112023"
         self.download_path = self.data_dir / f"{self.kaggle_dataset.split('/')[-1]}.zip"
-        # Possible columns in Kaggle dataset
-        self.usecols = ['URL', 'url', 'Title', 'title', 'Description', 'description', 'Content', 'content', 
-                        'Time', 'time', 'Date', 'date', 'Tags', 'tags']
+        # Fixed columns based on CSV sample
+        self.usecols = ['URL', 'Title', 'Content', 'Time', 'Tags']
 
     def download_dataset(self):
         """Download the Kaggle dataset using Kaggle API."""
@@ -48,168 +58,144 @@ class BatchDataCollector:
             with zipfile.ZipFile(self.download_path, 'r') as zip_ref:
                 zip_ref.extractall(self.data_dir)
             logger.info(f"Extracted ZIP to {self.data_dir}")
-            # Exclude output CSV
-            csv_files = [f for f in self.data_dir.glob("*.csv") if f.name != self.output_csv.name]
-            if csv_files:
-                logger.info(f"Found raw CSV: {csv_files[0]}")
-                return csv_files[0]
+            # Exclude output files (legacy CSV and current Parquet)
+            exclude_names = {self.output_parquet.name, self.output_csv_legacy.name}
+            csv_files = [f for f in self.data_dir.glob("*.csv") if f.name not in exclude_names]
+            parquet_files = [f for f in self.data_dir.glob("*.parquet") if f.name not in exclude_names]
+            all_files = csv_files + parquet_files
+            if all_files:
+                # Sort to prefer CSV over Parquet, and raw over processed
+                all_files.sort(key=lambda f: (f.suffix, f.name))
+                logger.info(f"Found raw CSV: {all_files[0]}")
+                return all_files[0]
             else:
                 raise FileNotFoundError("No raw CSV found in extracted files.")
         else:
             raise FileNotFoundError(f"ZIP file not found at {self.download_path}")
 
-    def parse_date(self, date_str):
-        """Parse date string with multiple formats for robustness."""
-        if pd.isna(date_str) or not isinstance(date_str, str):
-            return pd.NaT
-        date_str = date_str.strip().replace('.', ':')  # Fix Guardian dot-time to colon
-        formats_to_try = [
-            '%a %d %b %Y %H:%M %Z',   # "Sun 29 Mar 2015 21:40 BST" (post-fix)
-            '%a %d %b %Y %H.%M %Z',   # Legacy dot variant (if any slip through)
-            '%Y-%m-%d %H:%M:%S%z',    # ISO with tz "2015-01-01 23:11:00+0000"
-            '%Y-%m-%d %H:%M:%S',      # ISO no tz "2015-01-01 23:11:00"
-            '%d %b %Y %H:%M %Z',      # Short day "01 Jan 2015 23:11 GMT"
-            '%d/%m/%Y %H:%M',         # UK "01/01/2015 23:11"
-        ]
-        for fmt in formats_to_try:
-            try:
-                return pd.to_datetime(date_str, format=fmt)
-            except ValueError:
-                continue
-        # Final broad fallback
-        return pd.to_datetime(date_str, errors='coerce')
-
     def preprocess_data(self, csv_path: Path):
-        """Preprocess the historical data to match real-time schema, using chunks."""
+        """Preprocess the historical data using Polars for speed and vectorization."""
         logger.info(f"Loading batch data from {csv_path}")
         
-        # Check available columns
+        # Verify columns
         try:
-            sample_df = pd.read_csv(csv_path, nrows=1)
+            sample_df = pl.read_csv(csv_path, n_rows=1)
             available_cols = sample_df.columns
-            logger.info(f"Available columns in CSV: {list(available_cols)}")
-            load_cols = [col for col in self.usecols if col in available_cols]
-            if not load_cols:
-                raise ValueError("No matching columns found in CSV. Check dataset structure.")
+            logger.info(f"Available columns in CSV: {available_cols}")
+            missing_cols = [col for col in self.usecols if col not in available_cols]
+            if missing_cols:
+                raise ValueError(f"Missing columns in CSV: {missing_cols}. Check dataset structure.")
         except Exception as e:
             logger.error(f"Failed to read CSV columns: {e}")
             raise
 
-        # Column mappings
-        column_mapping = {
-            'webUrl': next((col for col in ['URL', 'url', 'link'] if col in available_cols), None),
-            'webTitle': next((col for col in ['Title', 'title', 'headline'] if col in available_cols), None),
-            'bodyText': next((col for col in ['Content', 'content', 'article', 'body'] if col in available_cols), None),
-            'webPublicationDate': next((col for col in ['Time', 'time', 'Date', 'date', 'publicationDate'] if col in available_cols), None),
-            'tags': next((col for col in ['Tags', 'tags'] if col in available_cols), None)
-        }
-        logger.info(f"Column mappings: {column_mapping}")
-
-        # Set single crawlTimestamp for the entire run
+        # Set single crawlTimestamp
         crawl_timestamp = datetime.now().isoformat()
         logger.info(f"Using crawlTimestamp: {crawl_timestamp}")
 
-        # Estimate total rows for progress bar
-        total_rows = sum(1 for _ in open(csv_path, encoding='utf-8')) - 1  # Subtract header
-        chunk_size = 10000  # Optimized size
-        total_records = 0
-        total_dropped = 0
-        all_chunks = []  # Collect for single write
+        # Schema for all available columns to avoid mismatch
+        schema = {col: pl.String for col in available_cols}
 
-        final_columns = ['crawlTimestamp', 'id', 'webPublicationDate', 'webTitle', 'bodyText', 'tags', 'webUrl', 'sectionName']
+        # Scan CSV lazily, select early, apply basic transforms, then eager collect (fast for this size)
+        section_raw = pl.col("URL").str.extract(r"theguardian\.com/([a-zA-Z0-9_-]+)", 1)
+        lf = pl.scan_csv(
+            str(csv_path), 
+            schema=schema, 
+            ignore_errors=True,
+            infer_schema_length=10000
+        ).select(self.usecols).with_columns([
+            pl.lit(crawl_timestamp).alias('crawlTimestamp'),
+            pl.col("URL").str.extract(r"theguardian\.com/(.*)", 1).alias('id'),
+            (pl.col("Time")
+             .str.replace(".", ":", literal=True)
+             .str.strptime(pl.Datetime, format='%a %d %b %Y %H:%M %Z', strict=True)
+             .alias('webPublicationDate')),
+            pl.col('Title').alias('webTitle'),
+            pl.col('Content').alias('bodyText'),
+            pl.col('URL').alias('webUrl'),
+            # Full titlecase for sectionName
+            section_raw.str.split("-").list.eval(
+                pl.concat_str([
+                    pl.element().str.slice(0, 1).str.to_uppercase(),
+                    pl.element().str.slice(1).str.to_lowercase()
+                ], separator="")
+            ).list.join(" ").alias('sectionName')
+        ])
 
-        # Process CSV with progress bar (dtype=str for perf)
-        with tqdm(total=total_rows, desc="Processing rows", unit="rows") as pbar:
-            for chunk_idx, chunk in enumerate(pd.read_csv(csv_path, encoding='utf-8', usecols=load_cols, chunksize=chunk_size, low_memory=False, dtype=str)):
-                # Rename columns
-                chunk = chunk.rename(columns={v: k for k, v in column_mapping.items() if v})
+        # Eager collect once for stats + filter (combines everything; ~5-7s)
+        df = lf.collect()  # No engine=streaming—eager is faster here
+        total_rows = df.height
+        invalid_dates = df['webPublicationDate'].null_count()
+        sample_lf = df.head(100)
+        logger.info(f"Invalid dates dropped: {invalid_dates}")
+        nan_counts = {
+            'id': sample_lf['id'].null_count(),
+            'webPublicationDate': sample_lf['webPublicationDate'].null_count(),
+            'webTitle': sample_lf['webTitle'].null_count(),
+            'bodyText': sample_lf['bodyText'].null_count()
+        }
+        logger.info(f"Sample NaN counts: {nan_counts}")
 
-                # Add missing columns
-                chunk['id'] = [url.split('theguardian.com/')[1] if isinstance(url, str) and 'theguardian.com/' in url else f"historical_{i + total_records}" for i, url in enumerate(chunk.get('webUrl', pd.Series([''] * len(chunk))))]
-                chunk['crawlTimestamp'] = crawl_timestamp
-                if 'tags' not in chunk.columns:
-                    chunk['tags'] = json.dumps([])
-                if 'webUrl' not in chunk.columns:
-                    chunk['webUrl'] = ''
-                if 'webTitle' not in chunk.columns:
-                    chunk['webTitle'] = ''
-                if 'bodyText' not in chunk.columns:
-                    chunk['bodyText'] = ''
-                if 'webPublicationDate' not in chunk.columns:
-                    chunk['webPublicationDate'] = pd.NaT
+        # Filter in eager (fast in-memory)
+        df = df.filter(
+            pl.col('id').is_not_null() &
+            pl.col('webPublicationDate').is_not_null() &
+            pl.col('webTitle').is_not_null() &
+            pl.col('bodyText').is_not_null()
+        )
 
-                # Derive sectionName from URL path (fallback to 'Unknown')
-                def get_section(url):
-                    if isinstance(url, str) and 'theguardian.com/' in url:
-                        path = url.split('theguardian.com/')[1].split('/')[0]
-                        return path.capitalize() if path else 'Unknown'
-                    return 'Unknown'
-                chunk['sectionName'] = chunk['webUrl'].apply(get_section)
-
-                # Handle date parsing with custom function
-                chunk['webPublicationDate'] = chunk['webPublicationDate'].apply(self.parse_date)
-
-                # Summary stats (first chunk only)
-                if chunk_idx == 0:
-                    nan_counts = {
-                        'id': chunk['id'].isna().sum(),
-                        'webPublicationDate': chunk['webPublicationDate'].isna().sum(),
-                        'webTitle': chunk['webTitle'].isna().sum(),
-                        'bodyText': chunk['bodyText'].isna().sum()
-                    }
-                    logger.info(f"Sample NaN counts: {nan_counts}")
-
-                # Drop rows with missing critical fields
-                before_drop = len(chunk)
-                chunk = chunk.dropna(subset=['id', 'webPublicationDate', 'webTitle', 'bodyText'])
-                dropped = before_drop - len(chunk)
-                total_dropped += dropped
-                if dropped > 50:  # Threshold for noise
-                    logger.info(f"Chunk {chunk_idx}: Dropped {dropped} rows due to missing fields")
-
-                # Format tags to match real-time schema
-                def format_tags(tag):
-                    if pd.isna(tag):
-                        return json.dumps([])
-                    try:
-                        if isinstance(tag, str):
-                            # First, try as JSON (for list of dicts)
-                            try:
-                                parsed = json.loads(tag)
-                                if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
-                                    return tag  # Already in desired format
-                            except json.JSONDecodeError:
-                                pass
-                            # Fallback to literal_eval for Python list string like "['Canada', ...]"
-                            parsed = literal_eval(tag)
-                            if isinstance(parsed, list) and parsed and isinstance(parsed[0], str):
-                                formatted = [{'id': f"tag_{t.lower().replace(' ', '-')}", 'type': 'keyword', 'webTitle': t} for t in parsed]
-                                return json.dumps(formatted)
-                        return json.dumps([])
-                    except:
-                        return json.dumps([])
-
-                chunk['tags'] = chunk['tags'].apply(format_tags)
-
-                # Reorder columns
-                chunk = chunk[final_columns]
-
-                # Collect for single write
-                if not chunk.empty:
-                    all_chunks.append(chunk)
-                    total_records += len(chunk)
-                    pbar.update(len(chunk))
-
-        # Single write at end
-        if all_chunks:
-            final_df = pd.concat(all_chunks, ignore_index=True)
-            final_df.to_csv(self.output_csv, index=False, encoding='utf-8')
-            logger.info(f"Final write complete: {len(final_df)} records")
-
-        logger.info(f"Total dropped across all chunks: {total_dropped}")
-        if total_records == 0:
+        if df.height == 0:
             logger.warning("No articles processed. Check CSV content or column mappings.")
-        logger.info(f"Preprocessed batch data saved to {self.output_csv} ({total_records} records)")
+
+        # Vectorized tag formatting (unchanged; works on DataFrame)
+        def parse_tags_vectorized(tags_col: pl.Expr) -> pl.Expr:
+            tags_clean = tags_col.str.replace_all(r"^\['", "", literal=False).str.replace_all(r"'\]$", "", literal=False)
+            tags_list = tags_clean.str.split("', '")
+            id_expr = pl.concat_str([
+                pl.lit("tag_"), 
+                pl.element().str.to_lowercase().str.replace_all(r"\s+", "-", literal=False)
+            ], separator="").alias("id")
+            tag_struct = pl.struct([
+                id_expr,
+                pl.lit("keyword").alias("type"),
+                pl.element().alias("webTitle")
+            ])
+            tag_structs = tags_list.list.eval(tag_struct)
+            json_part = pl.concat_str([
+                pl.lit('{ "id": "'),
+                pl.element().struct.field("id"),
+                pl.lit('", "type": "keyword", "webTitle": "'),
+                pl.element().struct.field("webTitle"),
+                pl.lit('" }')
+            ], separator="")
+            tag_jsons = tag_structs.list.eval(json_part)
+            joined = tag_jsons.list.join(", ")
+            full_json = pl.concat_str([pl.lit("["), joined, pl.lit("]")], separator="")
+            return (
+                pl.when(tags_col.is_null() | (tags_col.str.len_chars() == 0))
+                .then(pl.lit('[]'))
+                .otherwise(
+                    pl.when(tags_list.list.len() == 0)
+                    .then(pl.lit('[]'))
+                    .otherwise(full_json)
+                )
+                .alias("tags")
+            )
+
+        # Apply tags + final select (eager)
+        df = df.with_columns(
+            parse_tags_vectorized(pl.col('Tags'))
+        ).select([
+            'crawlTimestamp', 'id', 'webPublicationDate', 'webTitle',
+            'bodyText', 'tags', 'webUrl', 'sectionName'
+        ])
+
+        # Write to Parquet (DataFrame method)
+        df.write_parquet(str(self.output_parquet), compression='snappy')
+        total_records = df.height  # Already eager—no query needed
+        total_dropped = total_rows - total_records
+        logger.info(f"Total dropped: {total_dropped} rows due to missing fields")
+        logger.info(f"Preprocessed batch data saved to {self.output_parquet} ({total_records} records)")
 
 def main():
     collector = BatchDataCollector()
@@ -217,13 +203,20 @@ def main():
         if not collector.download_path.exists():
             collector.download_dataset()
         csv_path = collector.extract_zip()
+        
+        # Profile the preprocessing
+        pr = cProfile.Profile()
+        pr.enable()
         collector.preprocess_data(csv_path)
+        pr.disable()
+        pr.print_stats(sort='cumtime')
+        
         # Display first row of preprocessed data
         try:
-            first_row = pd.read_csv(collector.output_csv, nrows=1)
-            print(f"First row of preprocessed data:\n{first_row.to_dict(orient='records')[0]}")
+            first_row = pl.read_parquet(collector.output_parquet, n_rows=1).to_pandas().to_dict(orient='records')[0]
+            print(f"First row of preprocessed data:\n{first_row}")
         except Exception as e:
-            print(f"Failed to read first row of output CSV: {e}")
+            print(f"Failed to read first row of output Parquet: {e}")
     except Exception as e:
         print(f"Batch data collection failed: {e}")
 

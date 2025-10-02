@@ -33,6 +33,7 @@ data/external/*.csv
 data/external/*.json
 data/batch/*.csv
 data/batch/*.zip
+data/batch/*.parquet
 data/analysis/*.png
 
 # Ignore Python virtual environment

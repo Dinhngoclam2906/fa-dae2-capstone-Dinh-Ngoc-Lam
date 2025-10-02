@@ -9,6 +9,7 @@ dependencies = [
     "faker>=37.6.0",
     "git-filter-repo>=2.47.0",
     "ijson>=3.4.0",
+    "joblib>=1.5.2",
     "kaggle>=1.7.4.5",
     "logger>=1.4",
     "matplotlib>=3.10.6",
