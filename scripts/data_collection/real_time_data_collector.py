@@ -12,7 +12,6 @@ import pandas as pd
 from collections import Counter
 import argparse
 from datetime import datetime, timedelta
-from wordcloud import WordCloud
 from textblob import TextBlob
 import orjson
 import random
@@ -189,6 +188,7 @@ class APIDataCollector:
         try:
             start_time = time.time()
             async with session.get(url, params=params, timeout=30) as response:
+                logger.debug(f"All response headers for page {page}: {dict(response.headers)}")
                 remaining = response.headers.get('X-RateLimit-Remaining', 'Unknown')
                 reset_time = response.headers.get('X-RateLimit-Reset', 'Unknown')
                 logger.info(f"Rate limit status for page {page}: Remaining={remaining}, Reset={reset_time}")
@@ -208,7 +208,8 @@ class APIDataCollector:
                 logger.info(f"Page {page} network time: {network_time:.2f}s")
                 start_process = time.time()
                 text = await response.text()
-                data = orjson.loads(text)
+                start_process = time.time()
+                data = await asyncio.to_thread(orjson.loads, text)
                 process_time = time.time() - start_process
                 logger.info(f"Page {page} JSON processing time: {process_time:.2f}s")
 
@@ -248,7 +249,7 @@ class APIDataCollector:
         query_params = query_params or {}
         query_params['from-date'] = self.from_date
         
-        semaphore = asyncio.Semaphore(14)
+        semaphore = asyncio.Semaphore(15)
         connector = aiohttp.TCPConnector(limit=50)
         async with aiohttp.ClientSession(connector=connector) as session:
             async def fetch_with_semaphore(p):
