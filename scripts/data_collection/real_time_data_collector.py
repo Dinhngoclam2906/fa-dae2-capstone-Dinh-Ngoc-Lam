@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import aiohttp
 import asyncio
+from tqdm.asyncio import tqdm  # Updated import for async progress
 import requests
 from dotenv import load_dotenv
-from tqdm import tqdm
+from tqdm import tqdm as sync_tqdm  # Keep sync for other uses if needed
 import pandas as pd
 from collections import Counter
 import argparse
@@ -208,7 +209,6 @@ class APIDataCollector:
                 logger.info(f"Page {page} network time: {network_time:.2f}s")
                 start_process = time.time()
                 text = await response.text()
-                start_process = time.time()
                 data = await asyncio.to_thread(orjson.loads, text)
                 process_time = time.time() - start_process
                 logger.info(f"Page {page} JSON processing time: {process_time:.2f}s")
@@ -217,6 +217,7 @@ class APIDataCollector:
                     logger.error(f"Invalid response structure for page {page}")
                     raise ValueError(f"Unexpected API response format for page {page}")
                 request_time = time.time() - start_time
+                logger.info(f"Page {page} full request time: {request_time:.2f}s")
                 self.request_times.append(request_time)
                 results = data['response']['results']
                 if not isinstance(results, list):
@@ -254,92 +255,60 @@ class APIDataCollector:
         async with aiohttp.ClientSession(connector=connector) as session:
             async def fetch_with_semaphore(p):
                 async with semaphore:
+                    params = {
+                        'api-key': self.api_key,
+                        'page-size': self.batch_size,
+                        'show-fields': 'bodyText',
+                        'show-tags': 'all',
+                        **query_params
+                    }
                     return p, await self._fetch_page(session, f"{self.api_url}{endpoint}", params, p)
             
-            tasks = []
-            page_results = {}  # To store results by page for ordered processing
-            for p in tqdm(range(page, max_pages + 1), initial=page-1, total=max_pages, desc="Fetching pages"):
-                if total_records >= self.max_records or p > (total_available + self.batch_size - 1) // self.batch_size:
-                    break
-                params = {
-                    'api-key': self.api_key,
-                    'page-size': self.batch_size,
-                    'show-fields': 'bodyText',
-                    'show-tags': 'all',
-                    **query_params
-                }
-                tasks.append(fetch_with_semaphore(p))
-                if len(tasks) >= 14:  # Align with semaphore
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
-                    tasks = []
-                    for result in results:
-                        if isinstance(result, Exception):
-                            logger.error(f"Error fetching page: {result}")
-                            continue
-                        current_page, page_data = result
-                        page_results[current_page] = page_data
-                    # Process in order
-                    for sorted_page in sorted(page_results.keys()):
-                        result = page_results.pop(sorted_page)
-                        if not result:
-                            logger.info("No more results to fetch")
-                            break
-                        if sorted_page == page and isinstance(result, list) and result and 'response' in result[0] and 'total' in result[0]['response']:
-                            total_available = min(total_available, result[0]['response']['total'])
-                            self.max_records = min(self.max_records, total_available)
-                            max_pages = (self.max_records + self.batch_size - 1) // self.batch_size
-                        crawl_timestamp = datetime.now().isoformat()
-                        for r in result:
-                            r['crawlTimestamp'] = crawl_timestamp
-                        valid_results = [
-                            r for r in result
-                            if r.get('id') not in collected_ids
-                        ]
-                        for r in valid_results:
-                            collected_ids.add(r['id'])
-                        jsonl_file = self.temp_dir / f"collected_{sorted_page}.jsonl"
-                        with open(jsonl_file, 'wb') as f:
-                            for vr in valid_results:
-                                f.write(orjson.dumps(vr) + b'\n')
-                        total_records += len(valid_results)
-                        logger.info(f"Collected {total_records} records (page {sorted_page})")
-                        if total_records >= self.max_records:
-                            break
-                        logger.info(f"Request times: Avg={sum(self.request_times)/len(self.request_times):.2f}s, Min={min(self.request_times):.2f}s, Max={max(self.request_times):.2f}s")
-                        await asyncio.sleep(random.uniform(0.1, 0.5))
-                        self._save_checkpoint(sorted_page + 1)
-            if tasks:
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                for result in results:
-                    if isinstance(result, Exception):
-                        logger.error(f"Error fetching page: {result}")
-                        continue
-                    current_page, page_data = result
+            # Create all tasks upfront
+            pages_to_fetch = list(range(page, max_pages + 1))
+            tasks = [asyncio.create_task(fetch_with_semaphore(p)) for p in pages_to_fetch]
+            
+            # Fetch concurrently with async tqdm for real progress
+            page_results = {}
+            for future in tqdm.as_completed(tasks, total=len(tasks), desc="Fetching pages"):
+                try:
+                    current_page, page_data = await future
                     page_results[current_page] = page_data
-                for sorted_page in sorted(page_results.keys()):
-                    result = page_results.pop(sorted_page)
-                    if not result:
-                        break
-                    if sorted_page == page and isinstance(result, list) and result and 'response' in result[0] and 'total' in result[0]['response']:
-                        total_available = min(total_available, result[0]['response']['total'])
-                        self.max_records = min(self.max_records, total_available)
-                        max_pages = (self.max_records + self.batch_size - 1) // self.batch_size
-                    crawl_timestamp = datetime.now().isoformat()
-                    for r in result:
-                        r['crawlTimestamp'] = crawl_timestamp
-                    valid_results = [
-                        r for r in result
-                        if r.get('id') not in collected_ids
-                    ]
-                    for r in valid_results:
-                        collected_ids.add(r['id'])
-                    jsonl_file = self.temp_dir / f"collected_{sorted_page}.jsonl"
-                    with open(jsonl_file, 'wb') as f:
-                        for vr in valid_results:
-                            f.write(orjson.dumps(vr) + b'\n')
-                    total_records += len(valid_results)
-                    logger.info(f"Collected {total_records} records (page {sorted_page})")
-                    self._save_checkpoint(sorted_page + 1)
+                except Exception as e:
+                    logger.error(f"Error in async fetch: {e}")
+                    continue
+            
+            # Now process results in page order with a progress bar
+            sorted_pages = sorted(page_results.keys())
+            for sorted_page in tqdm(sorted_pages, desc="Processing pages"):
+                result = page_results.pop(sorted_page)
+                if not result:
+                    logger.info("No more results to fetch")
+                    break
+                if sorted_page == page and isinstance(result, list) and result and 'response' in result[0] and 'total' in result[0]['response']:
+                    total_available = min(total_available, result[0]['response']['total'])
+                    self.max_records = min(self.max_records, total_available)
+                    # Note: We can't adjust max_pages retroactively, but for small N it's fine
+                crawl_timestamp = datetime.now().isoformat()
+                for r in result:
+                    r['crawlTimestamp'] = crawl_timestamp
+                valid_results = [
+                    r for r in result
+                    if r.get('id') not in collected_ids
+                ]
+                for r in valid_results:
+                    collected_ids.add(r['id'])
+                jsonl_file = self.temp_dir / f"collected_{sorted_page}.jsonl"
+                with open(jsonl_file, 'wb') as f:
+                    for vr in valid_results:
+                        f.write(orjson.dumps(vr) + b'\n')
+                total_records += len(valid_results)
+                logger.info(f"Collected {total_records} records (page {sorted_page})")
+                if total_records >= self.max_records:
+                    break
+                logger.info(f"Request times: Avg={sum(self.request_times)/len(self.request_times):.2f}s, Min={min(self.request_times):.2f}s, Max={max(self.request_times):.2f}s")
+                await asyncio.sleep(random.uniform(0.1, 0.5))
+                self._save_checkpoint(sorted_page + 1)
         
         if total_records < self.max_records:
             logger.warning(f"Collected only {total_records} articles, less than requested MAX_RECORDS={self.max_records}")
