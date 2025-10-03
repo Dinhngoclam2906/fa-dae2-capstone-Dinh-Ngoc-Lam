@@ -8,6 +8,7 @@ dependencies = [
     "choco>=1.0.5",
     "faker>=37.6.0",
     "git-filter-repo>=2.47.0",
+    "huggingface-hub[hf-xet]>=0.35.3",
     "ijson>=3.4.0",
     "joblib>=1.5.2",
     "kaggle>=1.7.4.5",

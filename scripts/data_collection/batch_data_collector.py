@@ -1,19 +1,18 @@
 import logging
 import os
-import zipfile
 from pathlib import Path
 from datetime import datetime
 import json
 from ast import literal_eval
 import warnings
+from typing import Union, List
 import pandas as pd
 import multiprocessing
 
 # Detect CPU count and set thread pool size before importing Polars
 cpu_count = multiprocessing.cpu_count()
 print(f"Detected {cpu_count} CPU cores.")
-# os.environ['POLARS_MAX_THREADS'] = str(min(cpu_count, 32))  # Cap at 32 to avoid overhead
-os.environ['POLARS_MAX_THREADS'] = '12'  # Cap at 32 to avoid overhead
+os.environ['POLARS_MAX_THREADS'] = str(min(cpu_count, 32))  # Cap at 32 to avoid overhead
 
 # Now import Polars
 import polars as pl
@@ -21,6 +20,7 @@ import cProfile
 
 # Suppress warnings if needed
 warnings.filterwarnings("ignore", message=".*un-recognized timezone.*")
+warnings.filterwarnings("ignore", message=".*chrono.*")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -30,91 +30,99 @@ class BatchDataCollector:
     def __init__(self):
         self.data_dir = Path("data/batch")
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.output_parquet = self.data_dir / "guardian_historical_preprocessed.parquet"
-        self.output_csv_legacy = self.data_dir / "guardian_historical_preprocessed.csv"  # For exclusion
-        self.kaggle_dataset = "kiet21042003/news-articles-of-the-guardian-112015-23112023"
-        self.download_path = self.data_dir / f"{self.kaggle_dataset.split('/')[-1]}.zip"
-        # Fixed columns based on CSV sample
-        self.usecols = ['URL', 'Title', 'Content', 'Time', 'Tags']
+        self.output_csv = self.data_dir / "guardian_historical_preprocessed.csv"  # Changed to CSV
+        self.repo_id = "Stefan171/TheGuardian-Articles"
+        self.local_dir = self.data_dir / self.repo_id.replace("/", "_")
+        # Updated columns based on HF dataset schema
+        self.usecols = ['URL', 'Article Category', 'Publication Date', 'Article Title', 'Article Contents', 'Data Quality']
 
     def download_dataset(self):
-        """Download the Kaggle dataset using Kaggle API."""
+        """Download the Hugging Face dataset."""
         try:
-            from kaggle.api.kaggle_api_extended import KaggleApi
-            api = KaggleApi()
-            api.authenticate()
-            api.dataset_download_files(self.kaggle_dataset, path=str(self.data_dir), unzip=False)
-            logger.info(f"Downloaded dataset to {self.download_path}")
+            from huggingface_hub import snapshot_download
+            local_dir_str = str(self.local_dir)
+            snapshot_download(repo_id=self.repo_id, local_dir=local_dir_str, repo_type="dataset")
+            # Find Parquet files (HF often uses shards)
+            parquet_files = list(self.local_dir.rglob("*.parquet"))
+            if parquet_files:
+                self.raw_data_paths = parquet_files
+                logger.info(f"Downloaded HF dataset to {self.local_dir}, using {len(parquet_files)} Parquet files")
+            else:
+                # Fallback to JSON/CSV if no Parquet
+                jsonl_files = list(self.local_dir.rglob("*.jsonl")) + list(self.local_dir.rglob("*.json"))
+                csv_files = list(self.local_dir.rglob("*.csv"))
+                data_files = parquet_files + jsonl_files + csv_files
+                if data_files:
+                    self.raw_data_paths = data_files
+                    logger.info(f"Downloaded HF dataset to {self.local_dir}, using {len(data_files)} data files (mixed formats)")
+                else:
+                    raise FileNotFoundError("No data files (Parquet/JSON/CSV) found in HF dataset.")
+            
+            # Cleanup: Keep only CSV files, delete others (e.g., .gitattributes, README.md, .cache)
+            cleaned_count = 0
+            for file_path in self.local_dir.rglob('*'):
+                if file_path.is_file() and file_path.suffix != '.csv':
+                    file_path.unlink()
+                    cleaned_count += 1
+                    logger.debug(f"Cleaned up non-CSV file: {file_path}")
+            if cleaned_count > 0:
+                logger.info(f"Cleaned up {cleaned_count} non-CSV files from {self.local_dir}")
         except ImportError:
-            logger.error("Kaggle library not found. Install with 'pip install kaggle' and set up kaggle.json.")
+            logger.error("huggingface_hub not found. Install with 'pip install huggingface_hub'.")
             raise
         except Exception as e:
-            logger.error(f"Failed to download dataset: {e}. Download manually from https://www.kaggle.com/datasets/{self.kaggle_dataset} and place in data/batch.")
+            logger.error(f"Failed to download HF dataset: {e}. Download manually from https://huggingface.co/datasets/{self.repo_id}.")
             raise
 
-    def extract_zip(self):
-        """Extract the downloaded ZIP file and return the raw CSV path."""
-        if self.download_path.exists():
-            with zipfile.ZipFile(self.download_path, 'r') as zip_ref:
-                zip_ref.extractall(self.data_dir)
-            logger.info(f"Extracted ZIP to {self.data_dir}")
-            # Exclude output files (legacy CSV and current Parquet)
-            exclude_names = {self.output_parquet.name, self.output_csv_legacy.name}
-            csv_files = [f for f in self.data_dir.glob("*.csv") if f.name not in exclude_names]
-            parquet_files = [f for f in self.data_dir.glob("*.parquet") if f.name not in exclude_names]
-            all_files = csv_files + parquet_files
-            if all_files:
-                # Sort to prefer CSV over Parquet, and raw over processed
-                all_files.sort(key=lambda f: (f.suffix, f.name))
-                logger.info(f"Found raw CSV: {all_files[0]}")
-                return all_files[0]
-            else:
-                raise FileNotFoundError("No raw CSV found in extracted files.")
-        else:
-            raise FileNotFoundError(f"ZIP file not found at {self.download_path}")
-
-    def preprocess_data(self, csv_path: Path):
+    def preprocess_data(self, data_paths: List[Path]):
         """Preprocess the historical data using Polars for speed and vectorization."""
-        logger.info(f"Loading batch data from {csv_path}")
+        logger.info(f"Loading batch data from HF data files in {self.local_dir}")
         
-        # Verify columns
+        # Scan files lazily (concat if multiple; handle mixed formats)
+        lfs = []
+        for p in data_paths:
+            if p.suffix == '.parquet':
+                lfs.append(pl.scan_parquet(str(p)))
+            elif p.suffix in ['.jsonl', '.json']:
+                lfs.append(pl.scan_json(str(p), json_lines=p.suffix == '.jsonl'))
+            elif p.suffix == '.csv':
+                lfs.append(pl.scan_csv(str(p)))
+        if lfs:
+            lf = pl.concat(lfs)
+        else:
+            raise ValueError("No valid data files to scan.")
+        
+        # Verify columns without full collect
         try:
-            sample_df = pl.read_csv(csv_path, n_rows=1)
-            available_cols = sample_df.columns
-            logger.info(f"Available columns in CSV: {available_cols}")
+            available_cols = lf.collect_schema().names()
+            logger.info(f"Available columns in dataset: {available_cols}")
             missing_cols = [col for col in self.usecols if col not in available_cols]
             if missing_cols:
-                raise ValueError(f"Missing columns in CSV: {missing_cols}. Check dataset structure.")
+                raise ValueError(f"Missing columns in dataset: {missing_cols}. Check dataset structure.")
         except Exception as e:
-            logger.error(f"Failed to read CSV columns: {e}")
+            logger.error(f"Failed to read dataset columns: {e}")
             raise
 
         # Set single crawlTimestamp
         crawl_timestamp = datetime.now().isoformat()
         logger.info(f"Using crawlTimestamp: {crawl_timestamp}")
 
-        # Schema for all available columns to avoid mismatch
-        schema = {col: pl.String for col in available_cols}
+        # Early filter on Data Quality == 'Full'
+        lf = lf.filter(pl.col("Data Quality") == "Full").select(self.usecols)
 
-        # Scan CSV lazily, select early, apply basic transforms, then eager collect (fast for this size)
-        section_raw = pl.col("URL").str.extract(r"theguardian\.com/([a-zA-Z0-9_-]+)", 1)
-        lf = pl.scan_csv(
-            str(csv_path), 
-            schema=schema, 
-            ignore_errors=True,
-            infer_schema_length=10000
-        ).select(self.usecols).with_columns([
+        # Apply transforms lazily
+        section_raw = pl.col("Article Category")
+        lf = lf.with_columns([
             pl.lit(crawl_timestamp).alias('crawlTimestamp'),
             pl.col("URL").str.extract(r"theguardian\.com/(.*)", 1).alias('id'),
-            (pl.col("Time")
-             .str.replace(".", ":", literal=True)
-             .str.strptime(pl.Datetime, format='%a %d %b %Y %H:%M %Z', strict=True)
+            (pl.col("Publication Date")
+             .str.to_datetime("%Y-%m-%dT%H:%M:%S.%fZ")
              .alias('webPublicationDate')),
-            pl.col('Title').alias('webTitle'),
-            pl.col('Content').alias('bodyText'),
+            pl.col('Article Title').alias('webTitle'),
+            pl.col('Article Contents').alias('bodyText'),
             pl.col('URL').alias('webUrl'),
             # Full titlecase for sectionName
-            section_raw.str.split("-").list.eval(
+            section_raw.str.split(" ").list.eval(
                 pl.concat_str([
                     pl.element().str.slice(0, 1).str.to_uppercase(),
                     pl.element().str.slice(1).str.to_lowercase()
@@ -123,7 +131,7 @@ class BatchDataCollector:
         ])
 
         # Eager collect once for stats + filter (combines everything; ~5-7s)
-        df = lf.collect()  # No engine=streaming—eager is faster here
+        df = lf.collect(engine='streaming')
         total_rows = df.height
         invalid_dates = df['webPublicationDate'].null_count()
         sample_lf = df.head(100)
@@ -145,78 +153,67 @@ class BatchDataCollector:
         )
 
         if df.height == 0:
-            logger.warning("No articles processed. Check CSV content or column mappings.")
+            logger.warning("No articles processed. Check dataset content or column mappings.")
 
-        # Vectorized tag formatting (unchanged; works on DataFrame)
-        def parse_tags_vectorized(tags_col: pl.Expr) -> pl.Expr:
-            tags_clean = tags_col.str.replace_all(r"^\['", "", literal=False).str.replace_all(r"'\]$", "", literal=False)
-            tags_list = tags_clean.str.split("', '")
-            id_expr = pl.concat_str([
-                pl.lit("tag_"), 
-                pl.element().str.to_lowercase().str.replace_all(r"\s+", "-", literal=False)
-            ], separator="").alias("id")
-            tag_struct = pl.struct([
-                id_expr,
-                pl.lit("keyword").alias("type"),
-                pl.element().alias("webTitle")
-            ])
-            tag_structs = tags_list.list.eval(tag_struct)
-            json_part = pl.concat_str([
-                pl.lit('{ "id": "'),
-                pl.element().struct.field("id"),
-                pl.lit('", "type": "keyword", "webTitle": "'),
-                pl.element().struct.field("webTitle"),
-                pl.lit('" }')
+        # Derive tags from category (since no original Tags column)
+        def make_tags_from_category(category: pl.Expr) -> pl.Expr:
+            cat_lower = category.str.to_lowercase().str.replace_all(r"\s+", "-", literal=False)
+            id_tag = pl.concat_str([pl.lit("tag_"), cat_lower], separator="")
+            json_tag = pl.concat_str([
+                pl.lit('{"id": "'), id_tag, pl.lit('", "type": "keyword", "webTitle": "'), category, pl.lit('"}')
             ], separator="")
-            tag_jsons = tag_structs.list.eval(json_part)
-            joined = tag_jsons.list.join(", ")
-            full_json = pl.concat_str([pl.lit("["), joined, pl.lit("]")], separator="")
+            full_json = pl.concat_str([pl.lit("["), json_tag, pl.lit("]")], separator="")
             return (
-                pl.when(tags_col.is_null() | (tags_col.str.len_chars() == 0))
+                pl.when(category.is_null())
                 .then(pl.lit('[]'))
-                .otherwise(
-                    pl.when(tags_list.list.len() == 0)
-                    .then(pl.lit('[]'))
-                    .otherwise(full_json)
-                )
+                .otherwise(full_json)
                 .alias("tags")
             )
 
         # Apply tags + final select (eager)
         df = df.with_columns(
-            parse_tags_vectorized(pl.col('Tags'))
+            make_tags_from_category(pl.col('sectionName'))
         ).select([
             'crawlTimestamp', 'id', 'webPublicationDate', 'webTitle',
             'bodyText', 'tags', 'webUrl', 'sectionName'
         ])
 
-        # Write to Parquet (DataFrame method)
-        df.write_parquet(str(self.output_parquet), compression='snappy')
+        # Write to CSV (DataFrame method)
+        df.write_csv(str(self.output_csv))
         total_records = df.height  # Already eager—no query needed
         total_dropped = total_rows - total_records
         logger.info(f"Total dropped: {total_dropped} rows due to missing fields")
-        logger.info(f"Preprocessed batch data saved to {self.output_parquet} ({total_records} records)")
+        logger.info(f"Preprocessed batch data saved to {self.output_csv} ({total_records} records)")
 
 def main():
     collector = BatchDataCollector()
     try:
-        if not collector.download_path.exists():
+        local_dir = collector.local_dir
+        # Check for existing data files (Parquet/JSON/CSV)
+        parquet_files = list(local_dir.rglob("*.parquet"))
+        jsonl_files = list(local_dir.rglob("*.jsonl")) + list(local_dir.rglob("*.json"))
+        csv_files = list(local_dir.rglob("*.csv"))
+        existing_files = parquet_files + jsonl_files + csv_files
+        if not existing_files:
             collector.download_dataset()
-        csv_path = collector.extract_zip()
+            existing_files = collector.raw_data_paths
+        else:
+            logger.info(f"Using existing HF dataset in {local_dir}")
+            collector.raw_data_paths = existing_files
         
         # Profile the preprocessing
         pr = cProfile.Profile()
         pr.enable()
-        collector.preprocess_data(csv_path)
+        collector.preprocess_data(existing_files)
         pr.disable()
         pr.print_stats(sort='cumtime')
         
         # Display first row of preprocessed data
         try:
-            first_row = pl.read_parquet(collector.output_parquet, n_rows=1).to_pandas().to_dict(orient='records')[0]
+            first_row = pl.read_csv(collector.output_csv, n_rows=1).to_pandas().to_dict(orient='records')[0]
             print(f"First row of preprocessed data:\n{first_row}")
         except Exception as e:
-            print(f"Failed to read first row of output Parquet: {e}")
+            print(f"Failed to read first row of output CSV: {e}")
     except Exception as e:
         print(f"Batch data collection failed: {e}")
 
