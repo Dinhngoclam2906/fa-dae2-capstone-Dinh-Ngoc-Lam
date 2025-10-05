@@ -6,3 +6,4 @@
 # Binary files (e.g., images) should not have line ending conversion
 *.png binary
 *.jpg binary
+* text=auto eol=lf
