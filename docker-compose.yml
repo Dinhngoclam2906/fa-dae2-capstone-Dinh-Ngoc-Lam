@@ -1,12 +1,13 @@
 services:
   postgres:
     image: postgres:17.4
-    container_name: m01w02-postgres
+    container_name: guardian-postgres
     environment:
       POSTGRES_DB: staging_db
       POSTGRES_USER: staging_user
       POSTGRES_PASSWORD: staging_password
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      TZ: Asia/Ho_Chi_Minh  # NEW: Sets container/server timezone to Vietnam (GMT+7)
     ports:
       - "5432:5432"
     volumes:

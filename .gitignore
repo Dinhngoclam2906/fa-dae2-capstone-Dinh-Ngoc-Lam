@@ -1,43 +1,68 @@
+# Environment variables and secrets
 .env
-# Data files - ignore all generated data
-*.json
-*.csv
+.secret/
 
-# Python cache
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python cache and build artifacts
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Environment variables
-.env
-
-# Logs
-*.log
-
-# UV/Python virtual environment
-.venv/
-venv/
+*.pyc
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
 # IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# OS files
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Ignore large data files
-data/external/*.csv
-data/external/*.json
-data/batch/*.csv
-data/batch/*.zip
-data/batch/*.parquet
-data/analysis/*.png
+# Logs
+*.log
+logs/
+snowflake_connection_test.log
 
-# Ignore Python virtual environment
-.venv/
-# Ignore other temporary files
-*.pyc
-__pycache__/
+# Data files (generated/processed data)
+*.csv
+*.json
+*.parquet
+*.zip
+*.png
+data/
+
+# Snowflake private key
+rsa_key.p8
+rsa_key.pub

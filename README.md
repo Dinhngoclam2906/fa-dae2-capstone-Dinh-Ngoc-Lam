@@ -5,7 +5,7 @@ An end-to-end AI-powered data analytics system that processes real-time and hist
 
 **Success Metrics (Quantitative):**  
 * Real-time pipeline processes 500+ articles daily with <5% error rate.  
-* Batch pipeline processes 10,000+ historical articles with >95% data completeness.  
+* Batch pipeline processes 87,000+ historical articles with >95% data completeness.
 * AI chatbot answers 90% of queries accurately with response time <3 seconds.  
 * Data warehouse supports queries with <1 second latency for 95% of requests.
 
@@ -32,18 +32,18 @@ The rapid pace of news publication requires real-time ingestion and analysis to 
 - Description: Provides live news articles with metadata (title, publication date, section, etc.).
 
 **2. Batch Source:**
-- Dataset Name: Kaggle - "News Articles of The Guardian (11/2015 - 11/2023)"  
-- Format: CSV  
-- Volume: ~10,000+ articles  
+- Dataset Name: Hugging Face - "TheGuardian-Articles" (Stefan171)
+- Format: Parquet shards (downloaded via huggingface_hub, preprocessed to CSV)SV  
+- Volume: ~87,000 articles (filtered to full data quality) 
 - Update Cadence: Static dataset  
-- Description: Historical news articles with fields like title, body, publication date, and category.
+- Description: Historical news articles scraped from The Guardian (2010-2024) with fields like URL, category, publication date, title, contents, author, and data quality ('Full' or 'Partial').
 
 ### Architecture Overview:
-**High-level Diagram:** Data flows from The Guardian API (real-time) and Kaggle CSV (batch) into PostgreSQL for staging, then to Snowflake for warehousing. dbt transforms data into analytics-ready models, Kafka handles streaming, Airflow orchestrates pipelines, and a LangGraph-based AI chatbot with RAG queries the warehouse.
+**High-level Diagram:** Data flows from The Guardian API (real-time) and Hugging Face Dataset (batch) into PostgreSQL for staging (real-time only), then to Snowflake for warehousing. dbt transforms data into analytics-ready models, Kafka handles streaming, Airflow orchestrates pipelines, and a LangGraph-based AI chatbot with RAG queries the warehouse.
 
 **Data Flow:**
 - **Real-time:** The Guardian API → Python ingestion script → PostgreSQL (staging) → Snowflake (RAW schema).  
-- **Batch:** Kaggle CSV → Python ingestion script → Snowflake (RAW schema).  
+- **Batch:** Hugging Face Dataset → Python preprocessing script (BatchDataCollector: download, filter 'Full' quality, transform to schema-aligned CSV) → Python ingestion script → Snowflake (RAW schema).
 - **Transformation:** dbt models (stg_*, dim_*, fct_*) in Snowflake ANALYTICS schema.  
 - **Streaming:** Kafka processes real-time article updates.  
 
@@ -61,11 +61,14 @@ The rapid pace of news publication requires real-time ingestion and analysis to 
 ```
 capstone/
 ├── scripts/  
-|   ├──data_collection            # Data collection scripts
-|      ├── real_time_data_collector.py    # Guardian API ingestion
-|      ├── batch_data_collector.py        # Kaggle CSV ingestion
-|   ├── load_to_postgres.py       # Load to PostgreSQL
-|   ├── load_to_snowflake.py      # Load to Snowflake
+|   ├──data_collection                            # Data collection scripts
+|      ├── real_time_data_collector.py            # Guardian API ingestion
+|      ├── batch_data_collector.py                # HuggingFace historical news data ingestion
+|   ├──ingestion
+|      ├── load_csv_to_postgres.py                # Load local CSV to PostgreSQL
+|      ├── load_csv_to_snowflake.py               # Load local CSV to Snowflake
+|      ├── load_postgre_to_snowflake.py           # Load Postgre Data to Snowflake
+|      ├── snowflake_objects_verification.py      
 ├── .gitattributes/                    
 ├── .gitignore/                    
 ├── .python-version/                          
@@ -96,10 +99,10 @@ docker-compose -f docker/compose.yml up -d
 **4. Run Pipelines:**
 
 Real-time: 
-```python scripts/data_collection/real_time_data_collector.py && python scripts/load_to_postgres.py```
+```python scripts/data_collection/real_time_data_collector.py && python scripts/ingestion/load_csv_to_postgres.py && python scripts/ingestion/load_postgre_to_snowflake.py```
 
 Batch: 
-```python scripts/data_collection/batch_data_collector && python scripts/load_to_snowflake.py```
+```python scripts/data_collection/batch_data_collector && python scripts/ingestion/load_csv_to_snowflake.py```
 
 **5. Verify Data:** 
 Check PostgreSQL and Snowflake for loaded data (500+ rows for batch, continuous updates for real-time).

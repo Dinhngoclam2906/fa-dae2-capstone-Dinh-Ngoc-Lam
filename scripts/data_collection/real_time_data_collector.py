@@ -259,7 +259,6 @@ class APIDataCollector:
                         'api-key': self.api_key,
                         'page-size': self.batch_size,
                         'show-fields': 'bodyText',
-                        'show-tags': 'all',
                         **query_params
                     }
                     return p, await self._fetch_page(session, f"{self.api_url}{endpoint}", params, p)
@@ -325,18 +324,13 @@ class APIDataCollector:
                         'webPublicationDate': article.get('webPublicationDate', ''),
                         'webTitle': article.get('webTitle', ''),
                         'bodyText': article.get('fields', {}).get('bodyText', ''),
-                        'tags': orjson.dumps([{
-                            'id': tag.get('id', ''),
-                            'type': tag.get('type', ''),
-                            'webTitle': tag.get('webTitle', '')
-                        } for tag in article.get('tags', [])]).decode('utf-8'),
                         'webUrl': article.get('webUrl', ''),
                         'sectionName': article.get('sectionName', '')
                     }
                     rows.append(row)
         
         df = pd.DataFrame(rows)
-        df = df[['crawlTimestamp', 'id', 'webPublicationDate', 'webTitle', 'bodyText', 'tags', 'webUrl', 'sectionName']]
+        df = df[['crawlTimestamp', 'id', 'webPublicationDate', 'webTitle', 'bodyText', 'webUrl', 'sectionName']]
         df.to_csv(output_csv_file, index=False, encoding='utf-8')
         logger.info(f"Converted JSON to CSV with prioritized fields: {output_csv_file}")
         
@@ -361,44 +355,11 @@ class APIDataCollector:
         df['word_count'] = df['bodyText'].astype(str).str.split().str.len()
         df['sentiment'] = df['bodyText'].astype(str).apply(lambda x: TextBlob(x).sentiment.polarity)
         
-        # Tags and contributors extraction
-        def extract_tags(tags_str):
-            try:
-                tags = orjson.loads(tags_str.encode('utf-8'))
-                return [tag['webTitle'] for tag in tags if tag['type'] == 'keyword']
-            except:
-                return []
-        
-        def extract_contributors(tags_str):
-            try:
-                tags = orjson.loads(tags_str.encode('utf-8'))
-                return [tag['webTitle'] for tag in tags if tag['type'] == 'contributor']
-            except:
-                return []
-        
-        df['keywords'] = df['tags'].apply(extract_tags)
-        df['contributors'] = df['tags'].apply(extract_contributors)
-        
         word_counts = df['word_count'].tolist()
         sentiments = df['sentiment'].tolist()
-        all_tags = df['keywords'].explode().tolist()
-        all_contributors = df['contributors'].explode().tolist()
         
         avg_word_count = df['word_count'].mean() if total_articles > 0 else 0
-        unique_contributors = len(set(all_contributors))
-        print(f"Basic Statistics:\n- Total Articles: {total_articles}\n- Publication Date Range: {date_range}\n- Crawl Timestamp Range: {crawl_range}\n- Average Word Count: {avg_word_count:.2f}\n- Unique Contributors: {unique_contributors}\n")
-        
-        tag_counts = Counter(all_tags)
-        top_tags = tag_counts.most_common(10)
-        print("Top 10 Tags:")
-        for tag, count in top_tags:
-            print(f"- {tag}: {count}")
-        
-        contributor_counts = Counter(all_contributors)
-        top_contributors = contributor_counts.most_common(10)
-        print("\nTop 10 Contributors:")
-        for contrib, count in top_contributors:
-            print(f"- {contrib}: {count}")
+        print(f"Basic Statistics:\n- Total Articles: {total_articles}\n- Publication Date Range: {date_range}\n- Crawl Timestamp Range: {crawl_range}\n- Average Word Count: {avg_word_count:.2f}\n")
         
 def main():
     parser = argparse.ArgumentParser(description="Collect and analyze Guardian API data for RAG")
@@ -443,7 +404,6 @@ def test_api():
             'page': 1,
             'page-size': 200,
             'show-fields': 'bodyText',
-            'show-tags': 'all',
             'from-date': from_date
         }
         response = requests.get(f"{api_url}/search", params=params, timeout=60)

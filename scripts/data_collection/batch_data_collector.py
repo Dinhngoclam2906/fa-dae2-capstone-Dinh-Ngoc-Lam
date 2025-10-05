@@ -58,15 +58,16 @@ class BatchDataCollector:
                 else:
                     raise FileNotFoundError("No data files (Parquet/JSON/CSV) found in HF dataset.")
             
-            # Cleanup: Keep only CSV files, delete others (e.g., .gitattributes, README.md, .cache)
+            # Cleanup: Keep only data files, delete others (e.g., .gitattributes, README.md, .cache)
             cleaned_count = 0
+            data_suffixes = ['.parquet', '.csv', '.json', '.jsonl']
             for file_path in self.local_dir.rglob('*'):
-                if file_path.is_file() and file_path.suffix != '.csv':
+                if file_path.is_file() and file_path.suffix not in data_suffixes:
                     file_path.unlink()
                     cleaned_count += 1
-                    logger.debug(f"Cleaned up non-CSV file: {file_path}")
+                    logger.debug(f"Cleaned up non-data file: {file_path}")
             if cleaned_count > 0:
-                logger.info(f"Cleaned up {cleaned_count} non-CSV files from {self.local_dir}")
+                logger.info(f"Cleaned up {cleaned_count} non-data files from {self.local_dir}")
         except ImportError:
             logger.error("huggingface_hub not found. Install with 'pip install huggingface_hub'.")
             raise
@@ -113,69 +114,54 @@ class BatchDataCollector:
         # Apply transforms lazily
         section_raw = pl.col("Article Category")
         lf = lf.with_columns([
-            pl.lit(crawl_timestamp).alias('crawlTimestamp'),
-            pl.col("URL").str.extract(r"theguardian\.com/(.*)", 1).alias('id'),
+            pl.lit(crawl_timestamp).alias('crawl_timestamp'),
+            pl.col("URL").str.extract(r"theguardian\.com/(.*)", 1).alias('article_id'),
             (pl.col("Publication Date")
              .str.to_datetime("%Y-%m-%dT%H:%M:%S.%fZ")
-             .alias('webPublicationDate')),
-            pl.col('Article Title').alias('webTitle'),
-            pl.col('Article Contents').alias('bodyText'),
-            pl.col('URL').alias('webUrl'),
+             .alias('web_publication_date')),
+            pl.col('Article Title').alias('web_title'),
+            pl.col('Article Contents').alias('body_text'),
+            pl.col('URL').alias('web_url'),
             # Full titlecase for sectionName
             section_raw.str.split(" ").list.eval(
                 pl.concat_str([
                     pl.element().str.slice(0, 1).str.to_uppercase(),
                     pl.element().str.slice(1).str.to_lowercase()
                 ], separator="")
-            ).list.join(" ").alias('sectionName')
+            ).list.join(" ").alias('section_name')
         ])
 
         # Eager collect once for stats + filter (combines everything; ~5-7s)
         df = lf.collect(engine='streaming')
         total_rows = df.height
-        invalid_dates = df['webPublicationDate'].null_count()
+        invalid_dates = df['web_publication_date'].null_count()
         sample_lf = df.head(100)
         logger.info(f"Invalid dates dropped: {invalid_dates}")
         nan_counts = {
-            'id': sample_lf['id'].null_count(),
-            'webPublicationDate': sample_lf['webPublicationDate'].null_count(),
-            'webTitle': sample_lf['webTitle'].null_count(),
-            'bodyText': sample_lf['bodyText'].null_count()
+            'article_id': sample_lf['article_id'].null_count(),
+            'web_publication_date': sample_lf['web_publication_date'].null_count(),
+            'web_title': sample_lf['web_title'].null_count(),
+            'body_text': sample_lf['body_text'].null_count()
         }
         logger.info(f"Sample NaN counts: {nan_counts}")
 
         # Filter in eager (fast in-memory)
         df = df.filter(
-            pl.col('id').is_not_null() &
-            pl.col('webPublicationDate').is_not_null() &
-            pl.col('webTitle').is_not_null() &
-            pl.col('bodyText').is_not_null()
+            pl.col('article_id').is_not_null() &
+            pl.col('web_publication_date').is_not_null() &
+            pl.col('web_title').is_not_null() &
+            pl.col('body_text').is_not_null()
         )
 
         if df.height == 0:
             logger.warning("No articles processed. Check dataset content or column mappings.")
+        
+        df = df.with_row_index(offset=1001).rename({'index': 'id'})
 
-        # Derive tags from category (since no original Tags column)
-        def make_tags_from_category(category: pl.Expr) -> pl.Expr:
-            cat_lower = category.str.to_lowercase().str.replace_all(r"\s+", "-", literal=False)
-            id_tag = pl.concat_str([pl.lit("tag_"), cat_lower], separator="")
-            json_tag = pl.concat_str([
-                pl.lit('{"id": "'), id_tag, pl.lit('", "type": "keyword", "webTitle": "'), category, pl.lit('"}')
-            ], separator="")
-            full_json = pl.concat_str([pl.lit("["), json_tag, pl.lit("]")], separator="")
-            return (
-                pl.when(category.is_null())
-                .then(pl.lit('[]'))
-                .otherwise(full_json)
-                .alias("tags")
-            )
-
-        # Apply tags + final select (eager)
-        df = df.with_columns(
-            make_tags_from_category(pl.col('sectionName'))
-        ).select([
-            'crawlTimestamp', 'id', 'webPublicationDate', 'webTitle',
-            'bodyText', 'tags', 'webUrl', 'sectionName'
+        # Final select (eager), including 'id'
+        df = df.select([
+            'id', 'crawl_timestamp', 'article_id', 'web_publication_date', 'web_title',
+            'body_text', 'web_url', 'section_name'
         ])
 
         # Write to CSV (DataFrame method)
