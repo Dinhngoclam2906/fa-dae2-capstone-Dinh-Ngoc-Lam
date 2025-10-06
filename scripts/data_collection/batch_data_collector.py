@@ -156,7 +156,7 @@ class BatchDataCollector:
         if df.height == 0:
             logger.warning("No articles processed. Check dataset content or column mappings.")
         
-        df = df.with_row_index(offset=1001).rename({'index': 'id'})
+        df = df.with_row_index(offset=1).rename({'index': 'id'})
 
         # Final select (eager), including 'id'
         df = df.select([

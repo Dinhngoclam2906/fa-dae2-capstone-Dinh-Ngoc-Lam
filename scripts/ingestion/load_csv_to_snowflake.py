@@ -37,6 +37,47 @@ def setup_schema_and_stage(cursor, database, schema):
     cursor.execute(f"CREATE STAGE IF NOT EXISTS {database}.{schema}.CSV_STAGE")
     print(f"✅ Stage {database}.{schema}.CSV_STAGE created or already exists")
 
+def clear_snowflake_table():
+    """Clear all historical data in Snowflake's raw_data table before batch load (TRUNCATE for speed)."""
+    conn = None
+    try:
+        conn = get_snowflake_connection()
+        cursor = conn.cursor()
+        database = os.getenv("SNOWFLAKE_DATABASE")
+        schema = os.getenv("SNOWFLAKE_SCHEMA")
+        table_name = f"{database}.{schema}.raw_data"
+        
+        # TRUNCATE (faster, keeps structure)
+        cursor.execute(f"TRUNCATE TABLE IF EXISTS {table_name}")
+        print(f"✅ Truncated {table_name} (historical data cleared before batch load)")
+        
+        # Alternative: DROP + CREATE (uncomment if preferred for full reset)
+        # cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
+        # create_table_command = f"""
+        # CREATE TABLE {table_name} (
+        #     id INTEGER PRIMARY KEY,
+        #     crawl_timestamp TIMESTAMP,
+        #     article_id VARCHAR(2000),
+        #     web_publication_date TIMESTAMP,
+        #     web_title STRING,
+        #     body_text STRING,
+        #     web_url VARCHAR(500),
+        #     section_name VARCHAR(255),
+        #     loaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+        # )
+        # """
+        # cursor.execute(create_table_command)
+        # print(f"✅ Dropped and recreated {table_name} (historical data cleared)")
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"❌ Failed to clear Snowflake table: {e}")
+        return False
+    finally:
+        if conn:
+            conn.close()
+
 def ingest_csv_to_snowflake(csv_file_path):
     """Full ingestion: Upload CSV to stage, then load to table (single connection)."""
     conn = get_snowflake_connection()
@@ -185,6 +226,12 @@ def ingest_csv_to_snowflake(csv_file_path):
 
 def main():
     """Main execution logic."""
+    # NEW: Clear historical before batch load
+    print("🔄 Clearing historical data in Snowflake...")
+    if not clear_snowflake_table():
+        print("❌ Clear failed—exiting.")
+        return
+    
     csv_file_path = r"D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\data\batch\guardian_historical_preprocessed.csv"
     success = ingest_csv_to_snowflake(csv_file_path)
     if not success:

@@ -65,10 +65,12 @@ capstone/
 |      ├── real_time_data_collector.py            # Guardian API ingestion
 |      ├── batch_data_collector.py                # HuggingFace historical news data ingestion
 |   ├──ingestion
-|      ├── load_csv_to_postgres.py                # Load local CSV to PostgreSQL
+|      ├── load_csv_to_postgre_then_snowflake.py  # Load local CSV to PostgreSQL
 |      ├── load_csv_to_snowflake.py               # Load local CSV to Snowflake
-|      ├── load_postgre_to_snowflake.py           # Load Postgre Data to Snowflake
-|      ├── snowflake_objects_verification.py      
+|      ├── snowflake_objects_verification.py
+|   ├──sql
+|      ├── init.sql
+├── .env.example 
 ├── .gitattributes/                    
 ├── .gitignore/                    
 ├── .python-version/                          
