@@ -4185,3 +4185,2119 @@ Update your versions in packages.yml, then run dbt deps
 [0m16:27:16.893610 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001DA5EA9AA50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001DA5EC5BC50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001DA5EC596D0>]}
 [0m16:27:16.894107 [debug] [MainThread]: Flushing usage events
 [0m16:27:18.547752 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m16:52:56.874210 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000016865782E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000168664F82D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000168636B3110>]}
+
+
+============================== 16:52:57.002008 | d9e9f0e0-8e96-4298-bd3d-90334ca6231c ==============================
+[0m16:52:57.002008 [info ] [MainThread]: Running with dbt=1.10.13
+[0m16:52:57.002772 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'profiles_dir': 'C:\\Users\\DELL\\.dbt', 'send_anonymous_usage_stats': 'True', 'version_check': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'warn_error': 'None', 'invocation_command': 'dbt run --full-refresh', 'log_format': 'default', 'use_colors': 'True', 'introspect': 'True', 'debug': 'False', 'log_cache_events': 'False', 'fail_fast': 'False', 'no_print': 'None', 'quiet': 'False', 'use_experimental_parser': 'False', 'empty': 'False', 'printer_width': '80', 'indirect_selection': 'eager', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'write_json': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'static_parser': 'True'}
+[0m16:53:05.680320 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': 'd9e9f0e0-8e96-4298-bd3d-90334ca6231c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000016865EA8B00>]}
+[0m16:53:05.777157 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': 'd9e9f0e0-8e96-4298-bd3d-90334ca6231c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000016865777790>]}
+[0m16:53:05.778529 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m16:53:06.358735 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m16:53:06.570071 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 0 files added, 0 files changed.
+[0m16:53:06.570558 [debug] [MainThread]: Partial parsing enabled, no changes found, skipping parsing
+[0m16:53:06.577502 [warn ] [MainThread]: [[33mWARNING[0m]: Configuration paths exist in your dbt_project.yml file which do not apply to any resources.
+There are 3 unused configuration paths:
+- models.capstone_dbt_project.03_mart
+- models.capstone_dbt_project.02_intermediate
+- seeds.capstone_dbt_project.raw_data
+[0m16:53:06.760949 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'load_project', 'label': 'd9e9f0e0-8e96-4298-bd3d-90334ca6231c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000016878E73B50>]}
+[0m16:53:06.910733 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m16:53:06.932110 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m16:53:07.206496 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'resource_counts', 'label': 'd9e9f0e0-8e96-4298-bd3d-90334ca6231c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000168668CE6C0>]}
+[0m16:53:07.207149 [info ] [MainThread]: Found 3 models, 23 data tests, 1 source, 608 macros
+[0m16:53:07.207833 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': 'd9e9f0e0-8e96-4298-bd3d-90334ca6231c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000168796083D0>]}
+[0m16:53:07.251668 [info ] [MainThread]: 
+[0m16:53:07.252441 [info ] [MainThread]: Concurrency: 4 threads (target='dev')
+[0m16:53:07.253085 [info ] [MainThread]: 
+[0m16:53:07.254142 [debug] [MainThread]: Acquiring new snowflake connection 'master'
+[0m16:53:07.263809 [debug] [ThreadPool]: Acquiring new snowflake connection 'list_DB_T26'
+[0m16:53:08.025255 [debug] [ThreadPool]: Using snowflake connection "list_DB_T26"
+[0m16:53:08.025693 [debug] [ThreadPool]: On list_DB_T26: show terse schemas in database DB_T26
+    limit 10000
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "connection_name": "list_DB_T26"} */
+[0m16:53:08.026046 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m16:53:11.752248 [debug] [ThreadPool]: SQL status: SUCCESS 8 in 3.726 seconds
+[0m16:53:11.760186 [debug] [ThreadPool]: Acquiring new snowflake connection 'list_DB_T26_STAGING'
+[0m16:53:11.808111 [debug] [ThreadPool]: Using snowflake connection "list_DB_T26_STAGING"
+[0m16:53:11.811309 [debug] [ThreadPool]: On list_DB_T26_STAGING: show objects in DB_T26.STAGING
+    limit 10000
+    
+
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "connection_name": "list_DB_T26_STAGING"} */;
+[0m16:53:11.813227 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m16:53:13.170403 [debug] [ThreadPool]: SQL status: SUCCESS 0 in 1.357 seconds
+[0m16:53:13.179559 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': 'd9e9f0e0-8e96-4298-bd3d-90334ca6231c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000016879F1E9C0>]}
+[0m16:53:13.241608 [debug] [Thread-1 (]: Began running node model.capstone_dbt_project.my_first_dbt_model
+[0m16:53:13.243882 [debug] [Thread-2 (]: Began running node model.capstone_dbt_project.stg_sf__guardian
+[0m16:53:13.246646 [info ] [Thread-1 (]: 1 of 3 START sql table model STAGING.my_first_dbt_model ........................ [RUN]
+[0m16:53:13.252564 [debug] [Thread-1 (]: Acquiring new snowflake connection 'model.capstone_dbt_project.my_first_dbt_model'
+[0m16:53:13.254507 [debug] [Thread-1 (]: Began compiling node model.capstone_dbt_project.my_first_dbt_model
+[0m16:53:13.249196 [info ] [Thread-2 (]: 2 of 3 START sql view model STAGING.stg_sf__guardian ........................... [RUN]
+[0m16:53:13.283063 [debug] [Thread-2 (]: Acquiring new snowflake connection 'model.capstone_dbt_project.stg_sf__guardian'
+[0m16:53:13.286807 [debug] [Thread-1 (]: Writing injected SQL for node "model.capstone_dbt_project.my_first_dbt_model"
+[0m16:53:13.287534 [debug] [Thread-2 (]: Began compiling node model.capstone_dbt_project.stg_sf__guardian
+[0m16:53:13.311512 [debug] [Thread-2 (]: Writing injected SQL for node "model.capstone_dbt_project.stg_sf__guardian"
+[0m16:53:13.312612 [debug] [Thread-1 (]: Began executing node model.capstone_dbt_project.my_first_dbt_model
+[0m16:53:13.346555 [debug] [Thread-1 (]: Writing runtime sql for node "model.capstone_dbt_project.my_first_dbt_model"
+[0m16:53:13.347535 [debug] [Thread-2 (]: Began executing node model.capstone_dbt_project.stg_sf__guardian
+[0m16:53:13.370436 [debug] [Thread-2 (]: Writing runtime sql for node "model.capstone_dbt_project.stg_sf__guardian"
+[0m16:53:13.371680 [debug] [Thread-1 (]: Using snowflake connection "model.capstone_dbt_project.my_first_dbt_model"
+[0m16:53:13.372244 [debug] [Thread-1 (]: On model.capstone_dbt_project.my_first_dbt_model: create or replace transient table DB_T26.STAGING.my_first_dbt_model
+    
+    
+    
+    as (/*
+    Welcome to your first dbt model!
+    Did you know that you can also configure models directly within SQL files?
+    This will override configurations stated in dbt_project.yml
+
+    Try changing "table" to "view" below
+*/
+
+
+
+with source_data as (
+
+    select 1 as id
+    union all
+    select null as id
+
+)
+
+select *
+from source_data
+
+/*
+    Uncomment the line below to remove records with null `id` values
+*/
+
+-- where id is not null
+    )
+
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "model.capstone_dbt_project.my_first_dbt_model"} */;
+[0m16:53:13.372660 [debug] [Thread-1 (]: Opening a new connection, currently in state init
+[0m16:53:13.409219 [debug] [Thread-2 (]: Using snowflake connection "model.capstone_dbt_project.stg_sf__guardian"
+[0m16:53:13.409796 [debug] [Thread-2 (]: On model.capstone_dbt_project.stg_sf__guardian: create or replace   view DB_T26.STAGING.stg_sf__guardian
+  
+  
+  
+  
+  as (
+    -- models/01_staging/stg_articles.sql
+
+
+WITH raw_articles AS (
+    SELECT
+        id::INTEGER AS id,
+        crawl_timestamp::TIMESTAMP_NTZ AS crawl_timestamp,
+        article_id::STRING AS article_id,
+        TRY_TO_TIMESTAMP_NTZ(web_publication_date::STRING) AS web_publication_date,  -- Safe cast for potential string dates
+        web_title::STRING AS web_title,
+        body_text::STRING AS body_text,
+        web_url::STRING AS web_url,
+        section_name::STRING AS section_name,
+        loaded_at::TIMESTAMP_NTZ AS loaded_at
+    FROM DB_T26.sc_t26.raw_data
+    WHERE id IS NOT NULL  -- Basic row filter (id is PK)
+)
+
+SELECT
+    id,
+    crawl_timestamp,
+    article_id,
+    web_publication_date,
+    web_title,
+    body_text,
+    web_url,
+    section_name,
+    loaded_at,
+
+    -- Enhanced data quality flags
+    CASE
+        WHEN web_title IS NOT NULL 
+             AND TRIM(UPPER(web_title)) != '' 
+             AND LENGTH(TRIM(web_title)) <= 500  -- Reasonable title length cap
+        THEN TRUE
+        ELSE FALSE
+    END AS has_valid_title,
+
+    CASE
+        WHEN web_url IS NOT NULL 
+             AND TRIM(web_url) != '' 
+             AND web_url ILIKE 'http%' 
+             AND LENGTH(TRIM(web_url)) <= 1000  -- Reasonable URL length
+        THEN TRUE
+        ELSE FALSE
+    END AS has_valid_url,
+
+    CASE
+        WHEN body_text IS NOT NULL 
+             AND TRIM(body_text) != '' 
+             AND LENGTH(TRIM(body_text)) > 50  -- Basic content threshold
+        THEN TRUE
+        ELSE FALSE
+    END AS has_valid_content,
+
+    CASE
+        WHEN section_name IS NOT NULL AND TRIM(section_name) != ''
+        THEN TRUE
+        ELSE FALSE
+    END AS has_valid_section,
+
+    -- Processing metadata
+    CURRENT_TIMESTAMP() AS processed_at,
+    'dbt_staging' AS processing_source
+
+FROM raw_articles
+WHERE article_id IS NOT NULL  -- Ensure core identifier is present
+  AND has_valid_title  -- Filter out invalid titles early (optional; can be removed if tests handle it)
+  )
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "model.capstone_dbt_project.stg_sf__guardian"} */;
+[0m16:53:13.410266 [debug] [Thread-2 (]: Opening a new connection, currently in state init
+[0m16:53:14.928070 [debug] [Thread-2 (]: SQL status: SUCCESS 1 in 1.518 seconds
+[0m16:53:14.985788 [debug] [Thread-2 (]: Sending event: {'category': 'dbt', 'action': 'run_model', 'label': 'd9e9f0e0-8e96-4298-bd3d-90334ca6231c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001687A422750>]}
+[0m16:53:14.986676 [info ] [Thread-2 (]: 2 of 3 OK created sql view model STAGING.stg_sf__guardian ...................... [[32mSUCCESS 1[0m in 1.70s]
+[0m16:53:14.987600 [debug] [Thread-2 (]: Finished running node model.capstone_dbt_project.stg_sf__guardian
+[0m16:53:15.815412 [debug] [Thread-1 (]: SQL status: SUCCESS 1 in 2.443 seconds
+[0m16:53:15.818518 [debug] [Thread-1 (]: Sending event: {'category': 'dbt', 'action': 'run_model', 'label': 'd9e9f0e0-8e96-4298-bd3d-90334ca6231c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000016879487A10>]}
+[0m16:53:15.819330 [info ] [Thread-1 (]: 1 of 3 OK created sql table model STAGING.my_first_dbt_model ................... [[32mSUCCESS 1[0m in 2.57s]
+[0m16:53:15.820259 [debug] [Thread-1 (]: Finished running node model.capstone_dbt_project.my_first_dbt_model
+[0m16:53:15.821225 [debug] [Thread-3 (]: Began running node model.capstone_dbt_project.my_second_dbt_model
+[0m16:53:15.821733 [info ] [Thread-3 (]: 3 of 3 START sql view model STAGING.my_second_dbt_model ........................ [RUN]
+[0m16:53:15.822595 [debug] [Thread-3 (]: Acquiring new snowflake connection 'model.capstone_dbt_project.my_second_dbt_model'
+[0m16:53:15.822987 [debug] [Thread-3 (]: Began compiling node model.capstone_dbt_project.my_second_dbt_model
+[0m16:53:15.825887 [debug] [Thread-3 (]: Writing injected SQL for node "model.capstone_dbt_project.my_second_dbt_model"
+[0m16:53:15.826724 [debug] [Thread-3 (]: Began executing node model.capstone_dbt_project.my_second_dbt_model
+[0m16:53:15.829903 [debug] [Thread-3 (]: Writing runtime sql for node "model.capstone_dbt_project.my_second_dbt_model"
+[0m16:53:15.831137 [debug] [Thread-3 (]: Using snowflake connection "model.capstone_dbt_project.my_second_dbt_model"
+[0m16:53:15.831668 [debug] [Thread-3 (]: On model.capstone_dbt_project.my_second_dbt_model: create or replace   view DB_T26.STAGING.my_second_dbt_model
+  
+  
+  
+  
+  as (
+    -- Use the `ref` function to select from other models
+
+select *
+from DB_T26.STAGING.my_first_dbt_model
+where id = 1
+  )
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "model.capstone_dbt_project.my_second_dbt_model"} */;
+[0m16:53:15.832048 [debug] [Thread-3 (]: Opening a new connection, currently in state init
+[0m16:53:17.347212 [debug] [Thread-3 (]: SQL status: SUCCESS 1 in 1.515 seconds
+[0m16:53:17.357064 [debug] [Thread-3 (]: Sending event: {'category': 'dbt', 'action': 'run_model', 'label': 'd9e9f0e0-8e96-4298-bd3d-90334ca6231c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001687A499F90>]}
+[0m16:53:17.359219 [info ] [Thread-3 (]: 3 of 3 OK created sql view model STAGING.my_second_dbt_model ................... [[32mSUCCESS 1[0m in 1.53s]
+[0m16:53:17.361586 [debug] [Thread-3 (]: Finished running node model.capstone_dbt_project.my_second_dbt_model
+[0m16:53:17.365003 [debug] [MainThread]: Connection 'master' was properly closed.
+[0m16:53:17.365854 [debug] [MainThread]: Connection 'list_DB_T26' was left open.
+[0m16:53:17.366573 [debug] [MainThread]: On list_DB_T26: Close
+[0m16:53:17.894643 [debug] [MainThread]: Connection 'list_DB_T26_STAGING' was left open.
+[0m16:53:17.896589 [debug] [MainThread]: On list_DB_T26_STAGING: Close
+[0m16:53:18.391156 [debug] [MainThread]: Connection 'model.capstone_dbt_project.my_first_dbt_model' was left open.
+[0m16:53:18.391767 [debug] [MainThread]: On model.capstone_dbt_project.my_first_dbt_model: Close
+[0m16:53:18.852110 [debug] [MainThread]: Connection 'model.capstone_dbt_project.stg_sf__guardian' was left open.
+[0m16:53:18.853634 [debug] [MainThread]: On model.capstone_dbt_project.stg_sf__guardian: Close
+[0m16:53:19.333853 [debug] [MainThread]: Connection 'model.capstone_dbt_project.my_second_dbt_model' was left open.
+[0m16:53:19.334286 [debug] [MainThread]: On model.capstone_dbt_project.my_second_dbt_model: Close
+[0m16:53:20.573607 [info ] [MainThread]: 
+[0m16:53:20.574485 [info ] [MainThread]: Finished running 1 table model, 2 view models in 0 hours 0 minutes and 13.32 seconds (13.32s).
+[0m16:53:20.576244 [debug] [MainThread]: Command end result
+[0m16:53:20.617671 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m16:53:20.620177 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m16:53:20.626665 [debug] [MainThread]: Wrote artifact RunExecutionResult to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\run_results.json
+[0m16:53:20.627183 [info ] [MainThread]: 
+[0m16:53:20.627841 [info ] [MainThread]: [32mCompleted successfully[0m
+[0m16:53:20.628526 [info ] [MainThread]: 
+[0m16:53:20.629262 [info ] [MainThread]: Done. PASS=3 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=3
+[0m16:53:20.630596 [debug] [MainThread]: Command `dbt run` succeeded at 16:53:20.630482 after 24.01 seconds
+[0m16:53:20.631001 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000016864376350>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000168799267D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000016866B9A740>]}
+[0m16:53:20.631385 [debug] [MainThread]: Flushing usage events
+[0m16:53:22.265204 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m16:54:01.705036 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242AE502E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242AF2882D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242AC433110>]}
+
+
+============================== 16:54:01.709333 | 495d3262-c8a5-4f17-8482-88900960e6c5 ==============================
+[0m16:54:01.709333 [info ] [MainThread]: Running with dbt=1.10.13
+[0m16:54:01.710180 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'static_parser': 'True', 'send_anonymous_usage_stats': 'True', 'use_colors': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'version_check': 'True', 'invocation_command': 'dbt test --select stg_sf__guardian', 'log_format': 'default', 'warn_error': 'None', 'introspect': 'True', 'debug': 'False', 'printer_width': '80', 'fail_fast': 'False', 'no_print': 'None', 'quiet': 'False', 'empty': 'None', 'log_cache_events': 'False', 'use_experimental_parser': 'False', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'indirect_selection': 'eager', 'profiles_dir': 'C:\\Users\\DELL\\.dbt', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'write_json': 'True'}
+[0m16:54:02.799983 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': '495d3262-c8a5-4f17-8482-88900960e6c5', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242AEC38B00>]}
+[0m16:54:02.917373 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': '495d3262-c8a5-4f17-8482-88900960e6c5', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242AE4F7790>]}
+[0m16:54:02.918717 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m16:54:03.389242 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m16:54:03.591987 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 0 files added, 0 files changed.
+[0m16:54:03.592435 [debug] [MainThread]: Partial parsing enabled, no changes found, skipping parsing
+[0m16:54:03.598955 [warn ] [MainThread]: [[33mWARNING[0m]: Configuration paths exist in your dbt_project.yml file which do not apply to any resources.
+There are 3 unused configuration paths:
+- models.capstone_dbt_project.03_mart
+- models.capstone_dbt_project.02_intermediate
+- seeds.capstone_dbt_project.raw_data
+[0m16:54:03.673832 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'load_project', 'label': '495d3262-c8a5-4f17-8482-88900960e6c5', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242C1BE3A50>]}
+[0m16:54:03.865372 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m16:54:03.869554 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m16:54:04.086954 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'resource_counts', 'label': '495d3262-c8a5-4f17-8482-88900960e6c5', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242C23F49B0>]}
+[0m16:54:04.087854 [info ] [MainThread]: Found 3 models, 23 data tests, 1 source, 608 macros
+[0m16:54:04.088671 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': '495d3262-c8a5-4f17-8482-88900960e6c5', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242C240C910>]}
+[0m16:54:04.091505 [info ] [MainThread]: 
+[0m16:54:04.092561 [info ] [MainThread]: Concurrency: 4 threads (target='dev')
+[0m16:54:04.093633 [info ] [MainThread]: 
+[0m16:54:04.094936 [debug] [MainThread]: Acquiring new snowflake connection 'master'
+[0m16:54:04.104656 [debug] [ThreadPool]: Acquiring new snowflake connection 'list_DB_T26_STAGING'
+[0m16:54:04.225397 [debug] [ThreadPool]: Using snowflake connection "list_DB_T26_STAGING"
+[0m16:54:04.225997 [debug] [ThreadPool]: On list_DB_T26_STAGING: show objects in DB_T26.STAGING
+    limit 10000
+    
+
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "connection_name": "list_DB_T26_STAGING"} */;
+[0m16:54:04.226470 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m16:54:06.001296 [debug] [ThreadPool]: SQL status: SUCCESS 3 in 1.775 seconds
+[0m16:54:06.004819 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': '495d3262-c8a5-4f17-8482-88900960e6c5', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242C244EF70>]}
+[0m16:54:06.011362 [debug] [Thread-3 (]: Began running node test.capstone_dbt_project.not_null_stg_sf__guardian_article_id.41bb739548
+[0m16:54:06.012501 [debug] [Thread-2 (]: Began running node test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url.a31e693c5c
+[0m16:54:06.013084 [debug] [Thread-4 (]: Began running node test.capstone_dbt_project.not_null_stg_sf__guardian_crawl_timestamp.a622f020f4
+[0m16:54:06.011977 [info ] [Thread-3 (]: 3 of 11 START test not_null_stg_sf__guardian_article_id ........................ [RUN]
+[0m16:54:06.013740 [debug] [Thread-1 (]: Began running node test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title.8976b5ee8b
+[0m16:54:06.015441 [debug] [Thread-3 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.not_null_stg_sf__guardian_article_id.41bb739548'
+[0m16:54:06.014235 [info ] [Thread-2 (]: 2 of 11 START test dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url . [RUN]
+[0m16:54:06.016725 [debug] [Thread-3 (]: Began compiling node test.capstone_dbt_project.not_null_stg_sf__guardian_article_id.41bb739548
+[0m16:54:06.014704 [info ] [Thread-4 (]: 4 of 11 START test not_null_stg_sf__guardian_crawl_timestamp ................... [RUN]
+[0m16:54:06.017665 [debug] [Thread-2 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url.a31e693c5c'
+[0m16:54:06.016170 [info ] [Thread-1 (]: 1 of 11 START test dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title  [RUN]
+[0m16:54:06.041290 [debug] [Thread-3 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_stg_sf__guardian_article_id.41bb739548"
+[0m16:54:06.041992 [debug] [Thread-4 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.not_null_stg_sf__guardian_crawl_timestamp.a622f020f4'
+[0m16:54:06.042510 [debug] [Thread-2 (]: Began compiling node test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url.a31e693c5c
+[0m16:54:06.043087 [debug] [Thread-1 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title.8976b5ee8b'
+[0m16:54:06.043691 [debug] [Thread-4 (]: Began compiling node test.capstone_dbt_project.not_null_stg_sf__guardian_crawl_timestamp.a622f020f4
+[0m16:54:06.055654 [debug] [Thread-2 (]: Writing injected SQL for node "test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url.a31e693c5c"
+[0m16:54:06.056364 [debug] [Thread-1 (]: Began compiling node test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title.8976b5ee8b
+[0m16:54:06.060509 [debug] [Thread-4 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_stg_sf__guardian_crawl_timestamp.a622f020f4"
+[0m16:54:06.061030 [debug] [Thread-3 (]: Began executing node test.capstone_dbt_project.not_null_stg_sf__guardian_article_id.41bb739548
+[0m16:54:06.068615 [debug] [Thread-1 (]: Writing injected SQL for node "test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title.8976b5ee8b"
+[0m16:54:06.093416 [debug] [Thread-3 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_stg_sf__guardian_article_id.41bb739548"
+[0m16:54:06.094029 [debug] [Thread-2 (]: Began executing node test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url.a31e693c5c
+[0m16:54:06.096998 [debug] [Thread-4 (]: Began executing node test.capstone_dbt_project.not_null_stg_sf__guardian_crawl_timestamp.a622f020f4
+[0m16:54:06.102147 [debug] [Thread-2 (]: Writing runtime sql for node "test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url.a31e693c5c"
+[0m16:54:06.105024 [debug] [Thread-4 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_stg_sf__guardian_crawl_timestamp.a622f020f4"
+[0m16:54:06.105585 [debug] [Thread-1 (]: Began executing node test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title.8976b5ee8b
+[0m16:54:06.106684 [debug] [Thread-3 (]: Using snowflake connection "test.capstone_dbt_project.not_null_stg_sf__guardian_article_id.41bb739548"
+[0m16:54:06.110000 [debug] [Thread-1 (]: Writing runtime sql for node "test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title.8976b5ee8b"
+[0m16:54:06.110949 [debug] [Thread-2 (]: Using snowflake connection "test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url.a31e693c5c"
+[0m16:54:06.111416 [debug] [Thread-3 (]: On test.capstone_dbt_project.not_null_stg_sf__guardian_article_id.41bb739548: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select article_id
+from DB_T26.STAGING.stg_sf__guardian
+where article_id is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_stg_sf__guardian_article_id.41bb739548"} */
+[0m16:54:06.113168 [debug] [Thread-2 (]: On test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url.a31e693c5c: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+
+
+
+select
+    1
+from (select * from DB_T26.STAGING.stg_sf__guardian where has_valid_url = TRUE) dbt_subquery
+
+where not(has_valid_url )
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url.a31e693c5c"} */
+[0m16:54:06.114238 [debug] [Thread-3 (]: Opening a new connection, currently in state init
+[0m16:54:06.115247 [debug] [Thread-4 (]: Using snowflake connection "test.capstone_dbt_project.not_null_stg_sf__guardian_crawl_timestamp.a622f020f4"
+[0m16:54:06.117776 [debug] [Thread-1 (]: Using snowflake connection "test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title.8976b5ee8b"
+[0m16:54:06.118988 [debug] [Thread-2 (]: Opening a new connection, currently in state init
+[0m16:54:06.119653 [debug] [Thread-4 (]: On test.capstone_dbt_project.not_null_stg_sf__guardian_crawl_timestamp.a622f020f4: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select crawl_timestamp
+from DB_T26.STAGING.stg_sf__guardian
+where crawl_timestamp is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_stg_sf__guardian_crawl_timestamp.a622f020f4"} */
+[0m16:54:06.120219 [debug] [Thread-1 (]: On test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title.8976b5ee8b: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+
+
+
+select
+    1
+from (select * from DB_T26.STAGING.stg_sf__guardian where has_valid_title = TRUE) dbt_subquery
+
+where not(has_valid_title )
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title.8976b5ee8b"} */
+[0m16:54:06.120979 [debug] [Thread-4 (]: Opening a new connection, currently in state init
+[0m16:54:06.121587 [debug] [Thread-1 (]: Opening a new connection, currently in state init
+[0m16:54:08.035783 [debug] [Thread-3 (]: SQL status: SUCCESS 1 in 1.922 seconds
+[0m16:54:08.079221 [info ] [Thread-3 (]: 3 of 11 PASS not_null_stg_sf__guardian_article_id .............................. [[32mPASS[0m in 2.06s]
+[0m16:54:08.080739 [debug] [Thread-3 (]: Finished running node test.capstone_dbt_project.not_null_stg_sf__guardian_article_id.41bb739548
+[0m16:54:08.081376 [debug] [Thread-3 (]: Began running node test.capstone_dbt_project.not_null_stg_sf__guardian_id.683d8f41ed
+[0m16:54:08.081957 [info ] [Thread-3 (]: 5 of 11 START test not_null_stg_sf__guardian_id ................................ [RUN]
+[0m16:54:08.082856 [debug] [Thread-3 (]: Re-using an available connection from the pool (formerly test.capstone_dbt_project.not_null_stg_sf__guardian_article_id.41bb739548, now test.capstone_dbt_project.not_null_stg_sf__guardian_id.683d8f41ed)
+[0m16:54:08.083454 [debug] [Thread-3 (]: Began compiling node test.capstone_dbt_project.not_null_stg_sf__guardian_id.683d8f41ed
+[0m16:54:08.088420 [debug] [Thread-3 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_stg_sf__guardian_id.683d8f41ed"
+[0m16:54:08.089421 [debug] [Thread-3 (]: Began executing node test.capstone_dbt_project.not_null_stg_sf__guardian_id.683d8f41ed
+[0m16:54:08.093016 [debug] [Thread-3 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_stg_sf__guardian_id.683d8f41ed"
+[0m16:54:08.094237 [debug] [Thread-3 (]: Using snowflake connection "test.capstone_dbt_project.not_null_stg_sf__guardian_id.683d8f41ed"
+[0m16:54:08.094790 [debug] [Thread-3 (]: On test.capstone_dbt_project.not_null_stg_sf__guardian_id.683d8f41ed: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select id
+from DB_T26.STAGING.stg_sf__guardian
+where id is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_stg_sf__guardian_id.683d8f41ed"} */
+[0m16:54:08.153317 [debug] [Thread-2 (]: SQL status: SUCCESS 1 in 2.034 seconds
+[0m16:54:08.155354 [info ] [Thread-2 (]: 2 of 11 PASS dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url ....... [[32mPASS[0m in 2.14s]
+[0m16:54:08.156329 [debug] [Thread-2 (]: Finished running node test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url.a31e693c5c
+[0m16:54:08.156804 [debug] [Thread-2 (]: Began running node test.capstone_dbt_project.not_null_stg_sf__guardian_loaded_at.572f2a66c2
+[0m16:54:08.157244 [info ] [Thread-2 (]: 6 of 11 START test not_null_stg_sf__guardian_loaded_at ......................... [RUN]
+[0m16:54:08.157879 [debug] [Thread-2 (]: Re-using an available connection from the pool (formerly test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_url.a31e693c5c, now test.capstone_dbt_project.not_null_stg_sf__guardian_loaded_at.572f2a66c2)
+[0m16:54:08.158331 [debug] [Thread-2 (]: Began compiling node test.capstone_dbt_project.not_null_stg_sf__guardian_loaded_at.572f2a66c2
+[0m16:54:08.162555 [debug] [Thread-2 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_stg_sf__guardian_loaded_at.572f2a66c2"
+[0m16:54:08.163646 [debug] [Thread-2 (]: Began executing node test.capstone_dbt_project.not_null_stg_sf__guardian_loaded_at.572f2a66c2
+[0m16:54:08.172817 [debug] [Thread-2 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_stg_sf__guardian_loaded_at.572f2a66c2"
+[0m16:54:08.174112 [debug] [Thread-2 (]: Using snowflake connection "test.capstone_dbt_project.not_null_stg_sf__guardian_loaded_at.572f2a66c2"
+[0m16:54:08.174638 [debug] [Thread-2 (]: On test.capstone_dbt_project.not_null_stg_sf__guardian_loaded_at.572f2a66c2: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select loaded_at
+from DB_T26.STAGING.stg_sf__guardian
+where loaded_at is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_stg_sf__guardian_loaded_at.572f2a66c2"} */
+[0m16:54:08.345076 [debug] [Thread-1 (]: SQL status: SUCCESS 1 in 2.223 seconds
+[0m16:54:08.347455 [info ] [Thread-1 (]: 1 of 11 PASS dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title ..... [[32mPASS[0m in 2.30s]
+[0m16:54:08.348428 [debug] [Thread-1 (]: Finished running node test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title.8976b5ee8b
+[0m16:54:08.348924 [debug] [Thread-1 (]: Began running node test.capstone_dbt_project.not_null_stg_sf__guardian_processed_at.61a4d7194d
+[0m16:54:08.349375 [info ] [Thread-1 (]: 7 of 11 START test not_null_stg_sf__guardian_processed_at ...................... [RUN]
+[0m16:54:08.350119 [debug] [Thread-1 (]: Re-using an available connection from the pool (formerly test.capstone_dbt_project.dbt_utils_expression_is_true_stg_sf__guardian_has_valid_title.8976b5ee8b, now test.capstone_dbt_project.not_null_stg_sf__guardian_processed_at.61a4d7194d)
+[0m16:54:08.350564 [debug] [Thread-1 (]: Began compiling node test.capstone_dbt_project.not_null_stg_sf__guardian_processed_at.61a4d7194d
+[0m16:54:08.354687 [debug] [Thread-1 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_stg_sf__guardian_processed_at.61a4d7194d"
+[0m16:54:08.355649 [debug] [Thread-1 (]: Began executing node test.capstone_dbt_project.not_null_stg_sf__guardian_processed_at.61a4d7194d
+[0m16:54:08.359110 [debug] [Thread-1 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_stg_sf__guardian_processed_at.61a4d7194d"
+[0m16:54:08.360681 [debug] [Thread-1 (]: Using snowflake connection "test.capstone_dbt_project.not_null_stg_sf__guardian_processed_at.61a4d7194d"
+[0m16:54:08.363505 [debug] [Thread-1 (]: On test.capstone_dbt_project.not_null_stg_sf__guardian_processed_at.61a4d7194d: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select processed_at
+from DB_T26.STAGING.stg_sf__guardian
+where processed_at is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_stg_sf__guardian_processed_at.61a4d7194d"} */
+[0m16:54:08.513176 [debug] [Thread-4 (]: SQL status: SUCCESS 1 in 2.392 seconds
+[0m16:54:08.516368 [info ] [Thread-4 (]: 4 of 11 PASS not_null_stg_sf__guardian_crawl_timestamp ......................... [[32mPASS[0m in 2.47s]
+[0m16:54:08.517329 [debug] [Thread-4 (]: Finished running node test.capstone_dbt_project.not_null_stg_sf__guardian_crawl_timestamp.a622f020f4
+[0m16:54:08.517799 [debug] [Thread-4 (]: Began running node test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498
+[0m16:54:08.518241 [info ] [Thread-4 (]: 8 of 11 START test not_null_stg_sf__guardian_web_title ......................... [RUN]
+[0m16:54:08.518942 [debug] [Thread-4 (]: Re-using an available connection from the pool (formerly test.capstone_dbt_project.not_null_stg_sf__guardian_crawl_timestamp.a622f020f4, now test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498)
+[0m16:54:08.519377 [debug] [Thread-4 (]: Began compiling node test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498
+[0m16:54:08.525204 [debug] [Thread-4 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498"
+[0m16:54:08.527247 [debug] [Thread-4 (]: Began executing node test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498
+[0m16:54:08.534697 [debug] [Thread-4 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498"
+[0m16:54:08.536271 [debug] [Thread-4 (]: Using snowflake connection "test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498"
+[0m16:54:08.536954 [debug] [Thread-4 (]: On test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select web_title
+from DB_T26.STAGING.stg_sf__guardian
+where web_title is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498"} */
+[0m16:54:08.676557 [debug] [Thread-1 (]: SQL status: SUCCESS 1 in 0.311 seconds
+[0m16:54:08.679065 [info ] [Thread-1 (]: 7 of 11 PASS not_null_stg_sf__guardian_processed_at ............................ [[32mPASS[0m in 0.33s]
+[0m16:54:08.680099 [debug] [Thread-1 (]: Finished running node test.capstone_dbt_project.not_null_stg_sf__guardian_processed_at.61a4d7194d
+[0m16:54:08.680569 [debug] [Thread-1 (]: Began running node test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4
+[0m16:54:08.681003 [info ] [Thread-1 (]: 9 of 11 START test not_null_stg_sf__guardian_web_url ........................... [RUN]
+[0m16:54:08.681884 [debug] [Thread-1 (]: Re-using an available connection from the pool (formerly test.capstone_dbt_project.not_null_stg_sf__guardian_processed_at.61a4d7194d, now test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4)
+[0m16:54:08.682290 [debug] [Thread-1 (]: Began compiling node test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4
+[0m16:54:08.686229 [debug] [Thread-1 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4"
+[0m16:54:08.687133 [debug] [Thread-1 (]: Began executing node test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4
+[0m16:54:08.689815 [debug] [Thread-1 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4"
+[0m16:54:08.691551 [debug] [Thread-1 (]: Using snowflake connection "test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4"
+[0m16:54:08.692304 [debug] [Thread-1 (]: On test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select web_url
+from DB_T26.STAGING.stg_sf__guardian
+where web_url is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4"} */
+[0m16:54:08.723549 [debug] [Thread-3 (]: SQL status: SUCCESS 1 in 0.628 seconds
+[0m16:54:08.725548 [info ] [Thread-3 (]: 5 of 11 PASS not_null_stg_sf__guardian_id ...................................... [[32mPASS[0m in 0.64s]
+[0m16:54:08.726477 [debug] [Thread-3 (]: Finished running node test.capstone_dbt_project.not_null_stg_sf__guardian_id.683d8f41ed
+[0m16:54:08.726935 [debug] [Thread-3 (]: Began running node test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4
+[0m16:54:08.727366 [info ] [Thread-3 (]: 10 of 11 START test unique_stg_sf__guardian_article_id ......................... [RUN]
+[0m16:54:08.728045 [debug] [Thread-3 (]: Re-using an available connection from the pool (formerly test.capstone_dbt_project.not_null_stg_sf__guardian_id.683d8f41ed, now test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4)
+[0m16:54:08.728491 [debug] [Thread-3 (]: Began compiling node test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4
+[0m16:54:08.734670 [debug] [Thread-3 (]: Writing injected SQL for node "test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4"
+[0m16:54:08.735501 [debug] [Thread-3 (]: Began executing node test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4
+[0m16:54:08.738633 [debug] [Thread-3 (]: Writing runtime sql for node "test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4"
+[0m16:54:08.739906 [debug] [Thread-3 (]: Using snowflake connection "test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4"
+[0m16:54:08.740408 [debug] [Thread-3 (]: On test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+select
+    article_id as unique_field,
+    count(*) as n_records
+
+from DB_T26.STAGING.stg_sf__guardian
+where article_id is not null
+group by article_id
+having count(*) > 1
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4"} */
+[0m16:54:08.831194 [debug] [Thread-2 (]: SQL status: SUCCESS 1 in 0.656 seconds
+[0m16:54:08.837035 [info ] [Thread-2 (]: 6 of 11 PASS not_null_stg_sf__guardian_loaded_at ............................... [[32mPASS[0m in 0.68s]
+[0m16:54:08.839429 [debug] [Thread-2 (]: Finished running node test.capstone_dbt_project.not_null_stg_sf__guardian_loaded_at.572f2a66c2
+[0m16:54:08.840753 [debug] [Thread-2 (]: Began running node test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d
+[0m16:54:08.842039 [info ] [Thread-2 (]: 11 of 11 START test unique_stg_sf__guardian_id ................................. [RUN]
+[0m16:54:08.843874 [debug] [Thread-2 (]: Re-using an available connection from the pool (formerly test.capstone_dbt_project.not_null_stg_sf__guardian_loaded_at.572f2a66c2, now test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d)
+[0m16:54:08.845393 [debug] [Thread-2 (]: Began compiling node test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d
+[0m16:54:08.862244 [debug] [Thread-2 (]: Writing injected SQL for node "test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d"
+[0m16:54:08.864440 [debug] [Thread-2 (]: Began executing node test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d
+[0m16:54:08.869167 [debug] [Thread-2 (]: Writing runtime sql for node "test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d"
+[0m16:54:08.871278 [debug] [Thread-2 (]: Using snowflake connection "test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d"
+[0m16:54:08.872015 [debug] [Thread-2 (]: On test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+select
+    id as unique_field,
+    count(*) as n_records
+
+from DB_T26.STAGING.stg_sf__guardian
+where id is not null
+group by id
+having count(*) > 1
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d"} */
+[0m16:54:09.147911 [debug] [Thread-3 (]: SQL status: SUCCESS 1 in 0.407 seconds
+[0m16:54:09.156637 [debug] [Thread-4 (]: SQL status: SUCCESS 1 in 0.619 seconds
+[0m16:54:09.155807 [info ] [Thread-3 (]: 10 of 11 PASS unique_stg_sf__guardian_article_id ............................... [[32mPASS[0m in 0.43s]
+[0m16:54:09.159484 [debug] [Thread-3 (]: Finished running node test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4
+[0m16:54:09.158685 [info ] [Thread-4 (]: 8 of 11 PASS not_null_stg_sf__guardian_web_title ............................... [[32mPASS[0m in 0.64s]
+[0m16:54:09.160712 [debug] [Thread-4 (]: Finished running node test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498
+[0m16:54:09.286521 [debug] [Thread-1 (]: SQL status: SUCCESS 1 in 0.593 seconds
+[0m16:54:09.288594 [debug] [Thread-2 (]: SQL status: SUCCESS 1 in 0.416 seconds
+[0m16:54:09.290684 [info ] [Thread-1 (]: 9 of 11 PASS not_null_stg_sf__guardian_web_url ................................. [[32mPASS[0m in 0.61s]
+[0m16:54:09.293571 [debug] [Thread-1 (]: Finished running node test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4
+[0m16:54:09.292780 [info ] [Thread-2 (]: 11 of 11 PASS unique_stg_sf__guardian_id ....................................... [[32mPASS[0m in 0.45s]
+[0m16:54:09.294669 [debug] [Thread-2 (]: Finished running node test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d
+[0m16:54:09.296575 [debug] [MainThread]: Connection 'master' was properly closed.
+[0m16:54:09.296906 [debug] [MainThread]: Connection 'list_DB_T26_STAGING' was left open.
+[0m16:54:09.297230 [debug] [MainThread]: On list_DB_T26_STAGING: Close
+[0m16:54:09.799891 [debug] [MainThread]: Connection 'test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4' was left open.
+[0m16:54:09.800347 [debug] [MainThread]: On test.capstone_dbt_project.unique_stg_sf__guardian_article_id.752afc1ed4: Close
+[0m16:54:10.318812 [debug] [MainThread]: Connection 'test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d' was left open.
+[0m16:54:10.321029 [debug] [MainThread]: On test.capstone_dbt_project.unique_stg_sf__guardian_id.fca9dcd27d: Close
+[0m16:54:10.820436 [debug] [MainThread]: Connection 'test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498' was left open.
+[0m16:54:10.821032 [debug] [MainThread]: On test.capstone_dbt_project.not_null_stg_sf__guardian_web_title.0ee8ee7498: Close
+[0m16:54:11.314256 [debug] [MainThread]: Connection 'test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4' was left open.
+[0m16:54:11.314753 [debug] [MainThread]: On test.capstone_dbt_project.not_null_stg_sf__guardian_web_url.f7f2f63ec4: Close
+[0m16:54:11.802566 [info ] [MainThread]: 
+[0m16:54:11.803342 [info ] [MainThread]: Finished running 11 data tests in 0 hours 0 minutes and 7.71 seconds (7.71s).
+[0m16:54:11.805898 [debug] [MainThread]: Command end result
+[0m16:54:11.842672 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m16:54:11.845610 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m16:54:11.856688 [debug] [MainThread]: Wrote artifact RunExecutionResult to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\run_results.json
+[0m16:54:11.857312 [info ] [MainThread]: 
+[0m16:54:11.857965 [info ] [MainThread]: [32mCompleted successfully[0m
+[0m16:54:11.858545 [info ] [MainThread]: 
+[0m16:54:11.859160 [info ] [MainThread]: Done. PASS=11 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=11
+[0m16:54:11.860355 [debug] [MainThread]: Command `dbt test` succeeded at 16:54:11.860228 after 10.33 seconds
+[0m16:54:11.860819 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242AF8E9250>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242C2367AC0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000242C333A620>]}
+[0m16:54:11.861267 [debug] [MainThread]: Flushing usage events
+[0m16:54:13.160650 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m16:58:15.214318 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F0F6C76E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F0F79FC2D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F0F4BA7110>]}
+
+
+============================== 16:58:15.218640 | e0f89cd0-c0e3-46ca-86d3-c4427ed1a88b ==============================
+[0m16:58:15.218640 [info ] [MainThread]: Running with dbt=1.10.13
+[0m16:58:15.219477 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'write_json': 'True', 'send_anonymous_usage_stats': 'True', 'version_check': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'warn_error': 'None', 'invocation_command': 'dbt run --select int_article_metrics', 'log_format': 'default', 'use_colors': 'True', 'introspect': 'True', 'debug': 'False', 'log_cache_events': 'False', 'fail_fast': 'False', 'no_print': 'None', 'empty': 'False', 'quiet': 'False', 'printer_width': '80', 'use_experimental_parser': 'False', 'indirect_selection': 'eager', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'profiles_dir': 'C:\\Users\\DELL\\.dbt', 'static_parser': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])'}
+[0m16:58:16.529066 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': 'e0f89cd0-c0e3-46ca-86d3-c4427ed1a88b', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F0F73A8B00>]}
+[0m16:58:16.637525 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': 'e0f89cd0-c0e3-46ca-86d3-c4427ed1a88b', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F0F6C67790>]}
+[0m16:58:16.638847 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m16:58:17.037687 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m16:58:17.243717 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 0 files added, 0 files changed.
+[0m16:58:17.244216 [debug] [MainThread]: Partial parsing enabled, no changes found, skipping parsing
+[0m16:58:17.251098 [warn ] [MainThread]: [[33mWARNING[0m]: Configuration paths exist in your dbt_project.yml file which do not apply to any resources.
+There are 2 unused configuration paths:
+- models.capstone_dbt_project.03_mart
+- seeds.capstone_dbt_project.raw_data
+[0m16:58:17.311052 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'load_project', 'label': 'e0f89cd0-c0e3-46ca-86d3-c4427ed1a88b', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F08A513B50>]}
+[0m16:58:17.419022 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m16:58:17.422377 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m16:58:17.447186 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'resource_counts', 'label': 'e0f89cd0-c0e3-46ca-86d3-c4427ed1a88b', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F0F7DCE6C0>]}
+[0m16:58:17.447886 [info ] [MainThread]: Found 4 models, 28 data tests, 1 source, 608 macros
+[0m16:58:17.448520 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': 'e0f89cd0-c0e3-46ca-86d3-c4427ed1a88b', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F08ACB4830>]}
+[0m16:58:17.450313 [info ] [MainThread]: 
+[0m16:58:17.451023 [info ] [MainThread]: Concurrency: 4 threads (target='dev')
+[0m16:58:17.451658 [info ] [MainThread]: 
+[0m16:58:17.452492 [debug] [MainThread]: Acquiring new snowflake connection 'master'
+[0m16:58:17.457114 [debug] [ThreadPool]: Acquiring new snowflake connection 'list_DB_T26_STAGING'
+[0m16:58:17.562591 [debug] [ThreadPool]: Using snowflake connection "list_DB_T26_STAGING"
+[0m16:58:17.563091 [debug] [ThreadPool]: On list_DB_T26_STAGING: show objects in DB_T26.STAGING
+    limit 10000
+    
+
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "connection_name": "list_DB_T26_STAGING"} */;
+[0m16:58:17.563482 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m16:58:19.354028 [debug] [ThreadPool]: SQL status: SUCCESS 3 in 1.791 seconds
+[0m16:58:19.357124 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': 'e0f89cd0-c0e3-46ca-86d3-c4427ed1a88b', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F08AFF8940>]}
+[0m16:58:19.363652 [debug] [Thread-1 (]: Began running node model.capstone_dbt_project.int_article_metrics
+[0m16:58:19.364234 [debug] [Thread-1 (]: Acquiring new snowflake connection 'model.capstone_dbt_project.int_article_metrics'
+[0m16:58:19.364623 [debug] [Thread-1 (]: Began compiling node model.capstone_dbt_project.int_article_metrics
+[0m16:58:19.372049 [debug] [Thread-1 (]: Writing injected SQL for node "model.capstone_dbt_project.int_article_metrics"
+[0m16:58:19.373484 [debug] [Thread-1 (]: Finished running node model.capstone_dbt_project.int_article_metrics
+[0m16:58:19.375628 [debug] [MainThread]: Connection 'master' was properly closed.
+[0m16:58:19.375984 [debug] [MainThread]: Connection 'list_DB_T26_STAGING' was left open.
+[0m16:58:19.376318 [debug] [MainThread]: On list_DB_T26_STAGING: Close
+[0m16:58:19.806777 [debug] [MainThread]: Connection 'model.capstone_dbt_project.int_article_metrics' was properly closed.
+[0m16:58:19.808639 [info ] [MainThread]: 
+[0m16:58:19.811213 [info ] [MainThread]: Finished running  in 0 hours 0 minutes and 2.36 seconds (2.36s).
+[0m16:58:19.814617 [debug] [MainThread]: Command end result
+[0m16:58:19.890893 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m16:58:19.893715 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m16:58:19.897416 [debug] [MainThread]: Wrote artifact RunExecutionResult to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\run_results.json
+[0m16:58:19.898456 [debug] [MainThread]: Command `dbt run` succeeded at 16:58:19.898306 after 5.00 seconds
+[0m16:58:19.898931 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F0F8059250>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F08B372FC0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001F08B372C50>]}
+[0m16:58:19.899359 [debug] [MainThread]: Flushing usage events
+[0m16:58:21.224506 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m16:58:23.962678 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014A9B3F2E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014A9C17C2D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014A99327110>]}
+
+
+============================== 16:58:23.966951 | 0a58c20e-4a6d-410e-9b0d-fafb5a0e0a2c ==============================
+[0m16:58:23.966951 [info ] [MainThread]: Running with dbt=1.10.13
+[0m16:58:23.967812 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'send_anonymous_usage_stats': 'True', 'use_colors': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'warn_error': 'None', 'invocation_command': 'dbt test --select int_article_metrics', 'log_format': 'default', 'version_check': 'True', 'introspect': 'True', 'debug': 'False', 'log_cache_events': 'False', 'fail_fast': 'False', 'no_print': 'None', 'empty': 'None', 'printer_width': '80', 'quiet': 'False', 'use_experimental_parser': 'False', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'indirect_selection': 'eager', 'write_json': 'True', 'static_parser': 'True', 'profiles_dir': 'C:\\Users\\DELL\\.dbt'}
+[0m16:58:25.200134 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': '0a58c20e-4a6d-410e-9b0d-fafb5a0e0a2c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014A9BB28B00>]}
+[0m16:58:25.304694 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': '0a58c20e-4a6d-410e-9b0d-fafb5a0e0a2c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014A9B3E7790>]}
+[0m16:58:25.305834 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m16:58:25.681257 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m16:58:25.884055 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 0 files added, 0 files changed.
+[0m16:58:25.884525 [debug] [MainThread]: Partial parsing enabled, no changes found, skipping parsing
+[0m16:58:25.891310 [warn ] [MainThread]: [[33mWARNING[0m]: Configuration paths exist in your dbt_project.yml file which do not apply to any resources.
+There are 2 unused configuration paths:
+- models.capstone_dbt_project.03_mart
+- seeds.capstone_dbt_project.raw_data
+[0m16:58:25.952394 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'load_project', 'label': '0a58c20e-4a6d-410e-9b0d-fafb5a0e0a2c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014AAEAD3A50>]}
+[0m16:58:26.065933 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m16:58:26.068978 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m16:58:26.104430 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'resource_counts', 'label': '0a58c20e-4a6d-410e-9b0d-fafb5a0e0a2c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014AAF2F09B0>]}
+[0m16:58:26.105018 [info ] [MainThread]: Found 4 models, 28 data tests, 1 source, 608 macros
+[0m16:58:26.105689 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': '0a58c20e-4a6d-410e-9b0d-fafb5a0e0a2c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014AAF30CD70>]}
+[0m16:58:26.107655 [info ] [MainThread]: 
+[0m16:58:26.108303 [info ] [MainThread]: Concurrency: 4 threads (target='dev')
+[0m16:58:26.108946 [info ] [MainThread]: 
+[0m16:58:26.109833 [debug] [MainThread]: Acquiring new snowflake connection 'master'
+[0m16:58:26.114724 [debug] [ThreadPool]: Acquiring new snowflake connection 'list_DB_T26_STAGING'
+[0m16:58:26.215122 [debug] [ThreadPool]: Using snowflake connection "list_DB_T26_STAGING"
+[0m16:58:26.215603 [debug] [ThreadPool]: On list_DB_T26_STAGING: show objects in DB_T26.STAGING
+    limit 10000
+    
+
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "connection_name": "list_DB_T26_STAGING"} */;
+[0m16:58:26.215982 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m16:58:27.821522 [debug] [ThreadPool]: SQL status: SUCCESS 3 in 1.605 seconds
+[0m16:58:27.827172 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': '0a58c20e-4a6d-410e-9b0d-fafb5a0e0a2c', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014AAF55CBB0>]}
+[0m16:58:27.836771 [debug] [Thread-1 (]: Began running node test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172
+[0m16:58:27.837712 [debug] [Thread-2 (]: Began running node test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88
+[0m16:58:27.838562 [debug] [Thread-4 (]: Began running node test.capstone_dbt_project.not_null_int_article_metrics_section_name.0d3f6b3c06
+[0m16:58:27.839716 [debug] [Thread-3 (]: Began running node test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef
+[0m16:58:27.840683 [info ] [Thread-1 (]: 1 of 5 START test dbt_utils_expression_is_true_int_article_metrics_article_count  [RUN]
+[0m16:58:27.841555 [info ] [Thread-2 (]: 2 of 5 START test not_null_int_article_metrics_article_count ................... [RUN]
+[0m16:58:27.845102 [debug] [Thread-1 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172'
+[0m16:58:27.846786 [debug] [Thread-2 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88'
+[0m16:58:27.847363 [debug] [Thread-1 (]: Began compiling node test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172
+[0m16:58:27.842358 [info ] [Thread-4 (]: 4 of 5 START test not_null_int_article_metrics_section_name .................... [RUN]
+[0m16:58:27.848301 [debug] [Thread-2 (]: Began compiling node test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88
+[0m16:58:27.843571 [info ] [Thread-3 (]: 3 of 5 START test not_null_int_article_metrics_processed_at .................... [RUN]
+[0m16:58:27.888771 [debug] [Thread-4 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.not_null_int_article_metrics_section_name.0d3f6b3c06'
+[0m16:58:27.891314 [debug] [Thread-1 (]: Writing injected SQL for node "test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172"
+[0m16:58:27.898892 [debug] [Thread-2 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88"
+[0m16:58:27.899515 [debug] [Thread-3 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef'
+[0m16:58:27.899993 [debug] [Thread-4 (]: Began compiling node test.capstone_dbt_project.not_null_int_article_metrics_section_name.0d3f6b3c06
+[0m16:58:27.901394 [debug] [Thread-3 (]: Began compiling node test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef
+[0m16:58:27.912651 [debug] [Thread-4 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_int_article_metrics_section_name.0d3f6b3c06"
+[0m16:58:27.917791 [debug] [Thread-3 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef"
+[0m16:58:28.035921 [debug] [Thread-1 (]: Writing injected SQL for node "test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172"
+[0m16:58:28.037978 [debug] [Thread-4 (]: Began executing node test.capstone_dbt_project.not_null_int_article_metrics_section_name.0d3f6b3c06
+[0m16:58:28.061249 [debug] [Thread-4 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_int_article_metrics_section_name.0d3f6b3c06"
+[0m16:58:28.062555 [debug] [Thread-3 (]: Began executing node test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef
+[0m16:58:28.063267 [debug] [Thread-1 (]: Began executing node test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172
+[0m16:58:28.064092 [debug] [Thread-2 (]: Began executing node test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88
+[0m16:58:28.067000 [debug] [Thread-3 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef"
+[0m16:58:28.069781 [debug] [Thread-1 (]: Writing runtime sql for node "test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172"
+[0m16:58:28.072082 [debug] [Thread-2 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88"
+[0m16:58:28.075825 [debug] [Thread-1 (]: Using snowflake connection "test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172"
+[0m16:58:28.077507 [debug] [Thread-3 (]: Using snowflake connection "test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef"
+[0m16:58:28.078048 [debug] [Thread-3 (]: On test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+with __dbt__cte__int_article_metrics as (
+
+
+SELECT
+    section_name,
+    COUNT(*) AS article_count,
+    ROUND(AVG(LENGTH(body_text)), 0) AS avg_body_length_chars,
+    COUNT(DISTINCT web_url) AS unique_urls,
+    MIN(crawl_timestamp) AS earliest_crawl,
+    MAX(loaded_at) AS latest_load,
+    SUM(CASE WHEN has_valid_content THEN 1 ELSE 0 END) AS valid_articles,
+    CURRENT_TIMESTAMP() AS processed_at
+FROM DB_T26.STAGING.stg_sf__guardian
+GROUP BY section_name
+HAVING article_count > 1
+) select processed_at
+from __dbt__cte__int_article_metrics
+where processed_at is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef"} */
+[0m16:58:28.078645 [debug] [Thread-3 (]: Opening a new connection, currently in state init
+[0m16:58:28.079861 [debug] [Thread-4 (]: Using snowflake connection "test.capstone_dbt_project.not_null_int_article_metrics_section_name.0d3f6b3c06"
+[0m16:58:28.076501 [debug] [Thread-1 (]: On test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+
+
+
+with __dbt__cte__int_article_metrics as (
+
+
+SELECT
+    section_name,
+    COUNT(*) AS article_count,
+    ROUND(AVG(LENGTH(body_text)), 0) AS avg_body_length_chars,
+    COUNT(DISTINCT web_url) AS unique_urls,
+    MIN(crawl_timestamp) AS earliest_crawl,
+    MAX(loaded_at) AS latest_load,
+    SUM(CASE WHEN has_valid_content THEN 1 ELSE 0 END) AS valid_articles,
+    CURRENT_TIMESTAMP() AS processed_at
+FROM DB_T26.STAGING.stg_sf__guardian
+GROUP BY section_name
+HAVING article_count > 1
+) select
+    1
+from (select * from __dbt__cte__int_article_metrics where article_count > 0) dbt_subquery
+
+where not(article_count )
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172"} */
+[0m16:58:28.081786 [debug] [Thread-2 (]: Using snowflake connection "test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88"
+[0m16:58:28.082439 [debug] [Thread-4 (]: On test.capstone_dbt_project.not_null_int_article_metrics_section_name.0d3f6b3c06: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+with __dbt__cte__int_article_metrics as (
+
+
+SELECT
+    section_name,
+    COUNT(*) AS article_count,
+    ROUND(AVG(LENGTH(body_text)), 0) AS avg_body_length_chars,
+    COUNT(DISTINCT web_url) AS unique_urls,
+    MIN(crawl_timestamp) AS earliest_crawl,
+    MAX(loaded_at) AS latest_load,
+    SUM(CASE WHEN has_valid_content THEN 1 ELSE 0 END) AS valid_articles,
+    CURRENT_TIMESTAMP() AS processed_at
+FROM DB_T26.STAGING.stg_sf__guardian
+GROUP BY section_name
+HAVING article_count > 1
+) select section_name
+from __dbt__cte__int_article_metrics
+where section_name is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_int_article_metrics_section_name.0d3f6b3c06"} */
+[0m16:58:28.083051 [debug] [Thread-1 (]: Opening a new connection, currently in state init
+[0m16:58:28.122264 [debug] [Thread-2 (]: On test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+with __dbt__cte__int_article_metrics as (
+
+
+SELECT
+    section_name,
+    COUNT(*) AS article_count,
+    ROUND(AVG(LENGTH(body_text)), 0) AS avg_body_length_chars,
+    COUNT(DISTINCT web_url) AS unique_urls,
+    MIN(crawl_timestamp) AS earliest_crawl,
+    MAX(loaded_at) AS latest_load,
+    SUM(CASE WHEN has_valid_content THEN 1 ELSE 0 END) AS valid_articles,
+    CURRENT_TIMESTAMP() AS processed_at
+FROM DB_T26.STAGING.stg_sf__guardian
+GROUP BY section_name
+HAVING article_count > 1
+) select article_count
+from __dbt__cte__int_article_metrics
+where article_count is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88"} */
+[0m16:58:28.123723 [debug] [Thread-4 (]: Opening a new connection, currently in state init
+[0m16:58:28.125632 [debug] [Thread-2 (]: Opening a new connection, currently in state init
+[0m16:58:29.800843 [debug] [Thread-4 (]: SQL status: SUCCESS 1 in 1.677 seconds
+[0m16:58:29.809044 [info ] [Thread-4 (]: 4 of 5 PASS not_null_int_article_metrics_section_name .......................... [[32mPASS[0m in 1.92s]
+[0m16:58:29.810088 [debug] [Thread-4 (]: Finished running node test.capstone_dbt_project.not_null_int_article_metrics_section_name.0d3f6b3c06
+[0m16:58:29.810556 [debug] [Thread-4 (]: Began running node test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17
+[0m16:58:29.810950 [info ] [Thread-4 (]: 5 of 5 START test unique_int_article_metrics_section_name ...................... [RUN]
+[0m16:58:29.811726 [debug] [Thread-4 (]: Re-using an available connection from the pool (formerly test.capstone_dbt_project.not_null_int_article_metrics_section_name.0d3f6b3c06, now test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17)
+[0m16:58:29.812136 [debug] [Thread-4 (]: Began compiling node test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17
+[0m16:58:29.822745 [debug] [Thread-4 (]: Writing injected SQL for node "test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17"
+[0m16:58:29.825421 [debug] [Thread-4 (]: Began executing node test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17
+[0m16:58:29.838907 [debug] [Thread-4 (]: Writing runtime sql for node "test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17"
+[0m16:58:29.840544 [debug] [Thread-3 (]: SQL status: SUCCESS 1 in 1.762 seconds
+[0m16:58:29.843538 [info ] [Thread-3 (]: 3 of 5 PASS not_null_int_article_metrics_processed_at .......................... [[32mPASS[0m in 1.94s]
+[0m16:58:29.845396 [debug] [Thread-3 (]: Finished running node test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef
+[0m16:58:29.847508 [debug] [Thread-4 (]: Using snowflake connection "test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17"
+[0m16:58:29.848225 [debug] [Thread-4 (]: On test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+with __dbt__cte__int_article_metrics as (
+
+
+SELECT
+    section_name,
+    COUNT(*) AS article_count,
+    ROUND(AVG(LENGTH(body_text)), 0) AS avg_body_length_chars,
+    COUNT(DISTINCT web_url) AS unique_urls,
+    MIN(crawl_timestamp) AS earliest_crawl,
+    MAX(loaded_at) AS latest_load,
+    SUM(CASE WHEN has_valid_content THEN 1 ELSE 0 END) AS valid_articles,
+    CURRENT_TIMESTAMP() AS processed_at
+FROM DB_T26.STAGING.stg_sf__guardian
+GROUP BY section_name
+HAVING article_count > 1
+) select
+    section_name as unique_field,
+    count(*) as n_records
+
+from __dbt__cte__int_article_metrics
+where section_name is not null
+group by section_name
+having count(*) > 1
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17"} */
+[0m16:58:29.902061 [debug] [Thread-1 (]: SQL status: SUCCESS 1 in 1.819 seconds
+[0m16:58:29.905088 [info ] [Thread-1 (]: 1 of 5 PASS dbt_utils_expression_is_true_int_article_metrics_article_count ..... [[32mPASS[0m in 2.06s]
+[0m16:58:29.907030 [debug] [Thread-1 (]: Finished running node test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172
+[0m16:58:29.918040 [debug] [Thread-2 (]: SQL status: SUCCESS 1 in 1.792 seconds
+[0m16:58:29.921143 [info ] [Thread-2 (]: 2 of 5 PASS not_null_int_article_metrics_article_count ......................... [[32mPASS[0m in 2.08s]
+[0m16:58:29.922487 [debug] [Thread-2 (]: Finished running node test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88
+[0m16:58:30.352774 [debug] [Thread-4 (]: SQL status: SUCCESS 1 in 0.503 seconds
+[0m16:58:30.362262 [info ] [Thread-4 (]: 5 of 5 PASS unique_int_article_metrics_section_name ............................ [[32mPASS[0m in 0.55s]
+[0m16:58:30.366305 [debug] [Thread-4 (]: Finished running node test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17
+[0m16:58:30.373803 [debug] [MainThread]: Connection 'master' was properly closed.
+[0m16:58:30.375549 [debug] [MainThread]: Connection 'list_DB_T26_STAGING' was left open.
+[0m16:58:30.377235 [debug] [MainThread]: On list_DB_T26_STAGING: Close
+[0m16:58:30.785462 [debug] [MainThread]: Connection 'test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172' was left open.
+[0m16:58:30.787649 [debug] [MainThread]: On test.capstone_dbt_project.dbt_utils_expression_is_true_int_article_metrics_article_count.26f4f86172: Close
+[0m16:58:31.216704 [debug] [MainThread]: Connection 'test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88' was left open.
+[0m16:58:31.217385 [debug] [MainThread]: On test.capstone_dbt_project.not_null_int_article_metrics_article_count.a811a9bb88: Close
+[0m16:58:31.633160 [debug] [MainThread]: Connection 'test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17' was left open.
+[0m16:58:31.633780 [debug] [MainThread]: On test.capstone_dbt_project.unique_int_article_metrics_section_name.1523c48b17: Close
+[0m16:58:32.057919 [debug] [MainThread]: Connection 'test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef' was left open.
+[0m16:58:32.058685 [debug] [MainThread]: On test.capstone_dbt_project.not_null_int_article_metrics_processed_at.35ac262cef: Close
+[0m16:58:32.492170 [info ] [MainThread]: 
+[0m16:58:32.492903 [info ] [MainThread]: Finished running 5 data tests in 0 hours 0 minutes and 6.38 seconds (6.38s).
+[0m16:58:32.494661 [debug] [MainThread]: Command end result
+[0m16:58:32.536615 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m16:58:32.540537 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m16:58:32.551595 [debug] [MainThread]: Wrote artifact RunExecutionResult to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\run_results.json
+[0m16:58:32.552083 [info ] [MainThread]: 
+[0m16:58:32.552697 [info ] [MainThread]: [32mCompleted successfully[0m
+[0m16:58:32.553354 [info ] [MainThread]: 
+[0m16:58:32.554050 [info ] [MainThread]: Done. PASS=5 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=5
+[0m16:58:32.555291 [debug] [MainThread]: Command `dbt test` succeeded at 16:58:32.555147 after 8.75 seconds
+[0m16:58:32.555692 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014A9C7D9250>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014AAF26D4F0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000014AB01AA8E0>]}
+[0m16:58:32.556088 [debug] [MainThread]: Flushing usage events
+[0m16:58:33.848138 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m17:07:11.644977 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C7F3F66E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C7F4CD82D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C7F1E97110>]}
+
+
+============================== 17:07:11.649194 | da0299cb-01fb-47d6-9fab-f87edd019358 ==============================
+[0m17:07:11.649194 [info ] [MainThread]: Running with dbt=1.10.13
+[0m17:07:11.650025 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'profiles_dir': 'C:\\Users\\DELL\\.dbt', 'send_anonymous_usage_stats': 'True', 'use_colors': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'version_check': 'True', 'invocation_command': 'dbt run --select mart_section_summary', 'log_format': 'default', 'warn_error': 'None', 'introspect': 'True', 'debug': 'False', 'log_cache_events': 'False', 'fail_fast': 'False', 'no_print': 'None', 'use_experimental_parser': 'False', 'quiet': 'False', 'empty': 'False', 'printer_width': '80', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'indirect_selection': 'eager', 'write_json': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'static_parser': 'True'}
+[0m17:07:12.734722 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': 'da0299cb-01fb-47d6-9fab-f87edd019358', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C7F4688B00>]}
+[0m17:07:12.837828 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': 'da0299cb-01fb-47d6-9fab-f87edd019358', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C7F3F57790>]}
+[0m17:07:12.839129 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m17:07:13.215969 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m17:07:13.380296 [error] [MainThread]: Encountered an error:
+Parsing Error
+  Error reading capstone_dbt_project: 03_mart\mart_section_summary.yml - Runtime Error
+    Syntax error near line 13
+    ------------------------------
+    10 |           - not_null
+    11 |           - unique
+    12 |       - name: valid_rate_percent
+    13 |         description: % of valid articles in section
+    14 |         tests:
+    15 |           - not_null
+    16 |           - dbt_utils.expression_is_true:
+    
+    Raw Error:
+    ------------------------------
+    while scanning for the next token
+    found character that cannot start any token
+      in "<unicode string>", line 13, column 22
+[0m17:07:13.382087 [debug] [MainThread]: Command `dbt run` failed at 17:07:13.381952 after 1.99 seconds
+[0m17:07:13.382474 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C787BAEA50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C787BAED50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C787C32A80>]}
+[0m17:07:13.382860 [debug] [MainThread]: Flushing usage events
+[0m17:07:14.695281 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m17:07:17.469048 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001A2C72D2E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001A2C80482D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001A2C5203110>]}
+
+
+============================== 17:07:17.473579 | 043d6023-c750-429f-b41c-ff324ac9d371 ==============================
+[0m17:07:17.473579 [info ] [MainThread]: Running with dbt=1.10.13
+[0m17:07:17.474639 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'send_anonymous_usage_stats': 'True', 'version_check': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'use_colors': 'True', 'invocation_command': 'dbt test --select mart_section_summary', 'log_format': 'default', 'warn_error': 'None', 'introspect': 'True', 'debug': 'False', 'printer_width': '80', 'fail_fast': 'False', 'no_print': 'None', 'empty': 'None', 'use_experimental_parser': 'False', 'quiet': 'False', 'log_cache_events': 'False', 'indirect_selection': 'eager', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'profiles_dir': 'C:\\Users\\DELL\\.dbt', 'static_parser': 'True', 'write_json': 'True'}
+[0m17:07:18.603021 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': '043d6023-c750-429f-b41c-ff324ac9d371', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001A2C79F8B00>]}
+[0m17:07:18.704252 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': '043d6023-c750-429f-b41c-ff324ac9d371', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001A2C72C7790>]}
+[0m17:07:18.705468 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m17:07:19.088404 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m17:07:19.222623 [error] [MainThread]: Encountered an error:
+Parsing Error
+  Error reading capstone_dbt_project: 03_mart\mart_section_summary.yml - Runtime Error
+    Syntax error near line 13
+    ------------------------------
+    10 |           - not_null
+    11 |           - unique
+    12 |       - name: valid_rate_percent
+    13 |         description: % of valid articles in section
+    14 |         tests:
+    15 |           - not_null
+    16 |           - dbt_utils.expression_is_true:
+    
+    Raw Error:
+    ------------------------------
+    while scanning for the next token
+    found character that cannot start any token
+      in "<unicode string>", line 13, column 22
+[0m17:07:19.224465 [debug] [MainThread]: Command `dbt test` failed at 17:07:19.224311 after 1.91 seconds
+[0m17:07:19.224951 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001A2DAEA6A50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001A2DAEA6D50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001A2DAF2AA80>]}
+[0m17:07:19.225448 [debug] [MainThread]: Flushing usage events
+[0m17:07:21.512170 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m17:08:09.739617 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284EA526E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284EB2982D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284E8453110>]}
+
+
+============================== 17:08:09.743934 | d7d9a288-dc4c-4885-8a85-2cd4aaa95307 ==============================
+[0m17:08:09.743934 [info ] [MainThread]: Running with dbt=1.10.13
+[0m17:08:09.744825 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'write_json': 'True', 'send_anonymous_usage_stats': 'True', 'use_colors': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'version_check': 'True', 'invocation_command': 'dbt run --select mart_section_summary', 'log_format': 'default', 'warn_error': 'None', 'introspect': 'True', 'debug': 'False', 'printer_width': '80', 'fail_fast': 'False', 'no_print': 'None', 'empty': 'False', 'quiet': 'False', 'use_experimental_parser': 'False', 'log_cache_events': 'False', 'indirect_selection': 'eager', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'profiles_dir': 'C:\\Users\\DELL\\.dbt', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'static_parser': 'True'}
+[0m17:08:10.802684 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': 'd7d9a288-dc4c-4885-8a85-2cd4aaa95307', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284EAC48B00>]}
+[0m17:08:10.900979 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': 'd7d9a288-dc4c-4885-8a85-2cd4aaa95307', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284EA517790>]}
+[0m17:08:10.902234 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m17:08:11.289203 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m17:08:11.493644 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 0 files added, 0 files changed.
+[0m17:08:11.494130 [debug] [MainThread]: Partial parsing enabled, no changes found, skipping parsing
+[0m17:08:11.500885 [warn ] [MainThread]: [[33mWARNING[0m]: Configuration paths exist in your dbt_project.yml file which do not apply to any resources.
+There are 1 unused configuration paths:
+- seeds.capstone_dbt_project.raw_data
+[0m17:08:11.556499 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'load_project', 'label': 'd7d9a288-dc4c-4885-8a85-2cd4aaa95307', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284FDBF3B50>]}
+[0m17:08:11.671123 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m17:08:11.674396 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m17:08:11.697471 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'resource_counts', 'label': 'd7d9a288-dc4c-4885-8a85-2cd4aaa95307', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284EB66E6C0>]}
+[0m17:08:11.698101 [info ] [MainThread]: Found 5 models, 33 data tests, 1 source, 608 macros
+[0m17:08:11.698736 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': 'd7d9a288-dc4c-4885-8a85-2cd4aaa95307', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284FE4589F0>]}
+[0m17:08:11.700778 [info ] [MainThread]: 
+[0m17:08:11.701460 [info ] [MainThread]: Concurrency: 4 threads (target='dev')
+[0m17:08:11.702023 [info ] [MainThread]: 
+[0m17:08:11.702752 [debug] [MainThread]: Acquiring new snowflake connection 'master'
+[0m17:08:11.704346 [debug] [ThreadPool]: Acquiring new snowflake connection 'list_DB_T26'
+[0m17:08:11.808827 [debug] [ThreadPool]: Using snowflake connection "list_DB_T26"
+[0m17:08:11.809417 [debug] [ThreadPool]: On list_DB_T26: show terse schemas in database DB_T26
+    limit 10000
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "connection_name": "list_DB_T26"} */
+[0m17:08:11.809818 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m17:08:13.353627 [debug] [ThreadPool]: SQL status: SUCCESS 8 in 1.543 seconds
+[0m17:08:13.421162 [debug] [ThreadPool]: Acquiring new snowflake connection 'list_DB_T26_STAGING'
+[0m17:08:13.548857 [debug] [ThreadPool]: Using snowflake connection "list_DB_T26_STAGING"
+[0m17:08:13.552407 [debug] [ThreadPool]: On list_DB_T26_STAGING: show objects in DB_T26.STAGING
+    limit 10000
+    
+
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "connection_name": "list_DB_T26_STAGING"} */;
+[0m17:08:13.556262 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m17:08:14.878094 [debug] [ThreadPool]: SQL status: SUCCESS 3 in 1.322 seconds
+[0m17:08:14.881444 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': 'd7d9a288-dc4c-4885-8a85-2cd4aaa95307', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284FF0F4460>]}
+[0m17:08:14.887742 [debug] [Thread-1 (]: Began running node model.capstone_dbt_project.mart_section_summary
+[0m17:08:14.888343 [info ] [Thread-1 (]: 1 of 1 START sql table model STAGING.mart_section_summary ...................... [RUN]
+[0m17:08:14.889283 [debug] [Thread-1 (]: Acquiring new snowflake connection 'model.capstone_dbt_project.mart_section_summary'
+[0m17:08:14.889754 [debug] [Thread-1 (]: Began compiling node model.capstone_dbt_project.mart_section_summary
+[0m17:08:14.899629 [debug] [Thread-1 (]: Writing injected SQL for node "model.capstone_dbt_project.mart_section_summary"
+[0m17:08:14.903629 [debug] [Thread-1 (]: Writing injected SQL for node "model.capstone_dbt_project.mart_section_summary"
+[0m17:08:14.909076 [debug] [Thread-1 (]: Began executing node model.capstone_dbt_project.mart_section_summary
+[0m17:08:15.054197 [debug] [Thread-1 (]: Writing runtime sql for node "model.capstone_dbt_project.mart_section_summary"
+[0m17:08:15.057526 [debug] [Thread-1 (]: Using snowflake connection "model.capstone_dbt_project.mart_section_summary"
+[0m17:08:15.058273 [debug] [Thread-1 (]: On model.capstone_dbt_project.mart_section_summary: create or replace transient table DB_T26.STAGING.mart_section_summary
+    
+    
+    
+    as (select * from (
+            
+
+with __dbt__cte__int_article_metrics as (
+
+
+SELECT
+    section_name,
+    COUNT(*) AS article_count,
+    ROUND(AVG(LENGTH(body_text)), 0) AS avg_body_length_chars,
+    COUNT(DISTINCT web_url) AS unique_urls,
+    MIN(crawl_timestamp) AS earliest_crawl,
+    MAX(loaded_at) AS latest_load,
+    SUM(CASE WHEN has_valid_content THEN 1 ELSE 0 END) AS valid_articles,
+    CURRENT_TIMESTAMP() AS processed_at
+FROM DB_T26.STAGING.stg_sf__guardian
+GROUP BY section_name
+HAVING article_count > 1
+) SELECT
+    section_name,
+    article_count,
+    avg_body_length_chars,
+    unique_urls,
+    earliest_crawl,
+    latest_load,
+    valid_articles,
+    ROUND((valid_articles * 100.0 / article_count), 2) AS valid_rate_percent,
+    processed_at
+FROM __dbt__cte__int_article_metrics  # Depends on intermediate
+ORDER BY article_count DESC
+        )
+        order by (
+            section_name
+        )
+    )
+
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "model.capstone_dbt_project.mart_section_summary"} */;
+[0m17:08:15.058941 [debug] [Thread-1 (]: Opening a new connection, currently in state init
+[0m17:08:16.559522 [debug] [Thread-1 (]: Snowflake adapter: Snowflake query id: 01bfa2e0-0306-9ab5-0006-40470084ab1a
+[0m17:08:16.563629 [debug] [Thread-1 (]: Snowflake adapter: Snowflake error: 001003 (42000): SQL compilation error:
+syntax error line 33 at position 38 unexpected '# '.
+syntax error line 33 at position 48 unexpected 'on'.
+syntax error line 33 at position 51 unexpected 'intermediate'.
+[0m17:08:16.660742 [debug] [Thread-1 (]: Database Error in model mart_section_summary (models\03_mart\mart_section_summary.sql)
+  001003 (42000): SQL compilation error:
+  syntax error line 33 at position 38 unexpected '# '.
+  syntax error line 33 at position 48 unexpected 'on'.
+  syntax error line 33 at position 51 unexpected 'intermediate'.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.sql
+[0m17:08:16.677088 [debug] [Thread-1 (]: Sending event: {'category': 'dbt', 'action': 'run_model', 'label': 'd7d9a288-dc4c-4885-8a85-2cd4aaa95307', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284FF232390>]}
+[0m17:08:16.683782 [error] [Thread-1 (]: 1 of 1 ERROR creating sql table model STAGING.mart_section_summary ............. [[31mERROR[0m in 1.78s]
+[0m17:08:16.691575 [debug] [Thread-1 (]: Finished running node model.capstone_dbt_project.mart_section_summary
+[0m17:08:16.700091 [debug] [Thread-7 (]: Marking all children of 'model.capstone_dbt_project.mart_section_summary' to be skipped because of status 'error'.  Reason: Database Error in model mart_section_summary (models\03_mart\mart_section_summary.sql)
+  001003 (42000): SQL compilation error:
+  syntax error line 33 at position 38 unexpected '# '.
+  syntax error line 33 at position 48 unexpected 'on'.
+  syntax error line 33 at position 51 unexpected 'intermediate'.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.sql.
+[0m17:08:16.719635 [debug] [MainThread]: Connection 'master' was properly closed.
+[0m17:08:16.723262 [debug] [MainThread]: Connection 'list_DB_T26' was left open.
+[0m17:08:16.728839 [debug] [MainThread]: On list_DB_T26: Close
+[0m17:08:17.193588 [debug] [MainThread]: Connection 'list_DB_T26_STAGING' was left open.
+[0m17:08:17.194621 [debug] [MainThread]: On list_DB_T26_STAGING: Close
+[0m17:08:17.645564 [debug] [MainThread]: Connection 'model.capstone_dbt_project.mart_section_summary' was left open.
+[0m17:08:17.649830 [debug] [MainThread]: On model.capstone_dbt_project.mart_section_summary: Close
+[0m17:08:18.106372 [info ] [MainThread]: 
+[0m17:08:18.107143 [info ] [MainThread]: Finished running 1 table model in 0 hours 0 minutes and 6.40 seconds (6.40s).
+[0m17:08:18.108243 [debug] [MainThread]: Command end result
+[0m17:08:18.156892 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m17:08:18.159528 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m17:08:18.166273 [debug] [MainThread]: Wrote artifact RunExecutionResult to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\run_results.json
+[0m17:08:18.166783 [info ] [MainThread]: 
+[0m17:08:18.167505 [info ] [MainThread]: [31mCompleted with 1 error, 0 partial successes, and 0 warnings:[0m
+[0m17:08:18.168183 [info ] [MainThread]: 
+[0m17:08:18.168913 [error] [MainThread]: [31mFailure in model mart_section_summary (models\03_mart\mart_section_summary.sql)[0m
+[0m17:08:18.169631 [error] [MainThread]:   Database Error in model mart_section_summary (models\03_mart\mart_section_summary.sql)
+  001003 (42000): SQL compilation error:
+  syntax error line 33 at position 38 unexpected '# '.
+  syntax error line 33 at position 48 unexpected 'on'.
+  syntax error line 33 at position 51 unexpected 'intermediate'.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.sql
+[0m17:08:18.170297 [info ] [MainThread]: 
+[0m17:08:18.170986 [info ] [MainThread]:   compiled code at target\compiled\capstone_dbt_project\models\03_mart\mart_section_summary.sql
+[0m17:08:18.171538 [info ] [MainThread]: 
+[0m17:08:18.172397 [info ] [MainThread]: Done. PASS=0 WARN=0 ERROR=1 SKIP=0 NO-OP=0 TOTAL=1
+[0m17:08:18.173867 [debug] [MainThread]: Command `dbt run` failed at 17:08:18.173701 after 8.59 seconds
+[0m17:08:18.174342 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284FF22F800>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284E83A1EF0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000284FF1E2210>]}
+[0m17:08:18.174786 [debug] [MainThread]: Flushing usage events
+[0m17:08:19.494319 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m17:08:22.259513 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000178255E2E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001782636C2D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000017823517110>]}
+
+
+============================== 17:08:22.264105 | d5351e57-851e-4ade-b120-7cd50ad543f6 ==============================
+[0m17:08:22.264105 [info ] [MainThread]: Running with dbt=1.10.13
+[0m17:08:22.264962 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'profiles_dir': 'C:\\Users\\DELL\\.dbt', 'send_anonymous_usage_stats': 'True', 'warn_error': 'None', 'cache_selected_only': 'False', 'target_path': 'None', 'use_colors': 'True', 'invocation_command': 'dbt test --select mart_section_summary', 'log_format': 'default', 'version_check': 'True', 'introspect': 'True', 'debug': 'False', 'log_cache_events': 'False', 'fail_fast': 'False', 'no_print': 'None', 'quiet': 'False', 'empty': 'None', 'use_experimental_parser': 'False', 'printer_width': '80', 'indirect_selection': 'eager', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'write_json': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'static_parser': 'True'}
+[0m17:08:23.353551 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': 'd5351e57-851e-4ade-b120-7cd50ad543f6', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000017825D18B00>]}
+[0m17:08:23.466368 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': 'd5351e57-851e-4ade-b120-7cd50ad543f6', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000178255D7790>]}
+[0m17:08:23.467715 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m17:08:23.922670 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m17:08:24.127625 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 0 files added, 0 files changed.
+[0m17:08:24.128106 [debug] [MainThread]: Partial parsing enabled, no changes found, skipping parsing
+[0m17:08:24.134497 [warn ] [MainThread]: [[33mWARNING[0m]: Configuration paths exist in your dbt_project.yml file which do not apply to any resources.
+There are 1 unused configuration paths:
+- seeds.capstone_dbt_project.raw_data
+[0m17:08:24.199401 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'load_project', 'label': 'd5351e57-851e-4ade-b120-7cd50ad543f6', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000017838CC3A50>]}
+[0m17:08:24.409441 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m17:08:24.414003 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m17:08:24.447965 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'resource_counts', 'label': 'd5351e57-851e-4ade-b120-7cd50ad543f6', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001783955CAA0>]}
+[0m17:08:24.448602 [info ] [MainThread]: Found 5 models, 33 data tests, 1 source, 608 macros
+[0m17:08:24.449267 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': 'd5351e57-851e-4ade-b120-7cd50ad543f6', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000178395651D0>]}
+[0m17:08:24.451456 [info ] [MainThread]: 
+[0m17:08:24.452231 [info ] [MainThread]: Concurrency: 4 threads (target='dev')
+[0m17:08:24.453088 [info ] [MainThread]: 
+[0m17:08:24.454294 [debug] [MainThread]: Acquiring new snowflake connection 'master'
+[0m17:08:24.466751 [debug] [ThreadPool]: Acquiring new snowflake connection 'list_DB_T26_STAGING'
+[0m17:08:24.550493 [debug] [ThreadPool]: Using snowflake connection "list_DB_T26_STAGING"
+[0m17:08:24.550962 [debug] [ThreadPool]: On list_DB_T26_STAGING: show objects in DB_T26.STAGING
+    limit 10000
+    
+
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "connection_name": "list_DB_T26_STAGING"} */;
+[0m17:08:24.551332 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m17:08:26.232762 [debug] [ThreadPool]: SQL status: SUCCESS 3 in 1.681 seconds
+[0m17:08:26.238914 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': 'd5351e57-851e-4ade-b120-7cd50ad543f6', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000178397A01F0>]}
+[0m17:08:26.250175 [debug] [Thread-1 (]: Began running node test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8
+[0m17:08:26.252113 [debug] [Thread-4 (]: Began running node test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4
+[0m17:08:26.253149 [debug] [Thread-3 (]: Began running node test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df
+[0m17:08:26.251227 [info ] [Thread-1 (]: 1 of 5 START test dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent  [RUN]
+[0m17:08:26.255403 [debug] [Thread-2 (]: Began running node test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b
+[0m17:08:26.254485 [info ] [Thread-4 (]: 4 of 5 START test not_null_mart_section_summary_valid_rate_percent ............. [RUN]
+[0m17:08:26.258638 [debug] [Thread-1 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8'
+[0m17:08:26.256860 [info ] [Thread-3 (]: 3 of 5 START test not_null_mart_section_summary_section_name ................... [RUN]
+[0m17:08:26.262000 [debug] [Thread-4 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4'
+[0m17:08:26.260120 [info ] [Thread-2 (]: 2 of 5 START test not_null_mart_section_summary_processed_at ................... [RUN]
+[0m17:08:26.263509 [debug] [Thread-1 (]: Began compiling node test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8
+[0m17:08:26.264848 [debug] [Thread-3 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df'
+[0m17:08:26.265926 [debug] [Thread-4 (]: Began compiling node test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4
+[0m17:08:26.267239 [debug] [Thread-2 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b'
+[0m17:08:26.296302 [debug] [Thread-3 (]: Began compiling node test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df
+[0m17:08:26.298974 [debug] [Thread-1 (]: Writing injected SQL for node "test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8"
+[0m17:08:26.309432 [debug] [Thread-4 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4"
+[0m17:08:26.310060 [debug] [Thread-2 (]: Began compiling node test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b
+[0m17:08:26.317758 [debug] [Thread-3 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df"
+[0m17:08:26.324681 [debug] [Thread-2 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b"
+[0m17:08:26.328153 [debug] [Thread-4 (]: Began executing node test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4
+[0m17:08:26.331078 [debug] [Thread-3 (]: Began executing node test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df
+[0m17:08:26.333035 [debug] [Thread-1 (]: Began executing node test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8
+[0m17:08:26.343045 [debug] [Thread-2 (]: Began executing node test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b
+[0m17:08:26.364319 [debug] [Thread-4 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4"
+[0m17:08:26.366983 [debug] [Thread-1 (]: Writing runtime sql for node "test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8"
+[0m17:08:26.368395 [debug] [Thread-3 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df"
+[0m17:08:26.370818 [debug] [Thread-2 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b"
+[0m17:08:26.374347 [debug] [Thread-4 (]: Using snowflake connection "test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4"
+[0m17:08:26.375754 [debug] [Thread-1 (]: Using snowflake connection "test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8"
+[0m17:08:26.376463 [debug] [Thread-4 (]: On test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select valid_rate_percent
+from DB_T26.STAGING.mart_section_summary
+where valid_rate_percent is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4"} */
+[0m17:08:26.377191 [debug] [Thread-1 (]: On test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+
+
+
+select
+    1
+from (select * from DB_T26.STAGING.mart_section_summary where valid_rate_percent >= 0) dbt_subquery
+
+where not(valid_rate_percent )
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8"} */
+[0m17:08:26.378130 [debug] [Thread-3 (]: Using snowflake connection "test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df"
+[0m17:08:26.378667 [debug] [Thread-4 (]: Opening a new connection, currently in state init
+[0m17:08:26.379481 [debug] [Thread-2 (]: Using snowflake connection "test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b"
+[0m17:08:26.379987 [debug] [Thread-1 (]: Opening a new connection, currently in state init
+[0m17:08:26.380505 [debug] [Thread-3 (]: On test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select section_name
+from DB_T26.STAGING.mart_section_summary
+where section_name is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df"} */
+[0m17:08:26.381352 [debug] [Thread-2 (]: On test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select processed_at
+from DB_T26.STAGING.mart_section_summary
+where processed_at is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b"} */
+[0m17:08:26.424595 [debug] [Thread-3 (]: Opening a new connection, currently in state init
+[0m17:08:26.425845 [debug] [Thread-2 (]: Opening a new connection, currently in state init
+[0m17:08:27.781767 [debug] [Thread-2 (]: Snowflake adapter: Snowflake query id: 01bfa2e0-0306-a0c3-0006-4047008516be
+[0m17:08:27.783979 [debug] [Thread-2 (]: Snowflake adapter: Snowflake error: 002003 (42S02): SQL compilation error:
+Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+[0m17:08:27.800456 [debug] [Thread-2 (]: Database Error in test not_null_mart_section_summary_processed_at (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_processed_at.sql
+[0m17:08:27.801360 [error] [Thread-2 (]: 2 of 5 ERROR not_null_mart_section_summary_processed_at ........................ [[31mERROR[0m in 1.53s]
+[0m17:08:27.803634 [debug] [Thread-2 (]: Finished running node test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b
+[0m17:08:27.804406 [debug] [Thread-2 (]: Began running node test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76
+[0m17:08:27.805062 [info ] [Thread-2 (]: 5 of 5 START test unique_mart_section_summary_section_name ..................... [RUN]
+[0m17:08:27.805844 [debug] [Thread-7 (]: Marking all children of 'test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b' to be skipped because of status 'error'.  Reason: Database Error in test not_null_mart_section_summary_processed_at (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_processed_at.sql.
+[0m17:08:27.806969 [debug] [Thread-2 (]: Re-using an available connection from the pool (formerly test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b, now test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76)
+[0m17:08:27.808689 [debug] [Thread-2 (]: Began compiling node test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76
+[0m17:08:27.816628 [debug] [Thread-2 (]: Writing injected SQL for node "test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76"
+[0m17:08:27.817909 [debug] [Thread-3 (]: Snowflake adapter: Snowflake query id: 01bfa2e0-0306-a1a9-0006-404700853652
+[0m17:08:27.818524 [debug] [Thread-3 (]: Snowflake adapter: Snowflake error: 002003 (42S02): SQL compilation error:
+Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+[0m17:08:27.820189 [debug] [Thread-2 (]: Began executing node test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76
+[0m17:08:27.823397 [debug] [Thread-2 (]: Writing runtime sql for node "test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76"
+[0m17:08:27.825240 [debug] [Thread-2 (]: Using snowflake connection "test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76"
+[0m17:08:27.825789 [debug] [Thread-2 (]: On test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+select
+    section_name as unique_field,
+    count(*) as n_records
+
+from DB_T26.STAGING.mart_section_summary
+where section_name is not null
+group by section_name
+having count(*) > 1
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76"} */
+[0m17:08:27.830857 [debug] [Thread-3 (]: Database Error in test not_null_mart_section_summary_section_name (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_section_name.sql
+[0m17:08:27.831404 [error] [Thread-3 (]: 3 of 5 ERROR not_null_mart_section_summary_section_name ........................ [[31mERROR[0m in 1.57s]
+[0m17:08:27.832475 [debug] [Thread-3 (]: Finished running node test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df
+[0m17:08:27.833163 [debug] [Thread-7 (]: Marking all children of 'test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df' to be skipped because of status 'error'.  Reason: Database Error in test not_null_mart_section_summary_section_name (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_section_name.sql.
+[0m17:08:27.836406 [debug] [Thread-1 (]: Snowflake adapter: Snowflake query id: 01bfa2e0-0306-9c03-0006-404700845c36
+[0m17:08:27.836862 [debug] [Thread-1 (]: Snowflake adapter: Snowflake error: 002003 (42S02): SQL compilation error:
+Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+[0m17:08:27.847658 [debug] [Thread-1 (]: Database Error in test dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\dbt_utils_expression_is_true_m_6a1d61db7e14b39039894cf8effcb756.sql
+[0m17:08:27.849335 [error] [Thread-1 (]: 1 of 5 ERROR dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent  [[31mERROR[0m in 1.59s]
+[0m17:08:27.850635 [debug] [Thread-1 (]: Finished running node test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8
+[0m17:08:27.851395 [debug] [Thread-7 (]: Marking all children of 'test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8' to be skipped because of status 'error'.  Reason: Database Error in test dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\dbt_utils_expression_is_true_m_6a1d61db7e14b39039894cf8effcb756.sql.
+[0m17:08:28.117669 [debug] [Thread-2 (]: Snowflake adapter: Snowflake query id: 01bfa2e0-0306-a0b9-0006-40470084f6fa
+[0m17:08:28.118250 [debug] [Thread-2 (]: Snowflake adapter: Snowflake error: 002003 (42S02): SQL compilation error:
+Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+[0m17:08:28.124323 [debug] [Thread-2 (]: Database Error in test unique_mart_section_summary_section_name (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\unique_mart_section_summary_section_name.sql
+[0m17:08:28.124808 [error] [Thread-2 (]: 5 of 5 ERROR unique_mart_section_summary_section_name .......................... [[31mERROR[0m in 0.32s]
+[0m17:08:28.125818 [debug] [Thread-2 (]: Finished running node test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76
+[0m17:08:28.126434 [debug] [Thread-7 (]: Marking all children of 'test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76' to be skipped because of status 'error'.  Reason: Database Error in test unique_mart_section_summary_section_name (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\unique_mart_section_summary_section_name.sql.
+[0m17:08:28.720034 [debug] [Thread-4 (]: Snowflake adapter: Snowflake query id: 01bfa2e0-0306-9c03-0006-404700845c3a
+[0m17:08:28.721176 [debug] [Thread-4 (]: Snowflake adapter: Snowflake error: 002003 (42S02): SQL compilation error:
+Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+[0m17:08:28.728349 [debug] [Thread-4 (]: Database Error in test not_null_mart_section_summary_valid_rate_percent (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_valid_rate_percent.sql
+[0m17:08:28.728968 [error] [Thread-4 (]: 4 of 5 ERROR not_null_mart_section_summary_valid_rate_percent .................. [[31mERROR[0m in 2.47s]
+[0m17:08:28.729985 [debug] [Thread-4 (]: Finished running node test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4
+[0m17:08:28.730671 [debug] [Thread-7 (]: Marking all children of 'test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4' to be skipped because of status 'error'.  Reason: Database Error in test not_null_mart_section_summary_valid_rate_percent (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_valid_rate_percent.sql.
+[0m17:08:28.732449 [debug] [MainThread]: Connection 'master' was properly closed.
+[0m17:08:28.732819 [debug] [MainThread]: Connection 'list_DB_T26_STAGING' was left open.
+[0m17:08:28.733182 [debug] [MainThread]: On list_DB_T26_STAGING: Close
+[0m17:08:29.156373 [debug] [MainThread]: Connection 'test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8' was left open.
+[0m17:08:29.156818 [debug] [MainThread]: On test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8: Close
+[0m17:08:29.653961 [debug] [MainThread]: Connection 'test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4' was left open.
+[0m17:08:29.654429 [debug] [MainThread]: On test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4: Close
+[0m17:08:30.205315 [debug] [MainThread]: Connection 'test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df' was left open.
+[0m17:08:30.205855 [debug] [MainThread]: On test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df: Close
+[0m17:08:30.719744 [debug] [MainThread]: Connection 'test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76' was left open.
+[0m17:08:30.720219 [debug] [MainThread]: On test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76: Close
+[0m17:08:31.192333 [info ] [MainThread]: 
+[0m17:08:31.193188 [info ] [MainThread]: Finished running 5 data tests in 0 hours 0 minutes and 6.74 seconds (6.74s).
+[0m17:08:31.195198 [debug] [MainThread]: Command end result
+[0m17:08:31.236604 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m17:08:31.239234 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m17:08:31.250031 [debug] [MainThread]: Wrote artifact RunExecutionResult to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\run_results.json
+[0m17:08:31.250557 [info ] [MainThread]: 
+[0m17:08:31.251277 [info ] [MainThread]: [31mCompleted with 5 errors, 0 partial successes, and 0 warnings:[0m
+[0m17:08:31.251909 [info ] [MainThread]: 
+[0m17:08:31.252632 [error] [MainThread]: [31mFailure in test not_null_mart_section_summary_processed_at (models\03_mart\mart_section_summary.yml)[0m
+[0m17:08:31.253331 [error] [MainThread]:   Database Error in test not_null_mart_section_summary_processed_at (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_processed_at.sql
+[0m17:08:31.253976 [info ] [MainThread]: 
+[0m17:08:31.254626 [info ] [MainThread]:   compiled code at target\compiled\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_processed_at.sql
+[0m17:08:31.255198 [info ] [MainThread]: 
+[0m17:08:31.255855 [error] [MainThread]: [31mFailure in test not_null_mart_section_summary_section_name (models\03_mart\mart_section_summary.yml)[0m
+[0m17:08:31.256732 [error] [MainThread]:   Database Error in test not_null_mart_section_summary_section_name (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_section_name.sql
+[0m17:08:31.257686 [info ] [MainThread]: 
+[0m17:08:31.258924 [info ] [MainThread]:   compiled code at target\compiled\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_section_name.sql
+[0m17:08:31.259751 [info ] [MainThread]: 
+[0m17:08:31.260454 [error] [MainThread]: [31mFailure in test dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent (models\03_mart\mart_section_summary.yml)[0m
+[0m17:08:31.261119 [error] [MainThread]:   Database Error in test dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\dbt_utils_expression_is_true_m_6a1d61db7e14b39039894cf8effcb756.sql
+[0m17:08:31.262068 [info ] [MainThread]: 
+[0m17:08:31.263375 [info ] [MainThread]:   compiled code at target\compiled\capstone_dbt_project\models\03_mart\mart_section_summary.yml\dbt_utils_expression_is_true_m_6a1d61db7e14b39039894cf8effcb756.sql
+[0m17:08:31.266227 [info ] [MainThread]: 
+[0m17:08:31.268191 [error] [MainThread]: [31mFailure in test unique_mart_section_summary_section_name (models\03_mart\mart_section_summary.yml)[0m
+[0m17:08:31.268937 [error] [MainThread]:   Database Error in test unique_mart_section_summary_section_name (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\unique_mart_section_summary_section_name.sql
+[0m17:08:31.269618 [info ] [MainThread]: 
+[0m17:08:31.270260 [info ] [MainThread]:   compiled code at target\compiled\capstone_dbt_project\models\03_mart\mart_section_summary.yml\unique_mart_section_summary_section_name.sql
+[0m17:08:31.270850 [info ] [MainThread]: 
+[0m17:08:31.271525 [error] [MainThread]: [31mFailure in test not_null_mart_section_summary_valid_rate_percent (models\03_mart\mart_section_summary.yml)[0m
+[0m17:08:31.272195 [error] [MainThread]:   Database Error in test not_null_mart_section_summary_valid_rate_percent (models\03_mart\mart_section_summary.yml)
+  002003 (42S02): SQL compilation error:
+  Object 'DB_T26.STAGING.MART_SECTION_SUMMARY' does not exist or not authorized.
+  compiled code at target\run\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_valid_rate_percent.sql
+[0m17:08:31.272831 [info ] [MainThread]: 
+[0m17:08:31.273599 [info ] [MainThread]:   compiled code at target\compiled\capstone_dbt_project\models\03_mart\mart_section_summary.yml\not_null_mart_section_summary_valid_rate_percent.sql
+[0m17:08:31.274280 [info ] [MainThread]: 
+[0m17:08:31.274943 [info ] [MainThread]: Done. PASS=0 WARN=0 ERROR=5 SKIP=0 NO-OP=0 TOTAL=5
+[0m17:08:31.276193 [debug] [MainThread]: Command `dbt test` failed at 17:08:31.276026 after 9.18 seconds
+[0m17:08:31.276734 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000178269CD250>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000017839C00730>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001783A4268E0>]}
+[0m17:08:31.277341 [debug] [MainThread]: Flushing usage events
+[0m17:08:32.655643 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m17:10:23.520250 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028F835A6E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028F843182D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028F814D3110>]}
+
+
+============================== 17:10:23.524561 | 0e4e307f-6997-4856-b6e2-b6f348df7e42 ==============================
+[0m17:10:23.524561 [info ] [MainThread]: Running with dbt=1.10.13
+[0m17:10:23.525374 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'send_anonymous_usage_stats': 'True', 'version_check': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'use_colors': 'True', 'invocation_command': 'dbt run --select +mart_section_summary', 'log_format': 'default', 'warn_error': 'None', 'introspect': 'True', 'debug': 'False', 'log_cache_events': 'False', 'fail_fast': 'False', 'no_print': 'None', 'use_experimental_parser': 'False', 'empty': 'False', 'quiet': 'False', 'printer_width': '80', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'indirect_selection': 'eager', 'profiles_dir': 'C:\\Users\\DELL\\.dbt', 'static_parser': 'True', 'write_json': 'True'}
+[0m17:10:24.607693 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': '0e4e307f-6997-4856-b6e2-b6f348df7e42', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028F83CC8B00>]}
+[0m17:10:24.717111 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': '0e4e307f-6997-4856-b6e2-b6f348df7e42', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028F83597790>]}
+[0m17:10:24.718390 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m17:10:25.138273 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m17:10:25.277054 [error] [MainThread]: Encountered an error:
+Parsing Error
+  Error reading capstone_dbt_project: 03_mart\mart_section_summary.yml - Runtime Error
+    Syntax error near line 1
+    ------------------------------
+    1  | {{ config(materialized='table', cluster_by=["section_name"]) }}
+    2  | 
+    3  | SELECT
+    4  |     section_name,
+    
+    Raw Error:
+    ------------------------------
+    while parsing a flow mapping
+      in "<unicode string>", line 1, column 2
+    did not find expected ',' or '}'
+      in "<unicode string>", line 1, column 44
+[0m17:10:25.278927 [debug] [MainThread]: Command `dbt run` failed at 17:10:25.278777 after 1.97 seconds
+[0m17:10:25.279411 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028F97116A50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028F97116D50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028F9718EB70>]}
+[0m17:10:25.279835 [debug] [MainThread]: Flushing usage events
+[0m17:10:28.852605 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m17:10:31.595997 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002004C882E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002004D5F82D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002004A7B7110>]}
+
+
+============================== 17:10:31.600259 | e2fabc61-2418-4fd6-80bf-96a892127c39 ==============================
+[0m17:10:31.600259 [info ] [MainThread]: Running with dbt=1.10.13
+[0m17:10:31.601083 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'send_anonymous_usage_stats': 'True', 'version_check': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'warn_error': 'None', 'invocation_command': 'dbt test --select mart_section_summary', 'log_format': 'default', 'use_colors': 'True', 'introspect': 'True', 'debug': 'False', 'printer_width': '80', 'fail_fast': 'False', 'no_print': 'None', 'empty': 'None', 'use_experimental_parser': 'False', 'quiet': 'False', 'log_cache_events': 'False', 'indirect_selection': 'eager', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'profiles_dir': 'C:\\Users\\DELL\\.dbt', 'static_parser': 'True', 'write_json': 'True'}
+[0m17:10:32.677581 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': 'e2fabc61-2418-4fd6-80bf-96a892127c39', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002004CFA8B00>]}
+[0m17:10:32.782184 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': 'e2fabc61-2418-4fd6-80bf-96a892127c39', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002004C877790>]}
+[0m17:10:32.783408 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m17:10:33.164161 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m17:10:33.295605 [error] [MainThread]: Encountered an error:
+Parsing Error
+  Error reading capstone_dbt_project: 03_mart\mart_section_summary.yml - Runtime Error
+    Syntax error near line 1
+    ------------------------------
+    1  | {{ config(materialized='table', cluster_by=["section_name"]) }}
+    2  | 
+    3  | SELECT
+    4  |     section_name,
+    
+    Raw Error:
+    ------------------------------
+    while parsing a flow mapping
+      in "<unicode string>", line 1, column 2
+    did not find expected ',' or '}'
+      in "<unicode string>", line 1, column 44
+[0m17:10:33.297588 [debug] [MainThread]: Command `dbt test` failed at 17:10:33.297437 after 1.86 seconds
+[0m17:10:33.298024 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002006041AA50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002006041AD50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000020060492B70>]}
+[0m17:10:33.298431 [debug] [MainThread]: Flushing usage events
+[0m17:10:35.346251 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m17:11:56.944732 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000020008732E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000200094A82D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000020006663110>]}
+
+
+============================== 17:11:56.949029 | 2747184c-6c7b-49df-ac8b-12278d39f14f ==============================
+[0m17:11:56.949029 [info ] [MainThread]: Running with dbt=1.10.13
+[0m17:11:56.949849 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'static_parser': 'True', 'send_anonymous_usage_stats': 'True', 'use_colors': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'warn_error': 'None', 'invocation_command': 'dbt run --select +mart_section_summary', 'log_format': 'default', 'version_check': 'True', 'introspect': 'True', 'debug': 'False', 'log_cache_events': 'False', 'fail_fast': 'False', 'no_print': 'None', 'use_experimental_parser': 'False', 'empty': 'False', 'printer_width': '80', 'quiet': 'False', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'indirect_selection': 'eager', 'write_json': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'profiles_dir': 'C:\\Users\\DELL\\.dbt'}
+[0m17:11:58.158802 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': '2747184c-6c7b-49df-ac8b-12278d39f14f', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000020008E58B00>]}
+[0m17:11:58.262215 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': '2747184c-6c7b-49df-ac8b-12278d39f14f', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000020008727790>]}
+[0m17:11:58.263436 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m17:11:58.646139 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m17:11:58.855467 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 0 files added, 0 files changed.
+[0m17:11:58.855915 [debug] [MainThread]: Partial parsing enabled, no changes found, skipping parsing
+[0m17:11:58.862628 [warn ] [MainThread]: [[33mWARNING[0m]: Configuration paths exist in your dbt_project.yml file which do not apply to any resources.
+There are 1 unused configuration paths:
+- seeds.capstone_dbt_project.raw_data
+[0m17:11:58.917768 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'load_project', 'label': '2747184c-6c7b-49df-ac8b-12278d39f14f', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002001BE83B50>]}
+[0m17:11:59.035008 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m17:11:59.038040 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m17:11:59.061393 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'resource_counts', 'label': '2747184c-6c7b-49df-ac8b-12278d39f14f', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002000987E6C0>]}
+[0m17:11:59.062024 [info ] [MainThread]: Found 5 models, 33 data tests, 1 source, 608 macros
+[0m17:11:59.062741 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': '2747184c-6c7b-49df-ac8b-12278d39f14f', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002001C6E89F0>]}
+[0m17:11:59.065042 [info ] [MainThread]: 
+[0m17:11:59.065748 [info ] [MainThread]: Concurrency: 4 threads (target='dev')
+[0m17:11:59.066431 [info ] [MainThread]: 
+[0m17:11:59.067267 [debug] [MainThread]: Acquiring new snowflake connection 'master'
+[0m17:11:59.071872 [debug] [ThreadPool]: Acquiring new snowflake connection 'list_DB_T26'
+[0m17:11:59.163283 [debug] [ThreadPool]: Using snowflake connection "list_DB_T26"
+[0m17:11:59.163783 [debug] [ThreadPool]: On list_DB_T26: show terse schemas in database DB_T26
+    limit 10000
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "connection_name": "list_DB_T26"} */
+[0m17:11:59.164180 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m17:12:00.692362 [debug] [ThreadPool]: SQL status: SUCCESS 8 in 1.528 seconds
+[0m17:12:00.695905 [debug] [ThreadPool]: Acquiring new snowflake connection 'list_DB_T26_STAGING'
+[0m17:12:00.720114 [debug] [ThreadPool]: Using snowflake connection "list_DB_T26_STAGING"
+[0m17:12:00.720604 [debug] [ThreadPool]: On list_DB_T26_STAGING: show objects in DB_T26.STAGING
+    limit 10000
+    
+
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "connection_name": "list_DB_T26_STAGING"} */;
+[0m17:12:00.720990 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m17:12:01.995534 [debug] [ThreadPool]: SQL status: SUCCESS 3 in 1.274 seconds
+[0m17:12:01.999450 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': '2747184c-6c7b-49df-ac8b-12278d39f14f', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002001CBF7AD0>]}
+[0m17:12:02.005424 [debug] [Thread-1 (]: Began running node model.capstone_dbt_project.stg_sf__guardian
+[0m17:12:02.006028 [info ] [Thread-1 (]: 1 of 2 START sql view model STAGING.stg_sf__guardian ........................... [RUN]
+[0m17:12:02.006888 [debug] [Thread-1 (]: Acquiring new snowflake connection 'model.capstone_dbt_project.stg_sf__guardian'
+[0m17:12:02.007353 [debug] [Thread-1 (]: Began compiling node model.capstone_dbt_project.stg_sf__guardian
+[0m17:12:02.015334 [debug] [Thread-1 (]: Writing injected SQL for node "model.capstone_dbt_project.stg_sf__guardian"
+[0m17:12:02.016292 [debug] [Thread-1 (]: Began executing node model.capstone_dbt_project.stg_sf__guardian
+[0m17:12:02.056418 [debug] [Thread-1 (]: Writing runtime sql for node "model.capstone_dbt_project.stg_sf__guardian"
+[0m17:12:02.061016 [debug] [Thread-1 (]: Using snowflake connection "model.capstone_dbt_project.stg_sf__guardian"
+[0m17:12:02.061732 [debug] [Thread-1 (]: On model.capstone_dbt_project.stg_sf__guardian: create or replace   view DB_T26.STAGING.stg_sf__guardian
+  
+  
+  
+  
+  as (
+    -- models/01_staging/stg_articles.sql
+
+
+WITH raw_articles AS (
+    SELECT
+        id::INTEGER AS id,
+        crawl_timestamp::TIMESTAMP_NTZ AS crawl_timestamp,
+        article_id::STRING AS article_id,
+        TRY_TO_TIMESTAMP_NTZ(web_publication_date::STRING) AS web_publication_date,  -- Safe cast for potential string dates
+        web_title::STRING AS web_title,
+        body_text::STRING AS body_text,
+        web_url::STRING AS web_url,
+        section_name::STRING AS section_name,
+        loaded_at::TIMESTAMP_NTZ AS loaded_at
+    FROM DB_T26.sc_t26.raw_data
+    WHERE id IS NOT NULL  -- Basic row filter (id is PK)
+)
+
+SELECT
+    id,
+    crawl_timestamp,
+    article_id,
+    web_publication_date,
+    web_title,
+    body_text,
+    web_url,
+    section_name,
+    loaded_at,
+
+    -- Enhanced data quality flags
+    CASE
+        WHEN web_title IS NOT NULL 
+             AND TRIM(UPPER(web_title)) != '' 
+             AND LENGTH(TRIM(web_title)) <= 500  -- Reasonable title length cap
+        THEN TRUE
+        ELSE FALSE
+    END AS has_valid_title,
+
+    CASE
+        WHEN web_url IS NOT NULL 
+             AND TRIM(web_url) != '' 
+             AND web_url ILIKE 'http%' 
+             AND LENGTH(TRIM(web_url)) <= 1000  -- Reasonable URL length
+        THEN TRUE
+        ELSE FALSE
+    END AS has_valid_url,
+
+    CASE
+        WHEN body_text IS NOT NULL 
+             AND TRIM(body_text) != '' 
+             AND LENGTH(TRIM(body_text)) > 50  -- Basic content threshold
+        THEN TRUE
+        ELSE FALSE
+    END AS has_valid_content,
+
+    CASE
+        WHEN section_name IS NOT NULL AND TRIM(section_name) != ''
+        THEN TRUE
+        ELSE FALSE
+    END AS has_valid_section,
+
+    -- Processing metadata
+    CURRENT_TIMESTAMP() AS processed_at,
+    'dbt_staging' AS processing_source
+
+FROM raw_articles
+WHERE article_id IS NOT NULL  -- Ensure core identifier is present
+  AND has_valid_title  -- Filter out invalid titles early (optional; can be removed if tests handle it)
+  )
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "model.capstone_dbt_project.stg_sf__guardian"} */;
+[0m17:12:02.062193 [debug] [Thread-1 (]: Opening a new connection, currently in state init
+[0m17:12:03.636430 [debug] [Thread-1 (]: SQL status: SUCCESS 1 in 1.574 seconds
+[0m17:12:03.667037 [debug] [Thread-1 (]: Sending event: {'category': 'dbt', 'action': 'run_model', 'label': '2747184c-6c7b-49df-ac8b-12278d39f14f', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002001D4C3890>]}
+[0m17:12:03.667770 [info ] [Thread-1 (]: 1 of 2 OK created sql view model STAGING.stg_sf__guardian ...................... [[32mSUCCESS 1[0m in 1.66s]
+[0m17:12:03.668763 [debug] [Thread-1 (]: Finished running node model.capstone_dbt_project.stg_sf__guardian
+[0m17:12:03.669627 [debug] [Thread-2 (]: Began running node model.capstone_dbt_project.int_article_metrics
+[0m17:12:03.670183 [debug] [Thread-2 (]: Acquiring new snowflake connection 'model.capstone_dbt_project.int_article_metrics'
+[0m17:12:03.670567 [debug] [Thread-2 (]: Began compiling node model.capstone_dbt_project.int_article_metrics
+[0m17:12:03.673726 [debug] [Thread-2 (]: Writing injected SQL for node "model.capstone_dbt_project.int_article_metrics"
+[0m17:12:03.674955 [debug] [Thread-2 (]: Finished running node model.capstone_dbt_project.int_article_metrics
+[0m17:12:03.676045 [debug] [Thread-3 (]: Began running node model.capstone_dbt_project.mart_section_summary
+[0m17:12:03.676577 [info ] [Thread-3 (]: 2 of 2 START sql table model STAGING.mart_section_summary ...................... [RUN]
+[0m17:12:03.677428 [debug] [Thread-3 (]: Acquiring new snowflake connection 'model.capstone_dbt_project.mart_section_summary'
+[0m17:12:03.677915 [debug] [Thread-3 (]: Began compiling node model.capstone_dbt_project.mart_section_summary
+[0m17:12:03.683980 [debug] [Thread-3 (]: Writing injected SQL for node "model.capstone_dbt_project.mart_section_summary"
+[0m17:12:03.684930 [debug] [Thread-3 (]: Began executing node model.capstone_dbt_project.mart_section_summary
+[0m17:12:03.714228 [debug] [Thread-3 (]: Writing runtime sql for node "model.capstone_dbt_project.mart_section_summary"
+[0m17:12:03.716195 [debug] [Thread-3 (]: Using snowflake connection "model.capstone_dbt_project.mart_section_summary"
+[0m17:12:03.716629 [debug] [Thread-3 (]: On model.capstone_dbt_project.mart_section_summary: create or replace transient table DB_T26.STAGING.mart_section_summary
+    
+    
+    
+    as (select * from (
+            
+
+with __dbt__cte__int_article_metrics as (
+
+
+SELECT
+    section_name,
+    COUNT(*) AS article_count,
+    ROUND(AVG(LENGTH(body_text)), 0) AS avg_body_length_chars,
+    COUNT(DISTINCT web_url) AS unique_urls,
+    MIN(crawl_timestamp) AS earliest_crawl,
+    MAX(loaded_at) AS latest_load,
+    SUM(CASE WHEN has_valid_content THEN 1 ELSE 0 END) AS valid_articles,
+    CURRENT_TIMESTAMP() AS processed_at
+FROM DB_T26.STAGING.stg_sf__guardian
+GROUP BY section_name
+HAVING article_count > 1
+) SELECT
+    section_name,
+    article_count,
+    avg_body_length_chars,
+    unique_urls,
+    earliest_crawl,
+    latest_load,
+    valid_articles,
+    ROUND((valid_articles * 100.0 / article_count), 2) AS valid_rate_percent,
+    processed_at
+FROM __dbt__cte__int_article_metrics
+ORDER BY article_count DESC
+        )
+        order by (
+            section_name
+        )
+    )
+
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "model.capstone_dbt_project.mart_section_summary"} */;
+[0m17:12:03.717053 [debug] [Thread-3 (]: Opening a new connection, currently in state init
+[0m17:12:06.897728 [debug] [Thread-3 (]: SQL status: SUCCESS 1 in 3.180 seconds
+[0m17:12:06.898376 [debug] [Thread-3 (]: Using snowflake connection "model.capstone_dbt_project.mart_section_summary"
+[0m17:12:06.898799 [debug] [Thread-3 (]: On model.capstone_dbt_project.mart_section_summary: alter table DB_T26.STAGING.mart_section_summary cluster by (section_name)
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "model.capstone_dbt_project.mart_section_summary"} */;
+[0m17:12:07.321629 [debug] [Thread-3 (]: SQL status: SUCCESS 1 in 0.422 seconds
+[0m17:12:07.325559 [debug] [Thread-3 (]: Sending event: {'category': 'dbt', 'action': 'run_model', 'label': '2747184c-6c7b-49df-ac8b-12278d39f14f', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002001C5F3EE0>]}
+[0m17:12:07.326279 [info ] [Thread-3 (]: 2 of 2 OK created sql table model STAGING.mart_section_summary ................. [[32mSUCCESS 1[0m in 3.65s]
+[0m17:12:07.327296 [debug] [Thread-3 (]: Finished running node model.capstone_dbt_project.mart_section_summary
+[0m17:12:07.328949 [debug] [MainThread]: Connection 'master' was properly closed.
+[0m17:12:07.329307 [debug] [MainThread]: Connection 'list_DB_T26' was left open.
+[0m17:12:07.329652 [debug] [MainThread]: On list_DB_T26: Close
+[0m17:12:07.811722 [debug] [MainThread]: Connection 'list_DB_T26_STAGING' was left open.
+[0m17:12:07.812296 [debug] [MainThread]: On list_DB_T26_STAGING: Close
+[0m17:12:08.253390 [debug] [MainThread]: Connection 'model.capstone_dbt_project.stg_sf__guardian' was left open.
+[0m17:12:08.254219 [debug] [MainThread]: On model.capstone_dbt_project.stg_sf__guardian: Close
+[0m17:12:08.696698 [debug] [MainThread]: Connection 'model.capstone_dbt_project.int_article_metrics' was properly closed.
+[0m17:12:08.697263 [debug] [MainThread]: Connection 'model.capstone_dbt_project.mart_section_summary' was left open.
+[0m17:12:08.697683 [debug] [MainThread]: On model.capstone_dbt_project.mart_section_summary: Close
+[0m17:12:09.125354 [info ] [MainThread]: 
+[0m17:12:09.126131 [info ] [MainThread]: Finished running 1 table model, 1 view model in 0 hours 0 minutes and 10.06 seconds (10.06s).
+[0m17:12:09.127407 [debug] [MainThread]: Command end result
+[0m17:12:09.165654 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m17:12:09.168537 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m17:12:09.177676 [debug] [MainThread]: Wrote artifact RunExecutionResult to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\run_results.json
+[0m17:12:09.179332 [info ] [MainThread]: 
+[0m17:12:09.180175 [info ] [MainThread]: [32mCompleted successfully[0m
+[0m17:12:09.180867 [info ] [MainThread]: 
+[0m17:12:09.181608 [info ] [MainThread]: Done. PASS=2 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=2
+[0m17:12:09.183508 [debug] [MainThread]: Command `dbt run` succeeded at 17:12:09.183030 after 12.46 seconds
+[0m17:12:09.184034 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002001D5DF7F0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002001D52FD10>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002001C6547D0>]}
+[0m17:12:09.184471 [debug] [MainThread]: Flushing usage events
+[0m17:12:10.694607 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m17:12:20.183586 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C875F2E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C883782D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C85523110>]}
+
+
+============================== 17:12:20.187969 | fd7a2659-ab07-4348-a500-ce091a77c88d ==============================
+[0m17:12:20.187969 [info ] [MainThread]: Running with dbt=1.10.13
+[0m17:12:20.188743 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'static_parser': 'True', 'send_anonymous_usage_stats': 'True', 'warn_error': 'None', 'cache_selected_only': 'False', 'target_path': 'None', 'version_check': 'True', 'invocation_command': 'dbt test --select mart_section_summary', 'log_format': 'default', 'use_colors': 'True', 'introspect': 'True', 'debug': 'False', 'log_cache_events': 'False', 'fail_fast': 'False', 'no_print': 'None', 'empty': 'None', 'use_experimental_parser': 'False', 'printer_width': '80', 'quiet': 'False', 'log_path': 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\capstone_dbt_project\\capstone_dbt_project\\logs', 'indirect_selection': 'eager', 'write_json': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'profiles_dir': 'C:\\Users\\DELL\\.dbt'}
+[0m17:12:21.293688 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': 'fd7a2659-ab07-4348-a500-ce091a77c88d', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C87D28B00>]}
+[0m17:12:21.401275 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': 'fd7a2659-ab07-4348-a500-ce091a77c88d', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C875E7790>]}
+[0m17:12:21.402531 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m17:12:21.791200 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m17:12:21.993772 [debug] [MainThread]: Partial parsing enabled: 0 files deleted, 0 files added, 0 files changed.
+[0m17:12:21.994264 [debug] [MainThread]: Partial parsing enabled, no changes found, skipping parsing
+[0m17:12:22.001215 [warn ] [MainThread]: [[33mWARNING[0m]: Configuration paths exist in your dbt_project.yml file which do not apply to any resources.
+There are 1 unused configuration paths:
+- seeds.capstone_dbt_project.raw_data
+[0m17:12:22.058953 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'load_project', 'label': 'fd7a2659-ab07-4348-a500-ce091a77c88d', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C9ACD7A50>]}
+[0m17:12:22.167011 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m17:12:22.170273 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m17:12:22.204703 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'resource_counts', 'label': 'fd7a2659-ab07-4348-a500-ce091a77c88d', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C9B56CAA0>]}
+[0m17:12:22.205283 [info ] [MainThread]: Found 5 models, 33 data tests, 1 source, 608 macros
+[0m17:12:22.205923 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': 'fd7a2659-ab07-4348-a500-ce091a77c88d', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C9B5751D0>]}
+[0m17:12:22.208050 [info ] [MainThread]: 
+[0m17:12:22.208714 [info ] [MainThread]: Concurrency: 4 threads (target='dev')
+[0m17:12:22.209285 [info ] [MainThread]: 
+[0m17:12:22.210075 [debug] [MainThread]: Acquiring new snowflake connection 'master'
+[0m17:12:22.215520 [debug] [ThreadPool]: Acquiring new snowflake connection 'list_DB_T26_STAGING'
+[0m17:12:22.317323 [debug] [ThreadPool]: Using snowflake connection "list_DB_T26_STAGING"
+[0m17:12:22.317852 [debug] [ThreadPool]: On list_DB_T26_STAGING: show objects in DB_T26.STAGING
+    limit 10000
+    
+
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "connection_name": "list_DB_T26_STAGING"} */;
+[0m17:12:22.318270 [debug] [ThreadPool]: Opening a new connection, currently in state init
+[0m17:12:23.746075 [debug] [ThreadPool]: SQL status: SUCCESS 4 in 1.428 seconds
+[0m17:12:23.750179 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'runnable_timing', 'label': 'fd7a2659-ab07-4348-a500-ce091a77c88d', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C9B7B01F0>]}
+[0m17:12:23.757554 [debug] [Thread-1 (]: Began running node test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8
+[0m17:12:23.758760 [debug] [Thread-2 (]: Began running node test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b
+[0m17:12:23.759384 [debug] [Thread-4 (]: Began running node test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4
+[0m17:12:23.758210 [info ] [Thread-1 (]: 1 of 5 START test dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent  [RUN]
+[0m17:12:23.760776 [debug] [Thread-3 (]: Began running node test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df
+[0m17:12:23.760244 [info ] [Thread-2 (]: 2 of 5 START test not_null_mart_section_summary_processed_at ................... [RUN]
+[0m17:12:23.762476 [debug] [Thread-1 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8'
+[0m17:12:23.761468 [info ] [Thread-4 (]: 4 of 5 START test not_null_mart_section_summary_valid_rate_percent ............. [RUN]
+[0m17:12:23.764751 [debug] [Thread-2 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b'
+[0m17:12:23.765528 [debug] [Thread-1 (]: Began compiling node test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8
+[0m17:12:23.763194 [info ] [Thread-3 (]: 3 of 5 START test not_null_mart_section_summary_section_name ................... [RUN]
+[0m17:12:23.766581 [debug] [Thread-4 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4'
+[0m17:12:23.767263 [debug] [Thread-2 (]: Began compiling node test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b
+[0m17:12:23.773179 [debug] [Thread-3 (]: Acquiring new snowflake connection 'test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df'
+[0m17:12:23.792474 [debug] [Thread-1 (]: Writing injected SQL for node "test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8"
+[0m17:12:23.793063 [debug] [Thread-4 (]: Began compiling node test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4
+[0m17:12:23.800220 [debug] [Thread-2 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b"
+[0m17:12:23.800799 [debug] [Thread-3 (]: Began compiling node test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df
+[0m17:12:23.807762 [debug] [Thread-4 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4"
+[0m17:12:23.821586 [debug] [Thread-3 (]: Writing injected SQL for node "test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df"
+[0m17:12:23.823355 [debug] [Thread-1 (]: Began executing node test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8
+[0m17:12:23.853294 [debug] [Thread-2 (]: Began executing node test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b
+[0m17:12:23.874328 [debug] [Thread-2 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b"
+[0m17:12:23.875230 [debug] [Thread-4 (]: Began executing node test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4
+[0m17:12:23.877768 [debug] [Thread-1 (]: Writing runtime sql for node "test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8"
+[0m17:12:23.883430 [debug] [Thread-4 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4"
+[0m17:12:23.884823 [debug] [Thread-3 (]: Began executing node test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df
+[0m17:12:23.887257 [debug] [Thread-2 (]: Using snowflake connection "test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b"
+[0m17:12:23.894106 [debug] [Thread-3 (]: Writing runtime sql for node "test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df"
+[0m17:12:23.895090 [debug] [Thread-2 (]: On test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select processed_at
+from DB_T26.STAGING.mart_section_summary
+where processed_at is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b"} */
+[0m17:12:23.897278 [debug] [Thread-1 (]: Using snowflake connection "test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8"
+[0m17:12:23.898613 [debug] [Thread-2 (]: Opening a new connection, currently in state init
+[0m17:12:23.900414 [debug] [Thread-4 (]: Using snowflake connection "test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4"
+[0m17:12:23.902857 [debug] [Thread-3 (]: Using snowflake connection "test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df"
+[0m17:12:23.939634 [debug] [Thread-1 (]: On test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+
+
+
+select
+    1
+from (select * from DB_T26.STAGING.mart_section_summary where valid_rate_percent >= 0) dbt_subquery
+
+where not(valid_rate_percent )
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8"} */
+[0m17:12:24.004350 [debug] [Thread-4 (]: On test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select valid_rate_percent
+from DB_T26.STAGING.mart_section_summary
+where valid_rate_percent is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4"} */
+[0m17:12:24.005148 [debug] [Thread-3 (]: On test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+
+
+select section_name
+from DB_T26.STAGING.mart_section_summary
+where section_name is null
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df"} */
+[0m17:12:24.005998 [debug] [Thread-1 (]: Opening a new connection, currently in state init
+[0m17:12:24.006571 [debug] [Thread-4 (]: Opening a new connection, currently in state init
+[0m17:12:24.007227 [debug] [Thread-3 (]: Opening a new connection, currently in state init
+[0m17:12:25.363439 [debug] [Thread-3 (]: SQL status: SUCCESS 1 in 1.356 seconds
+[0m17:12:25.372818 [info ] [Thread-3 (]: 3 of 5 PASS not_null_mart_section_summary_section_name ......................... [[32mPASS[0m in 1.60s]
+[0m17:12:25.373917 [debug] [Thread-3 (]: Finished running node test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df
+[0m17:12:25.374332 [debug] [Thread-3 (]: Began running node test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76
+[0m17:12:25.374712 [info ] [Thread-3 (]: 5 of 5 START test unique_mart_section_summary_section_name ..................... [RUN]
+[0m17:12:25.375464 [debug] [Thread-3 (]: Re-using an available connection from the pool (formerly test.capstone_dbt_project.not_null_mart_section_summary_section_name.c8589852df, now test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76)
+[0m17:12:25.375864 [debug] [Thread-3 (]: Began compiling node test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76
+[0m17:12:25.382366 [debug] [Thread-3 (]: Writing injected SQL for node "test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76"
+[0m17:12:25.383212 [debug] [Thread-3 (]: Began executing node test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76
+[0m17:12:25.387027 [debug] [Thread-3 (]: Writing runtime sql for node "test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76"
+[0m17:12:25.388653 [debug] [Thread-3 (]: Using snowflake connection "test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76"
+[0m17:12:25.389491 [debug] [Thread-3 (]: On test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76: select
+      count(*) as failures,
+      count(*) != 0 as should_warn,
+      count(*) != 0 as should_error
+    from (
+      
+    
+  
+    
+    
+
+select
+    section_name as unique_field,
+    count(*) as n_records
+
+from DB_T26.STAGING.mart_section_summary
+where section_name is not null
+group by section_name
+having count(*) > 1
+
+
+
+  
+  
+      
+    ) dbt_internal_test
+/* {"app": "dbt", "dbt_version": "1.10.13", "profile_name": "capstone_dbt_project", "target_name": "dev", "node_id": "test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76"} */
+[0m17:12:25.568284 [debug] [Thread-1 (]: SQL status: SUCCESS 1 in 1.562 seconds
+[0m17:12:25.571950 [info ] [Thread-1 (]: 1 of 5 PASS dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent  [[32mPASS[0m in 1.81s]
+[0m17:12:25.572998 [debug] [Thread-1 (]: Finished running node test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8
+[0m17:12:25.604324 [debug] [Thread-4 (]: SQL status: SUCCESS 1 in 1.598 seconds
+[0m17:12:25.608769 [info ] [Thread-4 (]: 4 of 5 PASS not_null_mart_section_summary_valid_rate_percent ................... [[32mPASS[0m in 1.84s]
+[0m17:12:25.609954 [debug] [Thread-4 (]: Finished running node test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4
+[0m17:12:25.763148 [debug] [Thread-2 (]: SQL status: SUCCESS 1 in 1.865 seconds
+[0m17:12:25.765693 [info ] [Thread-2 (]: 2 of 5 PASS not_null_mart_section_summary_processed_at ......................... [[32mPASS[0m in 2.00s]
+[0m17:12:25.766872 [debug] [Thread-2 (]: Finished running node test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b
+[0m17:12:25.987323 [debug] [Thread-3 (]: SQL status: SUCCESS 1 in 0.595 seconds
+[0m17:12:25.990341 [info ] [Thread-3 (]: 5 of 5 PASS unique_mart_section_summary_section_name ........................... [[32mPASS[0m in 0.61s]
+[0m17:12:25.991477 [debug] [Thread-3 (]: Finished running node test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76
+[0m17:12:25.993250 [debug] [MainThread]: Connection 'master' was properly closed.
+[0m17:12:25.993625 [debug] [MainThread]: Connection 'list_DB_T26_STAGING' was left open.
+[0m17:12:25.993986 [debug] [MainThread]: On list_DB_T26_STAGING: Close
+[0m17:12:26.407986 [debug] [MainThread]: Connection 'test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8' was left open.
+[0m17:12:26.409001 [debug] [MainThread]: On test.capstone_dbt_project.dbt_utils_expression_is_true_mart_section_summary_valid_rate_percent.1a052bb4d8: Close
+[0m17:12:26.840497 [debug] [MainThread]: Connection 'test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b' was left open.
+[0m17:12:26.840996 [debug] [MainThread]: On test.capstone_dbt_project.not_null_mart_section_summary_processed_at.2e1d018c1b: Close
+[0m17:12:27.769101 [debug] [MainThread]: Connection 'test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4' was left open.
+[0m17:12:27.769544 [debug] [MainThread]: On test.capstone_dbt_project.not_null_mart_section_summary_valid_rate_percent.ce99ee20c4: Close
+[0m17:12:28.193359 [debug] [MainThread]: Connection 'test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76' was left open.
+[0m17:12:28.193862 [debug] [MainThread]: On test.capstone_dbt_project.unique_mart_section_summary_section_name.f710f6ee76: Close
+[0m17:12:28.780929 [info ] [MainThread]: 
+[0m17:12:28.781736 [info ] [MainThread]: Finished running 5 data tests in 0 hours 0 minutes and 6.57 seconds (6.57s).
+[0m17:12:28.783709 [debug] [MainThread]: Command end result
+[0m17:12:28.825094 [debug] [MainThread]: Wrote artifact WritableManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\manifest.json
+[0m17:12:28.827900 [debug] [MainThread]: Wrote artifact SemanticManifest to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\semantic_manifest.json
+[0m17:12:28.835705 [debug] [MainThread]: Wrote artifact RunExecutionResult to D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\capstone_dbt_project\target\run_results.json
+[0m17:12:28.836360 [info ] [MainThread]: 
+[0m17:12:28.837201 [info ] [MainThread]: [32mCompleted successfully[0m
+[0m17:12:28.838147 [info ] [MainThread]: 
+[0m17:12:28.841674 [info ] [MainThread]: Done. PASS=5 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=5
+[0m17:12:28.844765 [debug] [MainThread]: Command `dbt test` succeeded at 17:12:28.844590 after 8.82 seconds
+[0m17:12:28.845206 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C889D9250>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C9B9F4100>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000028C9C43A990>]}
+[0m17:12:28.845638 [debug] [MainThread]: Flushing usage events
+[0m17:12:30.321872 [debug] [MainThread]: An error was encountered while trying to flush usage events

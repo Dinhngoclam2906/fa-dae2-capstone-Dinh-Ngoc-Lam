@@ -1,5 +1,5 @@
 
-  create or replace   view DB_T26.STAGING_staging.stg_sf__guardian
+  create or replace   view DB_T26.STAGING.stg_sf__guardian
   
   
   
