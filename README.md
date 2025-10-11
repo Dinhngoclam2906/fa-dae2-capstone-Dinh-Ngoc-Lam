@@ -27,14 +27,15 @@ The rapid pace of news publication requires real-time ingestion and analysis to 
 **1. Real-time Source:**  
 - API Name: The Guardian API  
 - Endpoint: https://content.guardianapis.com/search  
-- Data Format: JSON  
+- Format: JSON  
+- Volume: 500 latest articles
 - Update Frequency: Hourly updates with new articles  
 - Description: Provides live news articles with metadata (title, publication date, section, etc.).
 
 **2. Batch Source:**
 - Dataset Name: Hugging Face - "TheGuardian-Articles" (Stefan171)
 - Format: Parquet shards (downloaded via huggingface_hub, preprocessed to CSV)SV  
-- Volume: ~87,000 articles (filtered to full data quality) 
+- Volume: 500 articles (filtered to full data quality) 
 - Update Cadence: Static dataset  
 - Description: Historical news articles scraped from The Guardian (2010-2024) with fields like URL, category, publication date, title, contents, author, and data quality ('Full' or 'Partial').
 

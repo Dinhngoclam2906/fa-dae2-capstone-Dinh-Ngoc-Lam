@@ -8,16 +8,14 @@ import asyncio
 from tqdm.asyncio import tqdm  # Updated import for async progress
 import requests
 from dotenv import load_dotenv
-from tqdm import tqdm as sync_tqdm  # Keep sync for other uses if needed
 import pandas as pd
-from collections import Counter
-import argparse
 from datetime import datetime, timedelta
 from textblob import TextBlob
 import orjson
 import random
 import glob
 import ijson
+import argparse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -240,20 +238,26 @@ class APIDataCollector:
 
     async def collect_data(self, endpoint: str, query_params: Optional[Dict] = None) -> Path:
         collected_ids = set()
+        collected_ids_lock = asyncio.Lock()
+        total_records_ref = [0]
         page = self._load_checkpoint()
-        total_records = 0
         total_available = float('inf')
-        base_filename = "guardian_all_articles"
-        output_csv_file = self.data_dir / f"{base_filename}.csv"
+        # Updated: Make filename dynamic based on section
+        section = query_params.get('section', 'all') if query_params else 'all'
+        base_filename = f"guardian_{section}_articles"
+        output_parquet_file = self.data_dir / f"{base_filename}.parquet"
         
         max_pages = (self.max_records + self.batch_size - 1) // self.batch_size
         query_params = query_params or {}
         query_params['from-date'] = self.from_date
         
-        semaphore = asyncio.Semaphore(15)
-        connector = aiohttp.TCPConnector(limit=50)
-        async with aiohttp.ClientSession(connector=connector) as session:
-            async def fetch_with_semaphore(p):
+        timeout = aiohttp.ClientTimeout(total=10)
+        connector = aiohttp.TCPConnector(limit=20, limit_per_host=5)
+        semaphore = asyncio.Semaphore(8)
+        jsonl_files_written = []
+        
+        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
+            async def fetch_and_process(p):
                 async with semaphore:
                     params = {
                         'api-key': self.api_key,
@@ -261,61 +265,78 @@ class APIDataCollector:
                         'show-fields': 'bodyText',
                         **query_params
                     }
-                    return p, await self._fetch_page(session, f"{self.api_url}{endpoint}", params, p)
+                    page_data = await self._fetch_page(session, f"{self.api_url}{endpoint}", params, p)
+                    if not page_data:
+                        return p, []
+
+                    # Check for total_available if this is the starting page
+                    if p == page and page_data and isinstance(page_data, list) and page_data and 'response' in page_data[0]:
+                        total_available = min(total_available, page_data[0].get('response', {}).get('total', float('inf')))
+                        self.max_records = min(self.max_records, total_available)
+
+                    # Process immediately: add timestamp, dedup, write JSONL
+                    crawl_timestamp = datetime.now().isoformat()
+                    valid_results = []
+                    async with collected_ids_lock:
+                        for r in page_data:
+                            r_copy = r.copy()  # Avoid mutating original
+                            r_copy['crawlTimestamp'] = crawl_timestamp
+                            if r_copy.get('id') not in collected_ids:
+                                valid_results.append(r_copy)
+                                collected_ids.add(r_copy['id'])
+
+                    # Write JSONL right away
+                    jsonl_file = self.temp_dir / f"collected_{p}.jsonl"
+                    with open(jsonl_file, 'wb') as f:
+                        for vr in valid_results:
+                            f.write(orjson.dumps(vr) + b'\n')
+                    jsonl_files_written.append(jsonl_file)
+                    
+                    added_count = len(valid_results)
+                    total_records_ref[0] += added_count
+                    logger.info(f"Collected {total_records_ref[0]} records (page {p})")
+                    
+                    if total_records_ref[0] >= self.max_records:
+                        logger.info("Record limit reached, cancelling remaining tasks")
+                    
+                    return p, valid_results
             
             # Create all tasks upfront
             pages_to_fetch = list(range(page, max_pages + 1))
-            tasks = [asyncio.create_task(fetch_with_semaphore(p)) for p in pages_to_fetch]
+            tasks = [asyncio.create_task(fetch_and_process(p)) for p in pages_to_fetch]
             
-            # Fetch concurrently with async tqdm for real progress
+            # Fetch and process concurrently with async tqdm for real progress
             page_results = {}
-            for future in tqdm.as_completed(tasks, total=len(tasks), desc="Fetching pages"):
+            for future in tqdm.as_completed(tasks, total=len(tasks), desc="Fetching & Processing pages"):
                 try:
-                    current_page, page_data = await future
-                    page_results[current_page] = page_data
+                    current_page, _ = await future
+                    page_results[current_page] = True  # Track completion
+                except asyncio.CancelledError:
+                    logger.info("Task cancelled due to record limit reached")
                 except Exception as e:
-                    logger.error(f"Error in async fetch: {e}")
+                    logger.error(f"Error in async fetch/process: {e}", exc_info=True)
                     continue
             
-            # Now process results in page order with a progress bar
-            sorted_pages = sorted(page_results.keys())
-            for sorted_page in tqdm(sorted_pages, desc="Processing pages"):
-                result = page_results.pop(sorted_page)
-                if not result:
-                    logger.info("No more results to fetch")
-                    break
-                if sorted_page == page and isinstance(result, list) and result and 'response' in result[0] and 'total' in result[0]['response']:
-                    total_available = min(total_available, result[0]['response']['total'])
-                    self.max_records = min(self.max_records, total_available)
-                    # Note: We can't adjust max_pages retroactively, but for small N it's fine
-                crawl_timestamp = datetime.now().isoformat()
-                for r in result:
-                    r['crawlTimestamp'] = crawl_timestamp
-                valid_results = [
-                    r for r in result
-                    if r.get('id') not in collected_ids
-                ]
-                for r in valid_results:
-                    collected_ids.add(r['id'])
-                jsonl_file = self.temp_dir / f"collected_{sorted_page}.jsonl"
-                with open(jsonl_file, 'wb') as f:
-                    for vr in valid_results:
-                        f.write(orjson.dumps(vr) + b'\n')
-                total_records += len(valid_results)
-                logger.info(f"Collected {total_records} records (page {sorted_page})")
-                if total_records >= self.max_records:
-                    break
-                logger.info(f"Request times: Avg={sum(self.request_times)/len(self.request_times):.2f}s, Min={min(self.request_times):.2f}s, Max={max(self.request_times):.2f}s")
-                await asyncio.sleep(random.uniform(0.1, 0.5))
-                self._save_checkpoint(sorted_page + 1)
+            # Cancel any remaining unfinished tasks if limit reached
+            if total_records_ref[0] >= self.max_records:
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
         
+        total_records = total_records_ref[0]
         if total_records < self.max_records:
             logger.warning(f"Collected only {total_records} articles, less than requested MAX_RECORDS={self.max_records}")
         
-        # Merge JSONL files using ijson for streaming
+        if self.request_times:
+            logger.info(f"Request times: Avg={sum(self.request_times)/len(self.request_times):.2f}s, Min={min(self.request_times):.2f}s, Max={max(self.request_times):.2f}s")
+        
+        # Early save checkpoint to next page
+        self._save_checkpoint(max_pages + 1 if total_records >= self.max_records else page + len(pages_to_fetch))
+        
+        # Merge JSONL files using ijson for streaming (sorted by page)
         rows = []
-        jsonl_files = sorted(glob.glob(str(self.temp_dir / "collected_*.jsonl")))
-        for jsonl_file in jsonl_files:
+        sorted_jsonl_files = sorted(jsonl_files_written, key=lambda f: int(f.stem.split('_')[-1]))
+        for jsonl_file in sorted_jsonl_files:
             with open(jsonl_file, 'rb') as f:
                 for article in ijson.items(f, '', multiple_values=True):
                     row = {
@@ -331,16 +352,16 @@ class APIDataCollector:
         
         df = pd.DataFrame(rows)
         df = df[['crawlTimestamp', 'id', 'webPublicationDate', 'webTitle', 'bodyText', 'webUrl', 'sectionName']]
-        df.to_csv(output_csv_file, index=False, encoding='utf-8')
-        logger.info(f"Converted JSON to CSV with prioritized fields: {output_csv_file}")
+        df.to_parquet(output_parquet_file, index=False, engine='pyarrow')
+        logger.info(f"Converted JSON to Parquet with prioritized fields: {output_parquet_file}")
         
         self._clean_checkpoint()
-        return output_csv_file
+        return output_parquet_file
 
     def analyze_data(self, file_path: Path) -> None:
         logger.info(f"Starting analysis on {file_path}")
         try:
-            df = pd.read_csv(file_path, encoding='utf-8')
+            df = pd.read_parquet(file_path)
         except PermissionError:
             logger.error(f"Cannot read {file_path} due to file lock")
             return
@@ -364,32 +385,36 @@ class APIDataCollector:
 def main():
     parser = argparse.ArgumentParser(description="Collect and analyze Guardian API data for RAG")
     parser.add_argument('--from-date', type=str, help="Start date for articles (YYYY-MM-DD)")
+    parser.add_argument('--section', type=str, default=None, help="Section to filter by (e.g., 'technology', 'world'); omit for all sections")
     parser.add_argument('--test', action='store_true', help="Test API connectivity")
     parser.add_argument('--test-cache', action='store_true', help="Test cache by simulating partial run")
     args = parser.parse_args()
     
     if args.test:
-        test_api()
-        return
+        test_api(args.section)
+        return True
     
     collector = APIDataCollector("guardian_api", from_date=args.from_date)
     try:
+        section_params = {'section': args.section} if args.section else {}
         if args.test_cache:
             original_max_records = collector.max_records
             collector.max_records = min(500, original_max_records)
-            output_path = asyncio.run(collector.collect_data("/search", query_params={}))
+            output_path = asyncio.run(collector.collect_data("/search", query_params=section_params))
             print(f"Cache test completed with {collector.max_records} records! Saved to {output_path}")
             collector.max_records = original_max_records
+            return True
         else:
-            output_path = asyncio.run(collector.collect_data("/search", query_params={}))
+            output_path = asyncio.run(collector.collect_data("/search", query_params=section_params))
             print(f"Data collection completed successfully! Saved to {output_path}")
-        collector.analyze_data(output_path)
+            collector.analyze_data(output_path)
+            return True
     except Exception as e:
         logger.error(f"Data collection or analysis failed: {e}", exc_info=True)
         collector._clean_checkpoint()
-        raise
+        return False
 
-def test_api():
+def test_api(section: Optional[str] = None):
     api_url = os.getenv("API_URL", "https://content.guardianapis.com")
     api_key = os.getenv("API_KEY")
     from_date = os.getenv("FROM_DATE", (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"))
@@ -404,8 +429,10 @@ def test_api():
             'page': 1,
             'page-size': 200,
             'show-fields': 'bodyText',
-            'from-date': from_date
+            'from-date': from_date,
         }
+        if section:
+            params['section'] = section
         response = requests.get(f"{api_url}/search", params=params, timeout=60)
         if response.status_code == 400:
             print(f"400 Bad Request: {response.text}")
@@ -414,7 +441,8 @@ def test_api():
         data = orjson.loads(response.content)
         total = data['response'].get('total', 0)
         results = data['response'].get('results', [])
-        print(f"API Test: Successfully fetched {len(results)} articles, total available: {total}")
+        section_note = f" (section: {section})" if section else " (all sections)"
+        print(f"API Test: Successfully fetched {len(results)} articles{section_note}, total available: {total}")
     except Exception as e:
         print(f"API Test failed: {e}")
 

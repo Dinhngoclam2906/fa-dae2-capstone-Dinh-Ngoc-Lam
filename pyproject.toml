@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "choco>=1.0.5",
+    "dbt-core>=1.10.13",
+    "dbt-snowflake>=1.10.2",
     "faker>=37.6.0",
     "git-filter-repo>=2.47.0",
     "huggingface-hub[hf-xet]>=0.35.3",
@@ -26,6 +28,7 @@ dependencies = [
     "rich>=14.1.0",
     "seaborn>=0.13.2",
     "snowflake-connector-python>=3.17.4",
+    "sqlalchemy>=2.0.43",
     "tenacity>=9.1.2",
     "textblob>=0.19.0",
     "tqdm>=4.67.1",
@@ -37,4 +40,9 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
+]
+
+[tool.uv.workspace]
+members = [
+    "capstone_dbt_project",
 ]

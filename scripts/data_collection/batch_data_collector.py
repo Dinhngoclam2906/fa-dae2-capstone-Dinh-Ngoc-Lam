@@ -27,10 +27,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class BatchDataCollector:
-    def __init__(self):
+    def __init__(self, max_articles: int = 500):  # Added: Configurable limit
+        self.max_articles = max_articles
         self.data_dir = Path("data/batch")
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.output_csv = self.data_dir / "guardian_historical_preprocessed.csv"  # Changed to CSV
+        self.output_parquet = self.data_dir / "guardian_historical_preprocessed.parquet"  # Changed to Parquet
         self.repo_id = "Stefan171/TheGuardian-Articles"
         self.local_dir = self.data_dir / self.repo_id.replace("/", "_")
         # Updated columns based on HF dataset schema
@@ -109,7 +110,8 @@ class BatchDataCollector:
         logger.info(f"Using crawlTimestamp: {crawl_timestamp}")
 
         # Early filter on Data Quality == 'Full'
-        lf = lf.filter(pl.col("Data Quality") == "Full").select(self.usecols)
+        lf = lf.filter(
+            (pl.col("Data Quality") == "Full")).select(self.usecols)
 
         # Apply transforms lazily
         section_raw = pl.col("Article Category")
@@ -153,6 +155,10 @@ class BatchDataCollector:
             pl.col('body_text').is_not_null()
         )
 
+        # Added: Limit to max_articles after filtering
+        df = df.head(self.max_articles)
+        logger.info(f"Limited to {self.max_articles} articles as requested")
+
         if df.height == 0:
             logger.warning("No articles processed. Check dataset content or column mappings.")
         
@@ -164,15 +170,15 @@ class BatchDataCollector:
             'body_text', 'web_url', 'section_name'
         ])
 
-        # Write to CSV (DataFrame method)
-        df.write_csv(str(self.output_csv))
+        # Write to Parquet (DataFrame method)
+        df.write_parquet(str(self.output_parquet))
         total_records = df.height  # Already eager—no query needed
         total_dropped = total_rows - total_records
         logger.info(f"Total dropped: {total_dropped} rows due to missing fields")
-        logger.info(f"Preprocessed batch data saved to {self.output_csv} ({total_records} records)")
+        logger.info(f"Preprocessed batch data saved to {self.output_parquet} ({total_records} records)")
 
 def main():
-    collector = BatchDataCollector()
+    collector = BatchDataCollector(max_articles=500)  # Updated: Set limit to 500
     try:
         local_dir = collector.local_dir
         # Check for existing data files (Parquet/JSON/CSV)
@@ -196,12 +202,14 @@ def main():
         
         # Display first row of preprocessed data
         try:
-            first_row = pl.read_csv(collector.output_csv, n_rows=1).to_pandas().to_dict(orient='records')[0]
+            first_row = pl.read_parquet(collector.output_parquet, n_rows=1).to_pandas().to_dict(orient='records')[0]
             print(f"First row of preprocessed data:\n{first_row}")
         except Exception as e:
-            print(f"Failed to read first row of output CSV: {e}")
+            print(f"Failed to read first row of output Parquet: {e}")
+        return True
     except Exception as e:
         print(f"Batch data collection failed: {e}")
-
+        return False
+        
 if __name__ == "__main__":
     main()
