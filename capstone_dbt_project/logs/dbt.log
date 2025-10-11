@@ -1,0 +1,182 @@
+[0m09:51:32.404975 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001E4D95C2E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001E4DA3382D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001E4D74F3110>]}
+
+
+============================== 09:51:32.774298 | 9a474ee8-fa29-49c7-a4ca-2de16a940609 ==============================
+[0m09:51:32.774298 [info ] [MainThread]: Running with dbt=1.10.13
+[0m09:51:32.775790 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'write_json': 'True', 'send_anonymous_usage_stats': 'True', 'version_check': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'use_colors': 'True', 'invocation_command': 'dbt init capstone_dbt_project', 'log_format': 'default', 'warn_error': 'None', 'introspect': 'True', 'debug': 'False', 'printer_width': '80', 'fail_fast': 'False', 'no_print': 'None', 'empty': 'None', 'quiet': 'False', 'use_experimental_parser': 'False', 'log_cache_events': 'False', 'log_path': 'logs', 'indirect_selection': 'eager', 'profiles_dir': 'C:\\Users\\DELL\\.dbt', 'static_parser': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])'}
+[0m09:51:33.623408 [info ] [MainThread]: Creating dbt configuration folder at C:\Users\DELL\.dbt
+[0m09:51:33.629887 [debug] [MainThread]: Starter project path: D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\.venv\Lib\site-packages\dbt\include\starter_project
+[0m09:51:33.716932 [info ] [MainThread]: 
+Your new dbt project "capstone_dbt_project" was created!
+
+For more information on how to configure the profiles.yml file,
+please consult the dbt documentation here:
+
+  https://docs.getdbt.com/docs/configure-your-profile
+
+One more thing:
+
+Need help? Don't hesitate to reach out to us via GitHub issues or on Slack:
+
+  https://community.getdbt.com/
+
+Happy modeling!
+
+[0m09:51:33.718054 [info ] [MainThread]: Setting up your profile.
+[0m09:57:06.492651 [info ] [MainThread]: Profile capstone_dbt_project written to C:\Users\DELL\.dbt\profiles.yml using target's profile_template.yml and your supplied values. Run 'dbt debug' to validate the connection.
+[0m09:57:06.497016 [debug] [MainThread]: Command `dbt init` succeeded at 09:57:06.496636 after 334.39 seconds
+[0m09:57:06.499322 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001E4ECD8A9E0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001E4EB13A450>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001E4D7B26690>]}
+[0m09:57:06.501166 [debug] [MainThread]: Flushing usage events
+[0m09:57:08.726799 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m09:58:19.659594 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000232FF432E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000232802582D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x00000232FD363110>]}
+
+
+============================== 09:58:19.667811 | cf2165d8-e0bc-48b7-8d4e-7683781e9cb5 ==============================
+[0m09:58:19.667811 [info ] [MainThread]: Running with dbt=1.10.13
+[0m09:58:19.669085 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'send_anonymous_usage_stats': 'True', 'version_check': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'use_colors': 'True', 'invocation_command': 'dbt debug', 'log_format': 'default', 'warn_error': 'None', 'introspect': 'True', 'debug': 'False', 'log_cache_events': 'False', 'fail_fast': 'False', 'no_print': 'None', 'use_experimental_parser': 'False', 'empty': 'None', 'printer_width': '80', 'quiet': 'False', 'indirect_selection': 'eager', 'log_path': 'logs', 'write_json': 'True', 'static_parser': 'True', 'profiles_dir': 'C:\\Users\\DELL\\.dbt'}
+[0m09:58:19.801807 [info ] [MainThread]: dbt version: 1.10.13
+[0m09:58:19.804027 [info ] [MainThread]: python version: 3.13.7
+[0m09:58:19.805353 [info ] [MainThread]: python path: D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\.venv\Scripts\python.exe
+[0m09:58:19.806687 [info ] [MainThread]: os info: Windows-11-10.0.22621-SP0
+[0m09:58:21.485257 [info ] [MainThread]: Using profiles dir at C:\Users\DELL\.dbt
+[0m09:58:21.486193 [info ] [MainThread]: Using profiles.yml file at C:\Users\DELL\.dbt\profiles.yml
+[0m09:58:21.486877 [info ] [MainThread]: Using dbt_project.yml file at D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\dbt_project.yml
+[0m09:58:21.488560 [info ] [MainThread]: adapter type: snowflake
+[0m09:58:21.489231 [info ] [MainThread]: adapter version: 1.10.2
+[0m09:58:21.489933 [info ] [MainThread]: Configuration:
+[0m09:58:21.490626 [info ] [MainThread]:   profiles.yml file [[32mOK found and valid[0m]
+[0m09:58:21.491244 [info ] [MainThread]:   dbt_project.yml file [[31mERROR not found[0m]
+[0m09:58:21.491937 [info ] [MainThread]: Required dependencies:
+[0m09:58:21.492809 [debug] [MainThread]: Executing "git --help"
+[0m09:58:21.535788 [debug] [MainThread]: STDOUT: "b"usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]\n           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]\n           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--no-lazy-fetch]\n           [--no-optional-locks] [--no-advice] [--bare] [--git-dir=<path>]\n           [--work-tree=<path>] [--namespace=<name>] [--config-env=<name>=<envvar>]\n           <command> [<args>]\n\nThese are common Git commands used in various situations:\n\nstart a working area (see also: git help tutorial)\n   clone      Clone a repository into a new directory\n   init       Create an empty Git repository or reinitialize an existing one\n\nwork on the current change (see also: git help everyday)\n   add        Add file contents to the index\n   mv         Move or rename a file, a directory, or a symlink\n   restore    Restore working tree files\n   rm         Remove files from the working tree and from the index\n\nexamine the history and state (see also: git help revisions)\n   bisect     Use binary search to find the commit that introduced a bug\n   diff       Show changes between commits, commit and working tree, etc\n   grep       Print lines matching a pattern\n   log        Show commit logs\n   show       Show various types of objects\n   status     Show the working tree status\n\ngrow, mark and tweak your common history\n   backfill   Download missing objects in a partial clone\n   branch     List, create, or delete branches\n   commit     Record changes to the repository\n   merge      Join two or more development histories together\n   rebase     Reapply commits on top of another base tip\n   reset      Reset current HEAD to the specified state\n   switch     Switch branches\n   tag        Create, list, delete or verify a tag object signed with GPG\n\ncollaborate (see also: git help workflows)\n   fetch      Download objects and refs from another repository\n   pull       Fetch from and integrate with another repository or a local branch\n   push       Update remote refs along with associated objects\n\n'git help -a' and 'git help -g' list available subcommands and some\nconcept guides. See 'git help <command>' or 'git help <concept>'\nto read about a specific subcommand or concept.\nSee 'git help git' for an overview of the system.\n""
+[0m09:58:21.537055 [debug] [MainThread]: STDERR: "b''"
+[0m09:58:21.537951 [info ] [MainThread]:  - git [[32mOK found[0m]
+
+[0m09:58:21.538906 [info ] [MainThread]: Connection:
+[0m09:58:21.539914 [info ] [MainThread]:   account: GEZJPYC-FOUNDRY-AI-ACADEMY
+[0m09:58:21.540749 [info ] [MainThread]:   user: T26
+[0m09:58:21.541572 [info ] [MainThread]:   database: DB_T26
+[0m09:58:21.542500 [info ] [MainThread]:   warehouse: WH_T26
+[0m09:58:21.543336 [info ] [MainThread]:   role: RL_T26
+[0m09:58:21.544358 [info ] [MainThread]:   schema: SC_T26
+[0m09:58:21.545731 [info ] [MainThread]:   authenticator: None
+[0m09:58:21.546784 [info ] [MainThread]:   oauth_client_id: None
+[0m09:58:21.548105 [info ] [MainThread]:   query_tag: None
+[0m09:58:21.549493 [info ] [MainThread]:   client_session_keep_alive: False
+[0m09:58:21.552234 [info ] [MainThread]:   host: None
+[0m09:58:21.553626 [info ] [MainThread]:   port: None
+[0m09:58:21.556884 [info ] [MainThread]:   proxy_host: None
+[0m09:58:21.558475 [info ] [MainThread]:   proxy_port: None
+[0m09:58:21.560613 [info ] [MainThread]:   protocol: None
+[0m09:58:21.561835 [info ] [MainThread]:   connect_retries: 1
+[0m09:58:21.563488 [info ] [MainThread]:   connect_timeout: None
+[0m09:58:21.565124 [info ] [MainThread]:   retry_on_database_errors: False
+[0m09:58:21.566240 [info ] [MainThread]:   retry_all: False
+[0m09:58:21.567468 [info ] [MainThread]:   insecure_mode: False
+[0m09:58:21.568301 [info ] [MainThread]:   reuse_connections: True
+[0m09:58:21.569575 [info ] [MainThread]:   s3_stage_vpce_dns_name: None
+[0m09:58:21.572790 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m09:58:22.328061 [debug] [MainThread]: Acquiring new snowflake connection 'debug'
+[0m09:58:33.035026 [debug] [MainThread]: Using snowflake connection "debug"
+[0m09:58:33.036036 [debug] [MainThread]: On debug: select 1 as id
+[0m09:58:33.036874 [debug] [MainThread]: Opening a new connection, currently in state init
+[0m09:58:33.093108 [debug] [MainThread]: Snowflake adapter: Error running SQL: select 1 as id
+[0m09:58:33.094114 [debug] [MainThread]: Snowflake adapter: Rolling back transaction.
+[0m09:58:33.095270 [info ] [MainThread]:   Connection test: [[31mERROR[0m]
+
+[0m09:58:33.097256 [info ] [MainThread]: [31m2 checks failed:[0m
+[0m09:58:33.098765 [info ] [MainThread]: Project loading failed for the following reason:
+ project path <D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\dbt_project.yml> not found
+
+[0m09:58:33.100284 [info ] [MainThread]: dbt was unable to connect to the specified database.
+The database returned the following error:
+
+  >Database Error
+  Password was given but private key is not encrypted.
+
+Check your database credentials and try again. For more information, visit:
+https://docs.getdbt.com/docs/configure-your-profile
+
+
+[0m09:58:33.105064 [debug] [MainThread]: Command `dbt debug` failed at 09:58:33.104593 after 14.00 seconds
+[0m09:58:33.106101 [debug] [MainThread]: Connection 'debug' was left open.
+[0m09:58:33.106982 [debug] [MainThread]: On debug: No close available on handle
+[0m09:58:33.108164 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000002329325DBA0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000023292FBD130>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x0000023292E988D0>]}
+[0m09:58:33.110328 [debug] [MainThread]: Flushing usage events
+[0m09:58:35.182793 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m09:59:46.631416 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C78D252E40>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C78DFD82D0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C78B187110>]}
+
+
+============================== 09:59:46.643730 | 3e073eb4-94ae-4ea5-91bd-d4b806a1a14f ==============================
+[0m09:59:46.643730 [info ] [MainThread]: Running with dbt=1.10.13
+[0m09:59:46.645686 [debug] [MainThread]: running dbt with arguments {'partial_parse': 'True', 'static_parser': 'True', 'send_anonymous_usage_stats': 'True', 'version_check': 'True', 'cache_selected_only': 'False', 'target_path': 'None', 'use_colors': 'True', 'invocation_command': 'dbt debug', 'log_format': 'default', 'warn_error': 'None', 'introspect': 'True', 'debug': 'False', 'printer_width': '80', 'fail_fast': 'False', 'no_print': 'None', 'quiet': 'False', 'empty': 'None', 'use_experimental_parser': 'False', 'log_cache_events': 'False', 'indirect_selection': 'eager', 'log_path': 'logs', 'profiles_dir': 'C:\\Users\\DELL\\.dbt', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'write_json': 'True'}
+[0m09:59:46.693893 [info ] [MainThread]: dbt version: 1.10.13
+[0m09:59:46.694887 [info ] [MainThread]: python version: 3.13.7
+[0m09:59:46.695838 [info ] [MainThread]: python path: D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\.venv\Scripts\python.exe
+[0m09:59:46.696616 [info ] [MainThread]: os info: Windows-11-10.0.22621-SP0
+[0m09:59:48.224992 [info ] [MainThread]: Using profiles dir at C:\Users\DELL\.dbt
+[0m09:59:48.225924 [info ] [MainThread]: Using profiles.yml file at C:\Users\DELL\.dbt\profiles.yml
+[0m09:59:48.226568 [info ] [MainThread]: Using dbt_project.yml file at D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\dbt_project.yml
+[0m09:59:48.228204 [info ] [MainThread]: adapter type: snowflake
+[0m09:59:48.228845 [info ] [MainThread]: adapter version: 1.10.2
+[0m09:59:48.229511 [info ] [MainThread]: Configuration:
+[0m09:59:48.230196 [info ] [MainThread]:   profiles.yml file [[32mOK found and valid[0m]
+[0m09:59:48.230752 [info ] [MainThread]:   dbt_project.yml file [[31mERROR not found[0m]
+[0m09:59:48.231466 [info ] [MainThread]: Required dependencies:
+[0m09:59:48.232361 [debug] [MainThread]: Executing "git --help"
+[0m09:59:48.321267 [debug] [MainThread]: STDOUT: "b"usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]\n           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]\n           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--no-lazy-fetch]\n           [--no-optional-locks] [--no-advice] [--bare] [--git-dir=<path>]\n           [--work-tree=<path>] [--namespace=<name>] [--config-env=<name>=<envvar>]\n           <command> [<args>]\n\nThese are common Git commands used in various situations:\n\nstart a working area (see also: git help tutorial)\n   clone      Clone a repository into a new directory\n   init       Create an empty Git repository or reinitialize an existing one\n\nwork on the current change (see also: git help everyday)\n   add        Add file contents to the index\n   mv         Move or rename a file, a directory, or a symlink\n   restore    Restore working tree files\n   rm         Remove files from the working tree and from the index\n\nexamine the history and state (see also: git help revisions)\n   bisect     Use binary search to find the commit that introduced a bug\n   diff       Show changes between commits, commit and working tree, etc\n   grep       Print lines matching a pattern\n   log        Show commit logs\n   show       Show various types of objects\n   status     Show the working tree status\n\ngrow, mark and tweak your common history\n   backfill   Download missing objects in a partial clone\n   branch     List, create, or delete branches\n   commit     Record changes to the repository\n   merge      Join two or more development histories together\n   rebase     Reapply commits on top of another base tip\n   reset      Reset current HEAD to the specified state\n   switch     Switch branches\n   tag        Create, list, delete or verify a tag object signed with GPG\n\ncollaborate (see also: git help workflows)\n   fetch      Download objects and refs from another repository\n   pull       Fetch from and integrate with another repository or a local branch\n   push       Update remote refs along with associated objects\n\n'git help -a' and 'git help -g' list available subcommands and some\nconcept guides. See 'git help <command>' or 'git help <concept>'\nto read about a specific subcommand or concept.\nSee 'git help git' for an overview of the system.\n""
+[0m09:59:48.336373 [debug] [MainThread]: STDERR: "b''"
+[0m09:59:48.337672 [info ] [MainThread]:  - git [[32mOK found[0m]
+
+[0m09:59:48.339087 [info ] [MainThread]: Connection:
+[0m09:59:48.340740 [info ] [MainThread]:   account: GEZJPYC-FOUNDRY-AI-ACADEMY
+[0m09:59:48.342048 [info ] [MainThread]:   user: T26
+[0m09:59:48.343355 [info ] [MainThread]:   database: DB_T26
+[0m09:59:48.344818 [info ] [MainThread]:   warehouse: WH_T26
+[0m09:59:48.346430 [info ] [MainThread]:   role: RL_T26
+[0m09:59:48.348085 [info ] [MainThread]:   schema: SC_T26
+[0m09:59:48.349944 [info ] [MainThread]:   authenticator: None
+[0m09:59:48.352323 [info ] [MainThread]:   oauth_client_id: None
+[0m09:59:48.355219 [info ] [MainThread]:   query_tag: None
+[0m09:59:48.357613 [info ] [MainThread]:   client_session_keep_alive: False
+[0m09:59:48.360175 [info ] [MainThread]:   host: None
+[0m09:59:48.361465 [info ] [MainThread]:   port: None
+[0m09:59:48.363218 [info ] [MainThread]:   proxy_host: None
+[0m09:59:48.365260 [info ] [MainThread]:   proxy_port: None
+[0m09:59:48.366952 [info ] [MainThread]:   protocol: None
+[0m09:59:48.368272 [info ] [MainThread]:   connect_retries: 1
+[0m09:59:48.369551 [info ] [MainThread]:   connect_timeout: None
+[0m09:59:48.371081 [info ] [MainThread]:   retry_on_database_errors: False
+[0m09:59:48.372505 [info ] [MainThread]:   retry_all: False
+[0m09:59:48.373811 [info ] [MainThread]:   insecure_mode: False
+[0m09:59:48.375566 [info ] [MainThread]:   reuse_connections: True
+[0m09:59:48.378053 [info ] [MainThread]:   s3_stage_vpce_dns_name: None
+[0m09:59:48.379847 [info ] [MainThread]: Registered adapter: snowflake=1.10.2
+[0m09:59:48.842178 [debug] [MainThread]: Acquiring new snowflake connection 'debug'
+[0m09:59:48.923584 [debug] [MainThread]: Using snowflake connection "debug"
+[0m09:59:48.924025 [debug] [MainThread]: On debug: select 1 as id
+[0m09:59:48.924394 [debug] [MainThread]: Opening a new connection, currently in state init
+[0m09:59:48.928346 [debug] [MainThread]: Snowflake adapter: Error running SQL: select 1 as id
+[0m09:59:48.928895 [debug] [MainThread]: Snowflake adapter: Rolling back transaction.
+[0m09:59:48.929325 [info ] [MainThread]:   Connection test: [[31mERROR[0m]
+
+[0m09:59:48.930059 [info ] [MainThread]: [31m2 checks failed:[0m
+[0m09:59:48.930733 [info ] [MainThread]: Project loading failed for the following reason:
+ project path <D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\capstone_dbt_project\dbt_project.yml> not found
+
+[0m09:59:48.931446 [info ] [MainThread]: dbt was unable to connect to the specified database.
+The database returned the following error:
+
+  >Database Error
+  Password was given but private key is not encrypted.
+
+Check your database credentials and try again. For more information, visit:
+https://docs.getdbt.com/docs/configure-your-profile
+
+
+[0m09:59:48.933140 [debug] [MainThread]: Command `dbt debug` failed at 09:59:48.932979 after 2.57 seconds
+[0m09:59:48.933597 [debug] [MainThread]: Connection 'debug' was left open.
+[0m09:59:48.934032 [debug] [MainThread]: On debug: No close available on handle
+[0m09:59:48.934506 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C7A0E9CFC0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C7A0C5CEF0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x000001C7A0B388D0>]}
+[0m09:59:48.935063 [debug] [MainThread]: Flushing usage events
+[0m09:59:50.571523 [debug] [MainThread]: An error was encountered while trying to flush usage events

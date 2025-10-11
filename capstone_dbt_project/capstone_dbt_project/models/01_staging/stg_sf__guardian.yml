@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: stg_sf__guardian
+    description: Cleaned and standardized Guardian articles data from raw Parquet ingestion
+    columns:
+      - name: id
+        description: Surrogate primary key
+        tests:
+          - unique
+          - not_null
+      - name: article_id
+        description: Original unique article identifier
+        tests:
+          - unique
+          - not_null
+      - name: web_title
+        description: Article title
+        tests:
+          - not_null
+      - name: web_url
+        description: Source URL
+        tests:
+          - not_null
+      - name: crawl_timestamp
+        description: Crawl timestamp
+        tests:
+          - not_null
+      - name: loaded_at
+        description: Load timestamp to Snowflake
+        tests:
+          - not_null
+      - name: has_valid_title
+        description: Flag for valid title (non-empty, reasonable length)
+        tests:
+          - dbt_utils.expression_is_true:
+              where: has_valid_title = TRUE
+      - name: has_valid_url
+        description: Flag for valid URL (starts with http, non-empty)
+        tests:
+          - dbt_utils.expression_is_true:
+              where: has_valid_url = TRUE
+      - name: processed_at
+        description: dbt processing timestamp
+        tests:
+          - not_null
