@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: mart_section_summary
+    description: Final analytics-ready summary of Guardian articles by section
+    columns:
+      - name: section_name
+        description: Article section
+        tests:
+          - not_null
+          - unique
+      - name: valid_rate_percent
+        description: "% of valid articles in section"
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                where: valid_rate_percent >= 0
+      - name: processed_at
+        description: Summary timestamp
+        tests:
+          - not_null
