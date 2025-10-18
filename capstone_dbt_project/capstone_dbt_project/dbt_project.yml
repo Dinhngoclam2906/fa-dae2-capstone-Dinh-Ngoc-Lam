@@ -15,7 +15,7 @@ models:
     03_mart:
       materialized: table
       # schema: marts
-      cluster_by: ["loaded_at"]
+      +cluster_by: ["loaded_at"]
 
 # Variables for environment-specific values
 vars:
