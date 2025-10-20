@@ -3,12 +3,6 @@
 ## Overview
 An end-to-end AI-powered data analytics system that processes real-time and historical news data from The Guardian to summarize and provide insights into news trends and sentiment. This enables users to receive updates from current and historical news trends and query insights using a natural language AI interface.
 
-**Success Metrics (Quantitative):**  
-* Real-time pipeline processes 500+ articles daily with <5% error rate.  
-* Batch pipeline processes 87,000+ historical articles with >95% data completeness.
-* AI chatbot answers 90% of queries accurately with response time <3 seconds.  
-* Data warehouse supports queries with <1 second latency for 95% of requests.
-
 ## Project Structure
 ### **1. Problem & Scope**:
 The rapid pace of news publication requires real-time ingestion and analysis to stay relevant, while historical data provides context for long-term trends. Constraints include API rate limits, data quality issues, and ensuring AI responses are grounded in accurate data.
@@ -61,15 +55,23 @@ The rapid pace of news publication requires real-time ingestion and analysis to 
 **Project Structure:**
 ```
 capstone/
+├── capstone_dbt_project/
+|   ├── .venv
+|   ├── capstone_dbt_project
+|   ├── logs
+|   ├── .gitignore/
+|   ├── README.md
+|   ├── expressions.txt
+|   ├── pyproject.toml/
 ├── scripts/  
-|   ├──data_collection                            # Data collection scripts
+|   ├── data_collection                            # Data collection scripts
 |      ├── real_time_data_collector.py            # Guardian API ingestion
 |      ├── batch_data_collector.py                # HuggingFace historical news data ingestion
-|   ├──ingestion
+|   ├── ingestion
 |      ├── load_csv_to_postgre_then_snowflake.py  # Load local CSV to PostgreSQL
 |      ├── load_csv_to_snowflake.py               # Load local CSV to Snowflake
 |      ├── snowflake_objects_verification.py
-|   ├──sql
+|   ├── sql
 |      ├── init.sql
 ├── .env.example 
 ├── .gitattributes/                    
@@ -102,7 +104,7 @@ docker-compose -f docker/compose.yml up -d
 **4. Run Pipelines:**
 
 Real-time: 
-```python scripts/data_collection/real_time_data_collector.py && python scripts/ingestion/load_csv_to_postgres.py && python scripts/ingestion/load_postgre_to_snowflake.py```
+```python scripts/data_collection/real_time_data_collector.py && python scripts/ingestion/load_csv_to_postgres_then_snowflake.py```
 
 Batch: 
 ```python scripts/data_collection/batch_data_collector && python scripts/ingestion/load_csv_to_snowflake.py```
