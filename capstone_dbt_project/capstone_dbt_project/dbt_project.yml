@@ -23,6 +23,7 @@ vars:
   staging_schema: 'staging'
   intermediate_schema: 'intermediate'
   marts_schema: 'marts'
+  start_date: '2010-01-01'
 
 # Seeds configuration
 seeds:
