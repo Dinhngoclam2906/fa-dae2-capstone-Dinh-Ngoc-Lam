@@ -1,0 +1,13 @@
+capstone_dbt_project:
+  target: dev  
+  outputs:
+    dev:  
+      type: snowflake
+      account: GEZJPYC-FOUNDRY_AI_ACADEMY  
+      user: T26
+      role: RL_T26 
+      database: DB_T26  
+      warehouse: WH_T26  
+      schema: SC_T26  
+      threads: 4
+      private_key_path: D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\rsa_key.p8
