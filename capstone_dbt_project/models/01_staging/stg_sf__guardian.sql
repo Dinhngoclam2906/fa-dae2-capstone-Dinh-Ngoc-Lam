@@ -1,3 +1,4 @@
+-- Test CI: Simulating a staging update for pipeline validation
 -- models/01_staging/stg_articles.sql
 {{ config(materialized='view') }}
 
@@ -30,8 +31,8 @@ SELECT
     -- Enhanced data quality flags
     CASE
         WHEN web_title IS NOT NULL 
-             AND TRIM(UPPER(web_title)) != '' 
-             AND LENGTH(TRIM(web_title)) <= 500  -- Reasonable title length cap
+            AND TRIM(UPPER(web_title)) != '' 
+            AND LENGTH(TRIM(web_title)) <= 500  -- Reasonable title length cap (updated: added note for CI test)
         THEN TRUE
         ELSE FALSE
     END AS has_valid_title,
