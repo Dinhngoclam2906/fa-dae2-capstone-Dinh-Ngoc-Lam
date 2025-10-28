@@ -4,8 +4,9 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional
 import aiohttp
+from aiohttp import ClientTimeout
 import asyncio
-from tqdm.asyncio import tqdm  # Updated import for async progress
+from tqdm.asyncio import tqdm
 import requests
 from dotenv import load_dotenv
 import pandas as pd
@@ -51,10 +52,8 @@ class APIDataCollector:
         except ValueError:
             raise ValueError(f"Invalid FROM_DATE format: {self.from_date}. Must be YYYY-MM-DD")
         
-        self.data_dir = Path("data/external")
-        self.analysis_dir = Path("data/analysis")
+        self.data_dir = Path("data/real_time")
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.analysis_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_file = self.data_dir / "checkpoint.json"
         self.temp_checkpoint = self.data_dir / "temp_checkpoint.json"
         self.temp_dir = self.data_dir / "temp"
@@ -177,16 +176,19 @@ class APIDataCollector:
                 logger.warning(f"Failed to load cached page {page}: {e}")
         return None
 
-    async def _fetch_page(self, session: aiohttp.ClientSession, url: str, params: Dict, page: int, retry: int = 0) -> List[Dict]:
+    async def _fetch_page(self, session: aiohttp.ClientSession, url: str, params: Dict, page: int, retry: int = 0) -> tuple[List[Dict], Optional[int]]:
+        # Return (results, total) for proper total access
         cache_file = self.temp_dir / f"page_{page}.jsonl"
         cached_data = self._load_cached_page(page)
         if cached_data:
-            return cached_data
+            return cached_data, None  # No total in cache; will use inf
 
         params['page'] = page
         try:
             start_time = time.time()
-            async with session.get(url, params=params, timeout=30) as response:
+            # Use ClientTimeout instance instead of int
+            timeout = ClientTimeout(total=30)
+            async with session.get(url, params=params, timeout=timeout) as response:
                 logger.debug(f"All response headers for page {page}: {dict(response.headers)}")
                 remaining = response.headers.get('X-RateLimit-Remaining', 'Unknown')
                 reset_time = response.headers.get('X-RateLimit-Reset', 'Unknown')
@@ -200,7 +202,7 @@ class APIDataCollector:
                     raise ValueError(f"Max retries ({self.max_retries}) reached after 429 error")
                 if response.status == 400:
                     logger.warning(f"400 Bad Request on page {page}: {await response.text()}")
-                    return []
+                    return [], None
                 response.raise_for_status()
 
                 network_time = time.time() - start_time
@@ -218,16 +220,17 @@ class APIDataCollector:
                 logger.info(f"Page {page} full request time: {request_time:.2f}s")
                 self.request_times.append(request_time)
                 results = data['response']['results']
+                total = data['response'].get('total', float('inf'))  # Extract total here
                 if not isinstance(results, list):
                     logger.warning(f"Results for page {page} is not a list: {type(results)}")
-                    return []
+                    return [], total
                 try:
                     with open(cache_file, 'wb') as f:
                         for result in results:
                             f.write(orjson.dumps(result) + b'\n')
                 except PermissionError:
                     logger.warning(f"Unable to cache page {page} due to file lock")
-                return results
+                return results, total
         except aiohttp.ClientError as e:
             if retry < self.max_retries:
                 logger.warning(f"Retry {retry + 1}/{self.max_retries} for page {page} after error: {e}")
@@ -240,24 +243,26 @@ class APIDataCollector:
         collected_ids = set()
         collected_ids_lock = asyncio.Lock()
         total_records_ref = [0]
-        page = self._load_checkpoint()
+        total_available_lock = asyncio.Lock()  # Added: For safe concurrent updates
         total_available = float('inf')
+        page = self._load_checkpoint()
         # Updated: Make filename dynamic based on section
-        section = query_params.get('section', 'all') if query_params else 'all'
-        base_filename = f"guardian_{section}_articles"
+        # section = query_params.get('section', 'all') if query_params else 'all'
+        base_filename = "guardian_real_time_articles"
         output_parquet_file = self.data_dir / f"{base_filename}.parquet"
         
         max_pages = (self.max_records + self.batch_size - 1) // self.batch_size
         query_params = query_params or {}
         query_params['from-date'] = self.from_date
         
-        timeout = aiohttp.ClientTimeout(total=10)
+        timeout = ClientTimeout(total=10)  # Use ClientTimeout
         connector = aiohttp.TCPConnector(limit=20, limit_per_host=5)
         semaphore = asyncio.Semaphore(8)
         jsonl_files_written = []
         
         async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
             async def fetch_and_process(p):
+                nonlocal total_available  # Declare for outer scope access
                 async with semaphore:
                     params = {
                         'api-key': self.api_key,
@@ -265,14 +270,16 @@ class APIDataCollector:
                         'show-fields': 'bodyText',
                         **query_params
                     }
-                    page_data = await self._fetch_page(session, f"{self.api_url}{endpoint}", params, p)
+                    page_data, page_total = await self._fetch_page(session, f"{self.api_url}{endpoint}", params, p)  # Changed: Unpack total
                     if not page_data:
                         return p, []
 
-                    # Check for total_available if this is the starting page
-                    if p == page and page_data and isinstance(page_data, list) and page_data and 'response' in page_data[0]:
-                        total_available = min(total_available, page_data[0].get('response', {}).get('total', float('inf')))
-                        self.max_records = min(self.max_records, total_available)
+                    # Fixed: Check/set total only on starting page; use lock for safety
+                    if p == page and page_total is not None:
+                        async with total_available_lock:
+                            total_available = min(total_available, page_total)
+                            self.max_records = min(self.max_records, total_available)
+                            logger.info(f"Total available articles: {total_available}")
 
                     # Process immediately: add timestamp, dedup, write JSONL
                     crawl_timestamp = datetime.now().isoformat()
@@ -354,6 +361,15 @@ class APIDataCollector:
         df = df[['crawlTimestamp', 'id', 'webPublicationDate', 'webTitle', 'bodyText', 'webUrl', 'sectionName']]
         df.to_parquet(output_parquet_file, index=False, engine='pyarrow')
         logger.info(f"Converted JSON to Parquet with prioritized fields: {output_parquet_file}")
+
+        # Optional CSV export for presentation
+        export_csv = os.getenv("EXPORT_CSV", "false").lower() == "true"
+        if export_csv:
+            output_csv_file = self.data_dir / f"{base_filename}.csv"
+            df.to_csv(output_csv_file, index=False, encoding='utf-8')
+            logger.info(f"Exported CSV for presentation: {output_csv_file}")
+        else:
+            logger.info(f"Exported only Parquet (set EXPORT_CSV=true for CSV too): {output_parquet_file}")
         
         self._clean_checkpoint()
         return output_parquet_file
@@ -374,7 +390,8 @@ class APIDataCollector:
         
         # Vectorized computations
         df['word_count'] = df['bodyText'].astype(str).str.split().str.len()
-        df['sentiment'] = df['bodyText'].astype(str).apply(lambda x: TextBlob(x).sentiment.polarity)
+        # Fixed: Suppress type error (textblob lacks stubs)
+        df['sentiment'] = df['bodyText'].astype(str).apply(lambda x: TextBlob(str(x)).sentiment.polarity)  # type: ignore[attr-defined]
         
         word_counts = df['word_count'].tolist()
         sentiments = df['sentiment'].tolist()
