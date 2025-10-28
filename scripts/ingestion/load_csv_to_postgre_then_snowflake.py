@@ -2,19 +2,21 @@ import os
 import sys
 from pathlib import Path
 import psycopg
+from psycopg import sql  # Added for safe SQL composition
 import snowflake.connector
 from dotenv import load_dotenv
 import pandas as pd
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta  # Added timedelta
 from tenacity import retry, stop_after_attempt, wait_exponential
 import subprocess
 import argparse
 import warnings
 import time
 
-# Suppress pandas warning related to type conversion
+# Suppress pandas warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pandas")
+warnings.filterwarnings("ignore", message="pandas only supports SQLAlchemy")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -38,7 +40,7 @@ def get_pg_connection():
     global _pg_conn
     params = {
         "host": os.getenv("POSTGRES_HOST", "localhost"),
-        "port": os.getenv("POSTGRES_PORT", "5432"),
+        "port": int(os.getenv("POSTGRES_PORT", "5432")),  # Fixed: Cast to int
         "dbname": os.getenv("POSTGRES_DB", "staging_db"),
         "user": os.getenv("POSTGRES_USER", "staging_user"),
         "password": os.getenv("POSTGRES_PASSWORD", "staging_password"),
@@ -95,7 +97,7 @@ def start_docker(docker_compose_path='docker-compose.yml'):
     while time.time() - start_time < max_wait:
         try:
             with get_pg_connection() as conn:
-                conn.execute("SELECT 1")  # Simple health check
+                conn.execute(sql.SQL("SELECT 1"))  # Fixed: Wrapped in sql.SQL
             logger.info("✅ Docker services started and PG ready.")
             return True
         except:
@@ -114,7 +116,8 @@ def get_next_id_from_sf():
         table_name = f"{database}.{schema}.raw_data"
         # NOTE: This assumes the raw_data table exists in Snowflake.
         cursor.execute(f"SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM {table_name}")
-        next_id = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        next_id = result[0] if result else 1  # Fixed: Safe None check
         logger.info(f"✅ Computed dynamic next ID from SF: {next_id}")
         return int(next_id)
     except Exception as e:
@@ -130,28 +133,28 @@ def create_raw_table(start_id=1):
     """Create staging.raw_data table if it doesn't exist, and add unique constraint on article_id.
     Dynamically sets sequence to max(SF start_id, PG MAX(id) + 1) to preserve historical data.
     """
-    create_sql = """
-    CREATE SCHEMA IF NOT EXISTS staging;
-    CREATE TABLE IF NOT EXISTS staging.raw_data (
-        id SERIAL PRIMARY KEY,
-        crawl_timestamp TIMESTAMP,
-        article_id VARCHAR(255),
-        web_publication_date TIMESTAMP,
-        web_title TEXT,
-        body_text TEXT,
-        web_url VARCHAR(500),
-        section_name VARCHAR(255),
-        loaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """
-    drop_constraint_sql = """
-    ALTER TABLE staging.raw_data 
-    DROP CONSTRAINT IF EXISTS unique_article_id;
-    """
-    add_constraint_sql = """
-    ALTER TABLE staging.raw_data 
-    ADD CONSTRAINT unique_article_id UNIQUE (article_id);
-    """
+    create_sql = sql.SQL("""
+        CREATE SCHEMA IF NOT EXISTS staging;
+        CREATE TABLE IF NOT EXISTS staging.raw_data (
+            id SERIAL PRIMARY KEY,
+            crawl_timestamp TIMESTAMP,
+            article_id VARCHAR(255),
+            web_publication_date TIMESTAMP,
+            web_title TEXT,
+            body_text TEXT,
+            web_url VARCHAR(500),
+            section_name VARCHAR(255),
+            loaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    drop_constraint_sql = sql.SQL("""
+        ALTER TABLE staging.raw_data 
+        DROP CONSTRAINT IF EXISTS unique_article_id;
+    """)
+    add_constraint_sql = sql.SQL("""
+        ALTER TABLE staging.raw_data 
+        ADD CONSTRAINT unique_article_id UNIQUE (article_id);
+    """)
     
     try:
         with get_pg_connection() as conn:
@@ -161,17 +164,17 @@ def create_raw_table(start_id=1):
                 cur.execute(add_constraint_sql)
                 
                 # Query PG's current MAX(id) to respect historical data
-                cur.execute("SELECT COALESCE(MAX(id), 0) FROM staging.raw_data")
-                pg_max_id = cur.fetchone()[0]
+                cur.execute(sql.SQL("SELECT COALESCE(MAX(id), 0) FROM staging.raw_data"))
+                result = cur.fetchone()
+                pg_max_id = result[0] if result else 0  # Fixed: Safe None check
                 
                 # Set effective sequence start: max(SF start_id, PG max + 1)
                 effective_start = max(start_id, pg_max_id + 1)
                 seq_val = max(0, effective_start - 1)  # Ensure non-negative
-                set_sequence_sql = f"""
-                SELECT setval(pg_get_serial_sequence('staging.raw_data', 'id'), {seq_val}, TRUE);
-                """  # Next insert gets effective_start
-                
-                cur.execute(set_sequence_sql)
+                set_sequence_sql = sql.SQL("""
+                    SELECT setval(pg_get_serial_sequence('staging.raw_data', 'id'), %s, TRUE);
+                """)
+                cur.execute(set_sequence_sql, (seq_val,))
                 conn.commit()
                 logger.info("✅ staging.raw_data table created/verified with unique constraint on article_id")
                 logger.info(f"✅ PG MAX(id): {pg_max_id} | Effective sequence start: {effective_start}")
@@ -226,40 +229,54 @@ def load_parquet_to_db(parquet_path: Path, start_id=1):
         with get_pg_connection() as conn:
             with conn.cursor() as cur:
 
-                cur.execute("TRUNCATE TABLE staging.raw_data;")
+                cur.execute(sql.SQL("TRUNCATE TABLE staging.raw_data;"))
                 conn.commit()
                 logger.info("✅ Truncated staging.raw_data for full refresh (now 0 rows)")
 
-                cur.execute("SELECT setval(pg_get_serial_sequence('staging.raw_data', 'id'), 500, false);")
-                conn.commit()
-                logger.info("✅ Reset PG ID sequence to start from 501 for real-time load")
-
-                cur.execute("SELECT COUNT(*) FROM staging.raw_data")
-                old_count = cur.fetchone()[0]
+                cur.execute(sql.SQL("SELECT COUNT(*) FROM staging.raw_data"))
+                result = cur.fetchone()
+                old_count = result[0] if result else 0  # Fixed: Safe None check
                 logger.info(f"📊 Current rows before upsert: {old_count}")
                 
                 # Query actual table MAX(id) for safety check
-                cur.execute("SELECT COALESCE(MAX(id), 0) FROM staging.raw_data")
-                pg_table_max = cur.fetchone()[0]
+                cur.execute(sql.SQL("SELECT COALESCE(MAX(id), 0) FROM staging.raw_data"))
+                result = cur.fetchone()
+                pg_table_max = result[0] if result else 0  # Fixed: Safe None check
                 logger.info(f"📊 PG table actual MAX(id): {pg_table_max}")
                 
                 # Existing sequence query...
-                cur.execute(f"SELECT nextval(pg_get_serial_sequence('staging.raw_data', 'id')) - 1")
-                current_max_id = cur.fetchone()[0]
+                cur.execute(sql.SQL("SELECT nextval(pg_get_serial_sequence('staging.raw_data', 'id')) - 1"))
+                result = cur.fetchone()
+                current_max_id = result[0] if result else 0  # Fixed: Safe None check
                 logger.info(f"📊 PostgreSQL ID sequence current MAX: {current_max_id}")
                 
                 # Log how many unique article_ids are truly new (will get new IDs)
                 article_ids_list = df['article_id'].dropna().unique().tolist()
-                existing_articles_query = """
+                existing_articles_query = sql.SQL("""
                     SELECT COUNT(*) FROM staging.raw_data 
                     WHERE article_id = ANY(%s)
-                """
+                """)
                 cur.execute(existing_articles_query, (article_ids_list,))
-                existing_matches = cur.fetchone()[0]
+                result = cur.fetchone()
+                existing_matches = result[0] if result else 0  # Fixed: Safe None check
                 new_count = len(article_ids_list) - existing_matches
                 logger.info(f"📊 Unique article_ids to sync: {len(article_ids_list)} | Expected new inserts: {new_count} | Matches to update: {existing_matches}")
                 
                 batch_size = 100
+                upsert_sql = sql.SQL("""
+                    INSERT INTO staging.raw_data (
+                        crawl_timestamp, article_id, web_publication_date, web_title,
+                        body_text, web_url, section_name, loaded_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (article_id) DO UPDATE SET
+                        crawl_timestamp = EXCLUDED.crawl_timestamp,
+                        web_publication_date = EXCLUDED.web_publication_date,
+                        web_title = EXCLUDED.web_title,
+                        body_text = EXCLUDED.body_text,
+                        web_url = EXCLUDED.web_url,
+                        section_name = EXCLUDED.section_name,
+                        loaded_at = CURRENT_TIMESTAMP
+                """)
                 for i in range(0, len(df), batch_size):
                     batch = df.iloc[i:i+batch_size]
                     
@@ -272,27 +289,18 @@ def load_parquet_to_db(parquet_path: Path, start_id=1):
                         for _, row in batch.iterrows()
                     ]
                     
-                    cur.executemany("""
-                        INSERT INTO staging.raw_data (
-                            crawl_timestamp, article_id, web_publication_date, web_title,
-                            body_text, web_url, section_name, loaded_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-                        ON CONFLICT (article_id) DO UPDATE SET
-                            crawl_timestamp = EXCLUDED.crawl_timestamp,
-                            web_publication_date = EXCLUDED.web_publication_date,
-                            web_title = EXCLUDED.web_title,
-                            body_text = EXCLUDED.body_text,
-                            web_url = EXCLUDED.web_url,
-                            section_name = EXCLUDED.section_name,
-                            loaded_at = CURRENT_TIMESTAMP
-                    """, values_list)
+                    cur.executemany(upsert_sql, values_list)
                     
                     total_upserted += len(batch)
                     logger.info(f"   UPSERT batch {i//batch_size + 1}: {len(batch)} rows (total processed: {total_upserted})")
                 
                 # After upserts, re-query table MAX(id) for confirmation
-                cur.execute("SELECT COUNT(*), MAX(id) FROM staging.raw_data")
-                final_count, max_id = cur.fetchone()
+                cur.execute(sql.SQL("SELECT COUNT(*), MAX(id) FROM staging.raw_data"))
+                result = cur.fetchone()
+                if result:
+                    final_count, max_id = result
+                else:
+                    final_count, max_id = 0, 0  # Fixed: Safe None check and unpack
                 logger.warning(f"⚠️ Post-upsert: If max_id < expected, check for gaps from prior failures.")
                 logger.info(f"✅ Processed {total_upserted} rows; total rows in PG: {final_count}")
                 logger.info(f"✅ Max ID after load: {max_id}")
@@ -311,33 +319,50 @@ def verify_pg_load(interval_minutes=15):
     try:
         with get_pg_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT COUNT(*) FROM staging.raw_data")
-                total_count = cur.fetchone()[0]
+                cur.execute(sql.SQL("SELECT COUNT(*) FROM staging.raw_data"))
+                result = cur.fetchone()
+                total_count = result[0] if result else 0  # Fixed: Safe None check
                 
-                recent_interval = f"INTERVAL '{interval_minutes} minutes'"
-                cur.execute(f"""
+                # Fix: Use timedelta for INTERVAL
+                recent_interval = timedelta(minutes=interval_minutes)
+                recent_query = sql.SQL("""
                     SELECT COUNT(*), MIN(loaded_at), MAX(loaded_at) 
                     FROM staging.raw_data 
-                    WHERE loaded_at >= NOW() - {recent_interval}
+                    WHERE loaded_at >= NOW() - %s
                 """)
-                recent_count, min_loaded, max_loaded = cur.fetchone()
+                cur.execute(recent_query, (recent_interval,))
+                result = cur.fetchone()
+                if result:
+                    recent_count, min_loaded, max_loaded = result
+                else:
+                    recent_count, min_loaded, max_loaded = 0, None, None  # Fixed: Safe None check and unpack
                 logger.info(f"📋 Total rows: {total_count} | Recent load: {recent_count} rows between {min_loaded} and {max_loaded}")
                 
-                cur.execute(f"""
+                crawl_query = sql.SQL("""
                     SELECT MIN(crawl_timestamp), MAX(crawl_timestamp) 
                     FROM staging.raw_data 
-                    WHERE loaded_at >= NOW() - {recent_interval}
+                    WHERE loaded_at >= NOW() - %s
                 """)
-                crawl_min, crawl_max = cur.fetchone()
+                cur.execute(crawl_query, (recent_interval,))
+                result = cur.fetchone()
+                if result:
+                    crawl_min, crawl_max = result
+                else:
+                    crawl_min, crawl_max = None, None  # Fixed: Safe None check and unpack
                 logger.info(f"📋 Recent crawl_timestamp range: {crawl_min} to {crawl_max}")
                 
-                cur.execute("""
+                null_query = sql.SQL("""
                     SELECT 
                         COUNT(CASE WHEN crawl_timestamp IS NULL THEN 1 END) AS null_crawl_ts,
                         COUNT(CASE WHEN web_publication_date IS NULL THEN 1 END) AS null_pub_dates
                     FROM staging.raw_data
                 """)
-                nulls = cur.fetchone()
+                cur.execute(null_query)
+                result = cur.fetchone()
+                if result:
+                    nulls = result
+                else:
+                    nulls = (0, 0)  # Fixed: Safe None check
                 logger.info(f"Data quality check: {nulls[0]} null crawl_ts, {nulls[1]} null pub dates")
                 
     except Exception as e:
@@ -373,12 +398,14 @@ def ingest_realtime_parquet_to_snowflake(parquet_file_path, sf_conn):
         logger.info(f"✅ Realtime upload completed in {upload_time:.1f}s")
 
         cursor.execute(f"SHOW TABLES LIKE 'raw_data' IN SCHEMA {database}.{schema}")
-        if not cursor.fetchone():
+        result = cursor.fetchone()
+        if not result:
             raise ValueError(f"Table {table_name} does not exist—run batch load first.")
 
         # Pre-merge SF MAX(id) check
         cursor.execute(f"SELECT COALESCE(MAX(ID), 0) FROM {table_name}")
-        sf_max_id = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        sf_max_id = result[0] if result else 0  # Fixed: Safe None check
         logger.info(f"📊 SF current MAX(ID): {sf_max_id} | Incoming PG IDs start from: min(source.ID) TBD")
 
         # --- Use a Temporary View over the Stage for MERGE ---
@@ -448,12 +475,14 @@ def ingest_realtime_parquet_to_snowflake(parquet_file_path, sf_conn):
         
         # After merge, log new SF MAX
         cursor.execute(f"SELECT COALESCE(MAX(ID), 0) FROM {table_name}")
-        new_sf_max = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        new_sf_max = result[0] if result else 0  # Fixed: Safe None check
         logger.info(f"✅ Post-merge SF MAX(ID): {new_sf_max}")
 
         # Final Total Row Count (Safety check)
         cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-        total_row_count = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        total_row_count = result[0] if result else 0  # Fixed: Safe None check
         logger.info(f"✅ Load complete. Total unique rows in {table_name}: {total_row_count}")
 
         sf_conn.commit()
@@ -479,12 +508,13 @@ def load_postgres_to_snowflake(start_id=1, sf_conn=None):
     try:
         # Extract ALL data from staging.raw_data (which now contains all incremental history)
         with get_pg_connection() as pg_conn:
-            query = """
+            query = sql.SQL("""
                 SELECT id, crawl_timestamp, article_id, web_publication_date, 
                         web_title, body_text, web_url, section_name 
                 FROM staging.raw_data
-            """
-            df = pd.read_sql_query(query, pg_conn)
+            """)
+            # Fix: Render clean SQL string using as_string
+            df = pd.read_sql_query(query.as_string(pg_conn), pg_conn)
         logger.info(f"✅ Extracted {len(df)} records from PostgreSQL")
 
         if len(df) == 0:
@@ -523,14 +553,19 @@ def verify_sf_load(sf_conn, interval_minutes=15):
              FROM {table} 
              WHERE LOADED_AT >= CURRENT_TIMESTAMP - {recent_interval}
         """)
-        recent_count = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        recent_count = result[0] if result else 0  # Fixed: Safe None check
         
         cursor.execute(f"""
              SELECT MIN(LOADED_AT), MAX(LOADED_AT) 
              FROM {table} 
              WHERE LOADED_AT >= CURRENT_TIMESTAMP - {recent_interval}
         """)
-        load_range = cursor.fetchone()
+        result = cursor.fetchone()
+        if result:
+            load_range = result
+        else:
+            load_range = (None, None)  # Fixed: Safe None check
         logger.info(f"📋 Recent Snowflake load: {recent_count} rows between {load_range[0]} and {load_range[1]}")
         
         cursor.execute(f"""
@@ -538,7 +573,11 @@ def verify_sf_load(sf_conn, interval_minutes=15):
              FROM {table} 
              WHERE LOADED_AT >= CURRENT_TIMESTAMP - {recent_interval}
         """)
-        crawl_range = cursor.fetchone()
+        result = cursor.fetchone()
+        if result:
+            crawl_range = result
+        else:
+            crawl_range = (None, None)  # Fixed: Safe None check
         logger.info(f"📋 Recent CRAWL_TIMESTAMP range: {crawl_range[0]} to {crawl_range[1]}")
 
         cursor.execute(f"""
@@ -547,7 +586,11 @@ def verify_sf_load(sf_conn, interval_minutes=15):
                  COUNT(CASE WHEN WEB_PUBLICATION_DATE IS NULL THEN 1 END) AS null_pub_dates
              FROM {table}
         """)
-        nulls = cursor.fetchone()
+        result = cursor.fetchone()
+        if result:
+            nulls = result
+        else:
+            nulls = (0, 0)  # Fixed: Safe None check
         logger.info(f"Data quality check: {nulls[0]} null crawl_ts, {nulls[1]} null pub dates")
 
         # Check for duplicates based on the unique key ARTICLE_ID
@@ -564,7 +607,11 @@ def verify_sf_load(sf_conn, interval_minutes=15):
              logger.info("✅ No duplicate ARTICLE_IDs in Snowflake")
         
         cursor.execute(f"SELECT MIN(ID), MAX(ID), COUNT(*) FROM {table}")
-        id_min, id_max, total = cursor.fetchone()
+        result = cursor.fetchone()
+        if result:
+            id_min, id_max, total = result
+        else:
+            id_min, id_max, total = None, None, 0  # Fixed: Safe None check and unpack
         logger.info(f"📋 ID range: {id_min} to {id_max} (total rows: {total})")
         
     except Exception as e:
@@ -582,7 +629,7 @@ def main():
     print("🚀 End-to-End Pipeline: Docker -> Parquet -> PostgreSQL -> Snowflake")
     print("=" * 80)
 
-    parquet_path = os.getenv("REALTIME_PARQUET_PATH", r'data\external\guardian_all_articles.parquet')
+    parquet_path = os.getenv("REALTIME_PARQUET_PATH", r"data\external\guardian_real_time_articles.parquet")
     parquet_path = Path(parquet_path)
     if not parquet_path.exists():
         logger.error(f"❌ Parquet not found: {parquet_path}")

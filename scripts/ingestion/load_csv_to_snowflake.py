@@ -36,7 +36,8 @@ def get_next_id_from_sf():
         schema = os.getenv("SNOWFLAKE_SCHEMA")
         table_name = f"{database}.{schema}.raw_data"
         cursor.execute(f"SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM {table_name}")
-        next_id = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        next_id = result[0] if result else 1  # Safe: Default to 1 if None (no rows)
         logger.info(f"✅ Computed next ID from SF: {next_id}")
         return int(next_id)
     except Exception as e:
@@ -48,9 +49,12 @@ def get_next_id_from_sf():
 
 def setup_schema_and_stage(cursor, database, schema):
     """Shared setup for schema, stage, and context (avoids duplication)."""
-    # Confirm session context
+    # Confirm session context (safe unpack with defaults)
     cursor.execute("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA(), CURRENT_ROLE()")
-    db, sch, role = cursor.fetchone()
+    result = cursor.fetchone()
+    db = result[0] if result else os.getenv("SNOWFLAKE_DATABASE", "UNKNOWN")
+    sch = result[1] if result else os.getenv("SNOWFLAKE_SCHEMA", "UNKNOWN")
+    role = result[2] if result else "UNKNOWN"
     logger.info(f"Current context: Database={db}, Schema={sch}, Role={role}")
 
     # Create schema if not exists
@@ -166,14 +170,16 @@ def ingest_parquet_to_snowflake(parquet_file_path, start_id=1):
             for row in result:
                 logger.info(f"✅ Data loaded: {row[0]} rows to {table_name}")
         else:
-            # Fallback verification
+            # Fallback verification (safe fetchone)
             cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-            row_count = cursor.fetchone()[0]
+            count_result = cursor.fetchone()
+            row_count = count_result[0] if count_result else 0
             logger.info(f"✅ Data loaded: {row_count} rows to {table_name}")
 
         # Verify loaded data (enhanced null checks)
         cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-        row_count = cursor.fetchone()[0]
+        count_result = cursor.fetchone()
+        row_count = count_result[0] if count_result else 0
         logger.info(f"✅ Table contains {row_count} rows")
 
         cursor.execute(f"""
@@ -183,12 +189,16 @@ def ingest_parquet_to_snowflake(parquet_file_path, start_id=1):
             COUNT(CASE WHEN web_publication_date IS NULL THEN 1 END) AS null_pub_dates
         FROM {table_name}
         """)
-        verification = cursor.fetchone()
-        logger.info(f"Data quality check: {verification[0]} total, {verification[1]} null crawl_ts, {verification[2]} null pub dates")
+        verification_result = cursor.fetchone()
+        if verification_result:
+            logger.info(f"Data quality check: {verification_result[0]} total, {verification_result[1]} null crawl_ts, {verification_result[2]} null pub dates")
+        else:
+            logger.warning("No verification results—table may be empty")
 
-        # Count distinct article_ids
+        # Count distinct article_ids (safe)
         cursor.execute(f"SELECT COUNT(DISTINCT article_id) AS distinct_articles FROM {table_name}")
-        distinct_count = cursor.fetchone()[0]
+        distinct_result = cursor.fetchone()
+        distinct_count = distinct_result[0] if distinct_result else 0
         logger.info(f"✅ Distinct article_ids: {distinct_count}")
         
         return True
@@ -214,7 +224,7 @@ def main(parquet_file_path=None):
     logger.info("⏱️ Full script timer started")
 
     if parquet_file_path is None:
-        parquet_file_path = r"data\batch\guardian_historical_preprocessed.parquet"
+        parquet_file_path = r"data\batch\guardian_historical_articles.parquet"
     
     # Use dynamic start_id (1 for batch)
     start_id = 1

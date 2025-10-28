@@ -31,7 +31,7 @@ class BatchDataCollector:
         self.max_articles = max_articles
         self.data_dir = Path("data/batch")
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.output_parquet = self.data_dir / "guardian_historical_preprocessed.parquet"  # Changed to Parquet
+        self.output_parquet = self.data_dir / "guardian_historical_articles.parquet"  # Changed to Parquet
         self.repo_id = "Stefan171/TheGuardian-Articles"
         self.local_dir = self.data_dir / self.repo_id.replace("/", "_")
         # Updated columns based on HF dataset schema
@@ -85,8 +85,11 @@ class BatchDataCollector:
         for p in data_paths:
             if p.suffix == '.parquet':
                 lfs.append(pl.scan_parquet(str(p)))
-            elif p.suffix in ['.jsonl', '.json']:
-                lfs.append(pl.scan_json(str(p), json_lines=p.suffix == '.jsonl'))
+            elif p.suffix in ['.jsonl', '.ndjson']: 
+                lfs.append(pl.scan_ndjson(str(p)))
+            elif p.suffix == '.json': 
+                df_temp = pl.read_json(str(p))
+                lfs.append(df_temp.lazy())
             elif p.suffix == '.csv':
                 lfs.append(pl.scan_csv(str(p)))
         if lfs:
@@ -133,7 +136,6 @@ class BatchDataCollector:
             ).list.join(" ").alias('section_name')
         ])
 
-        # Eager collect once for stats + filter (combines everything; ~5-7s)
         df = lf.collect(engine='streaming')
         total_rows = df.height
         invalid_dates = df['web_publication_date'].null_count()
@@ -155,9 +157,13 @@ class BatchDataCollector:
             pl.col('body_text').is_not_null()
         )
 
-        # Added: Limit to max_articles after filtering
-        df = df.head(self.max_articles)
-        logger.info(f"Limited to {self.max_articles} articles as requested")
+        # Randomly sample max_articles (shuffle for true randomness each run)
+        sample_size = min(self.max_articles, df.height)
+        if sample_size > 0:
+            df = df.sample(n=sample_size, shuffle=True)
+            logger.info(f"Randomly sampled {sample_size} articles from {df.height} filtered candidates")
+        else:
+            logger.warning("No articles available after filtering; output will be empty")
 
         if df.height == 0:
             logger.warning("No articles processed. Check dataset content or column mappings.")
@@ -177,8 +183,18 @@ class BatchDataCollector:
         logger.info(f"Total dropped: {total_dropped} rows due to missing fields")
         logger.info(f"Preprocessed batch data saved to {self.output_parquet} ({total_records} records)")
 
+        presentation_sample_size = 100  # Adjust as needed for your demo
+        if df.height > presentation_sample_size:
+            sample_df = df.head(presentation_sample_size)
+        else:
+            sample_df = df
+
+        presentation_csv = self.data_dir / "guardian_historical_articles_sample.csv"
+        sample_df.write_csv(str(presentation_csv), include_header=True)  # Includes all columns, timestamps as ISO strings
+        logger.info(f"Presentation-ready CSV sample saved to {presentation_csv} ({sample_df.height} rows)")
+
 def main():
-    collector = BatchDataCollector(max_articles=500)  # Updated: Set limit to 500
+    collector = BatchDataCollector(max_articles=500)
     try:
         local_dir = collector.local_dir
         # Check for existing data files (Parquet/JSON/CSV)
