@@ -1,21 +1,22 @@
--- models/02_intermediate/dim_date_cross_db.sql (updated with holiday join)
+-- models/03_mart/dim_date.sql
 {{ config(materialized='table', cluster_by=['year', 'month']) }}
 
 WITH date_spine AS (
-    -- Embedded portable spine: Recursive CTE (Snowflake/BigQuery/Postgres-compatible)
-    WITH RECURSIVE dates AS (
-        SELECT DATE('2010-01-01') AS date_value
-        UNION ALL
-        SELECT DATEADD('day', 1, date_value) 
-        FROM dates 
-        WHERE DATEDIFF('day', DATE('2010-01-01'), date_value) < 6000 
-    )
-    SELECT date_value FROM dates
-    WHERE date_value <= CURRENT_DATE()
+  -- Embedded portable spine: Recursive CTE (Snowflake/BigQuery/Postgres-compatible)
+  WITH RECURSIVE dates AS (
+    SELECT DATE('{{ var("date_start", "2001-01-01") }}') AS date_id
+    UNION ALL
+    SELECT DATEADD('day', 1, date_id)
+    FROM dates
+    WHERE DATEDIFF('day', DATE('{{ var("date_start", "2001-01-01") }}'), date_id) < {{ var("spine_days", 100000) }}
+  )
+
+  SELECT date_id FROM dates
 ),
+
 -- Simple hardcoded UK holidays (Guardian-focused; expand as seed if needed)
 uk_holidays AS (
-    SELECT PARSE_JSON('[
+  SELECT PARSE_JSON('[
         {"date": "2010-01-01", "name": "New Year\'s Day"},
         {"date": "2010-12-27", "name": "Christmas (substitute)"},
         {"date": "2010-12-28", "name": "Boxing Day (substitute)"},
@@ -142,33 +143,38 @@ uk_holidays AS (
         {"date": "2025-12-26", "name": "Boxing Day"}
     ]') AS holidays_array
 ),
+
 holiday_dates AS (
-    SELECT 
-        DATE(value:date::STRING) AS holiday_date,
-        value:name::STRING AS holiday_name
-    FROM uk_holidays,
+  SELECT
+    DATE(value:date::STRING) AS holiday_date,
+    value:name::STRING AS holiday_name
+  FROM uk_holidays,
     LATERAL FLATTEN(input => holidays_array)
 ),
+
 date_attributes AS (
-    SELECT
-        ds.date_value,
-        YEAR(ds.date_value) AS year,
-        MONTH(ds.date_value) AS month,
-        DAY(ds.date_value) AS day,
-        DAYOFWEEK(ds.date_value) AS day_of_week,
-        DAYOFYEAR(ds.date_value) AS day_of_year,
-        QUARTER(ds.date_value) AS quarter,
-        CASE
-            WHEN MONTH(ds.date_value) IN (1,2,3) THEN 'Q1'
-            WHEN MONTH(ds.date_value) IN (4,5,6) THEN 'Q2'
-            WHEN MONTH(ds.date_value) IN (7,8,9) THEN 'Q3'
-            ELSE 'Q4'
-        END AS fiscal_quarter,
-        CASE WHEN DAYOFWEEK(ds.date_value) IN (1,7) THEN TRUE ELSE FALSE END AS is_weekend,
-        CASE WHEN ds.date_value = CURRENT_DATE() THEN TRUE ELSE FALSE END AS is_today,
-        COALESCE(h.holiday_date IS NOT NULL, FALSE) AS is_holiday,
-        h.holiday_name
-    FROM date_spine ds
-    LEFT JOIN holiday_dates h ON ds.date_value = h.holiday_date
+  SELECT
+    ds.date_id,
+    YEAR(ds.date_id) AS year,
+    MONTH(ds.date_id) AS month,
+    DAY(ds.date_id) AS day,
+    DAYOFWEEK(ds.date_id) AS day_of_week,
+    QUARTER(ds.date_id) AS quarter,
+    CASE
+      WHEN MONTH(ds.date_id) IN (1, 2, 3) THEN 'Q1'
+      WHEN MONTH(ds.date_id) IN (4, 5, 6) THEN 'Q2'
+      WHEN MONTH(ds.date_id) IN (7, 8, 9) THEN 'Q3'
+      ELSE 'Q4'
+    END AS fiscal_quarter,
+    CASE WHEN DAYOFWEEK(ds.date_id) IN (1, 7) THEN TRUE ELSE FALSE END AS is_weekend,
+    COALESCE(h.holiday_date IS NOT NULL, FALSE) AS is_holiday,
+    h.holiday_name
+  FROM date_spine ds
+  LEFT JOIN holiday_dates h ON ds.date_id = h.holiday_date
 )
-SELECT date_value AS date_id, *, CURRENT_TIMESTAMP() AS dbt_updated_at FROM date_attributes
+
+SELECT
+  *,
+  CURRENT_TIMESTAMP() AS dbt_updated_at
+FROM date_attributes
+ORDER BY date_id ASC
