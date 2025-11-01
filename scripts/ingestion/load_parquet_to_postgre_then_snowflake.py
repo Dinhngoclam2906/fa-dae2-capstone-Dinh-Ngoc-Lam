@@ -25,9 +25,6 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# Config: Set default start_id here (used as fallback or for initial run)
-DEFAULT_START_ID = 501
-
 # Global connections (lazy-init)
 _pg_conn = None
 _sf_conn = None
@@ -56,7 +53,6 @@ def get_sf_connection():
         user=os.getenv("SNOWFLAKE_USER"),
         authenticator="SNOWFLAKE_JWT",
         private_key_file=os.getenv("SNOWFLAKE_PRIVATE_KEY_FILE_PATH"),
-        private_key_file_pwd=os.getenv("SNOWFLAKE_PRIVATE_KEY_FILE_PWD"),
         warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
         database=os.getenv("SNOWFLAKE_DATABASE"),
         schema=os.getenv("SNOWFLAKE_SCHEMA"),
@@ -64,7 +60,7 @@ def get_sf_connection():
         timezone="Asia/Ho_Chi_Minh"
     )
 
-# --- Docker & ID Functions (Unchanged) ---
+# --- Docker & ID Functions ---
 
 def run_docker_command(command_parts, cwd=None):
     """Run a docker-compose command and log output."""
@@ -105,40 +101,16 @@ def start_docker(docker_compose_path='docker-compose.yml'):
     logger.error("❌ PG not ready after wait.")
     return False
 
-def get_next_id_from_sf():
-    """Dynamically compute next ID from Snowflake (reuse from batch script)."""
-    conn = None
-    try:
-        conn = get_sf_connection()
-        cursor = conn.cursor()
-        database = os.getenv("SNOWFLAKE_DATABASE")
-        schema = os.getenv("SNOWFLAKE_SCHEMA")
-        table_name = f"{database}.{schema}.raw_data"
-        # NOTE: This assumes the raw_data table exists in Snowflake.
-        cursor.execute(f"SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM {table_name}")
-        result = cursor.fetchone()
-        next_id = result[0] if result else 1  # Fixed: Safe None check
-        logger.info(f"✅ Computed dynamic next ID from SF: {next_id}")
-        return int(next_id)
-    except Exception as e:
-        logger.error(f"❌ Failed to compute next ID: {e}")
-        return DEFAULT_START_ID  # Fallback
-    finally:
-        if conn:
-            conn.close()
+# --- PostgreSQL Setup & Load Functions ---
 
-# --- PostgreSQL Setup & Load Functions (Includes all PG Fixes) ---
-
-def create_raw_table(start_id=1):
-    """Create staging.raw_data table if it doesn't exist, and add unique constraint on article_id.
-    Dynamically sets sequence to max(SF start_id, PG MAX(id) + 1) to preserve historical data.
-    """
+def create_raw_table():
+    """Create staging.raw_data without surrogate 'id'; use article_id as PK."""
+    drop_sql = sql.SQL("DROP TABLE IF EXISTS staging.raw_data;")
     create_sql = sql.SQL("""
         CREATE SCHEMA IF NOT EXISTS staging;
         CREATE TABLE IF NOT EXISTS staging.raw_data (
-            id SERIAL PRIMARY KEY,
             crawl_timestamp TIMESTAMP,
-            article_id VARCHAR(255),
+            article_id VARCHAR(255) PRIMARY KEY,
             web_publication_date TIMESTAMP,
             web_title TEXT,
             body_text TEXT,
@@ -147,55 +119,37 @@ def create_raw_table(start_id=1):
             loaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    drop_constraint_sql = sql.SQL("""
-        ALTER TABLE staging.raw_data 
-        DROP CONSTRAINT IF EXISTS unique_article_id;
-    """)
-    add_constraint_sql = sql.SQL("""
-        ALTER TABLE staging.raw_data 
-        ADD CONSTRAINT unique_article_id UNIQUE (article_id);
-    """)
     
     try:
         with get_pg_connection() as conn:
             with conn.cursor() as cur:
+                cur.execute(drop_sql)
                 cur.execute(create_sql)
-                cur.execute(drop_constraint_sql)
-                cur.execute(add_constraint_sql)
                 
-                # Query PG's current MAX(id) to respect historical data
-                cur.execute(sql.SQL("SELECT COALESCE(MAX(id), 0) FROM staging.raw_data"))
-                result = cur.fetchone()
-                pg_max_id = result[0] if result else 0  # Fixed: Safe None check
-                
-                # Set effective sequence start: max(SF start_id, PG max + 1)
-                effective_start = max(start_id, pg_max_id + 1)
-                seq_val = max(0, effective_start - 1)  # Ensure non-negative
-                set_sequence_sql = sql.SQL("""
-                    SELECT setval(pg_get_serial_sequence('staging.raw_data', 'id'), %s, TRUE);
-                """)
-                cur.execute(set_sequence_sql, (seq_val,))
+                # Verify table structure
+                cur.execute(sql.SQL("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'staging' AND table_name = 'raw_data' ORDER BY ordinal_position"))
+                cols = cur.fetchall()
+                logger.info(f"✅ Table structure: {[col[0] for col in cols]}")
                 conn.commit()
-                logger.info("✅ staging.raw_data table created/verified with unique constraint on article_id")
-                logger.info(f"✅ PG MAX(id): {pg_max_id} | Effective sequence start: {effective_start}")
+                logger.info("✅ staging.raw_data table created/verified with PK on article_id")
     except Exception as e:
-        logger.error(f"❌ Failed to create table/constraint/sequence: {e}")
+        logger.error(f"❌ Failed to create table: {e}")
         return False
     return True
 
-def load_parquet_to_db(parquet_path: Path, start_id=1):
-    """Load Parquet data into staging.raw_data table using UPSERT (ON CONFLICT)."""
+def load_parquet_to_db(parquet_path: Path):
+    """Load Parquet into staging.raw_data (UPSERT on article_id PK)."""
     try:
         df = pd.read_parquet(parquet_path)
         logger.info(f"📊 Loaded {len(df)} rows from {parquet_path}")
         logger.info(f"DEBUG: Columns found in Parquet file: {df.columns.tolist()}")
 
-        # 1. Rename the source 'id' (which is the unique article ID string) to 'article_id'
-        if 'id' in df.columns:
+        # Rename source 'id' to 'article_id' if needed
+        if 'id' in df.columns and 'article_id' not in df.columns:
             df = df.rename(columns={'id': 'article_id'})
-            logger.info("✅ Renamed source 'id' (the unique article slug) to 'article_id'.")
-        
-        # Define other column renames (assuming camelCase to snake_case)
+            logger.info("✅ Renamed source 'id' to 'article_id'.")
+
+        # Apply other renames
         rename_map = {
             'crawlTimestamp': 'crawl_timestamp',
             'webPublicationDate': 'web_publication_date',
@@ -204,23 +158,15 @@ def load_parquet_to_db(parquet_path: Path, start_id=1):
             'webUrl': 'web_url',
             'sectionName': 'section_name',
         }
-        
-        # Apply other renames
         cols_to_rename = {k: v for k, v in rename_map.items() if k in df.columns}
         df = df.rename(columns=cols_to_rename)
         
-        # 2. DROP the source 'id' column from the DataFrame
-        # This prevents Pandas from trying to insert it into the target 'id' SERIAL column.
-        if 'id' in df.columns:
-            df = df.drop(columns=['id'])
-            logger.info("✅ Dropped source 'id' column to allow PostgreSQL to auto-generate the SERIAL 'id'.")
-        
-        # Safety check: ensure the critical article_id column is present
+        # Ensure article_id is present
         if 'article_id' not in df.columns:
-            logger.error("❌ Critical column 'article_id' is missing after renaming checks.")
+            logger.error("❌ Critical column 'article_id' missing.")
             return False
 
-        # Data type conversions
+        # Data types
         df['crawl_timestamp'] = pd.to_datetime(df['crawl_timestamp'], errors='coerce')
         df['web_publication_date'] = pd.to_datetime(df['web_publication_date'], errors='coerce')
         
@@ -229,28 +175,17 @@ def load_parquet_to_db(parquet_path: Path, start_id=1):
         with get_pg_connection() as conn:
             with conn.cursor() as cur:
 
+                # Optional truncate for full refresh—comment out for incremental
                 cur.execute(sql.SQL("TRUNCATE TABLE staging.raw_data;"))
                 conn.commit()
-                logger.info("✅ Truncated staging.raw_data for full refresh (now 0 rows)")
+                logger.info("✅ Truncated for refresh (now 0 rows)")
 
                 cur.execute(sql.SQL("SELECT COUNT(*) FROM staging.raw_data"))
                 result = cur.fetchone()
-                old_count = result[0] if result else 0  # Fixed: Safe None check
+                old_count = result[0] if result else 0
                 logger.info(f"📊 Current rows before upsert: {old_count}")
                 
-                # Query actual table MAX(id) for safety check
-                cur.execute(sql.SQL("SELECT COALESCE(MAX(id), 0) FROM staging.raw_data"))
-                result = cur.fetchone()
-                pg_table_max = result[0] if result else 0  # Fixed: Safe None check
-                logger.info(f"📊 PG table actual MAX(id): {pg_table_max}")
-                
-                # Existing sequence query...
-                cur.execute(sql.SQL("SELECT nextval(pg_get_serial_sequence('staging.raw_data', 'id')) - 1"))
-                result = cur.fetchone()
-                current_max_id = result[0] if result else 0  # Fixed: Safe None check
-                logger.info(f"📊 PostgreSQL ID sequence current MAX: {current_max_id}")
-                
-                # Log how many unique article_ids are truly new (will get new IDs)
+                # Log unique article_ids
                 article_ids_list = df['article_id'].dropna().unique().tolist()
                 existing_articles_query = sql.SQL("""
                     SELECT COUNT(*) FROM staging.raw_data 
@@ -258,7 +193,7 @@ def load_parquet_to_db(parquet_path: Path, start_id=1):
                 """)
                 cur.execute(existing_articles_query, (article_ids_list,))
                 result = cur.fetchone()
-                existing_matches = result[0] if result else 0  # Fixed: Safe None check
+                existing_matches = result[0] if result else 0
                 new_count = len(article_ids_list) - existing_matches
                 logger.info(f"📊 Unique article_ids to sync: {len(article_ids_list)} | Expected new inserts: {new_count} | Matches to update: {existing_matches}")
                 
@@ -266,16 +201,15 @@ def load_parquet_to_db(parquet_path: Path, start_id=1):
                 upsert_sql = sql.SQL("""
                     INSERT INTO staging.raw_data (
                         crawl_timestamp, article_id, web_publication_date, web_title,
-                        body_text, web_url, section_name, loaded_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        body_text, web_url, section_name
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (article_id) DO UPDATE SET
                         crawl_timestamp = EXCLUDED.crawl_timestamp,
                         web_publication_date = EXCLUDED.web_publication_date,
                         web_title = EXCLUDED.web_title,
                         body_text = EXCLUDED.body_text,
                         web_url = EXCLUDED.web_url,
-                        section_name = EXCLUDED.section_name,
-                        loaded_at = CURRENT_TIMESTAMP
+                        section_name = EXCLUDED.section_name
                 """)
                 for i in range(0, len(df), batch_size):
                     batch = df.iloc[i:i+batch_size]
@@ -292,18 +226,13 @@ def load_parquet_to_db(parquet_path: Path, start_id=1):
                     cur.executemany(upsert_sql, values_list)
                     
                     total_upserted += len(batch)
-                    logger.info(f"   UPSERT batch {i//batch_size + 1}: {len(batch)} rows (total processed: {total_upserted})")
+                    logger.info(f"  UPSERT batch {i//batch_size + 1}: {len(batch)} rows (total processed: {total_upserted})")
                 
-                # After upserts, re-query table MAX(id) for confirmation
-                cur.execute(sql.SQL("SELECT COUNT(*), MAX(id) FROM staging.raw_data"))
+                # Post-upsert: Log count only
+                cur.execute(sql.SQL("SELECT COUNT(*) FROM staging.raw_data"))
                 result = cur.fetchone()
-                if result:
-                    final_count, max_id = result
-                else:
-                    final_count, max_id = 0, 0  # Fixed: Safe None check and unpack
-                logger.warning(f"⚠️ Post-upsert: If max_id < expected, check for gaps from prior failures.")
+                final_count = result[0] if result else 0
                 logger.info(f"✅ Processed {total_upserted} rows; total rows in PG: {final_count}")
-                logger.info(f"✅ Max ID after load: {max_id}")
                 conn.commit()
                 
         return True
@@ -312,7 +241,7 @@ def load_parquet_to_db(parquet_path: Path, start_id=1):
         logger.error(f"❌ Failed to load Parquet: {e}")
         return False
 
-# --- Snowflake & Verification Functions (Includes all SF Fixes) ---
+# --- Snowflake & Verification Functions (Updated: No 'id' column) ---
 
 def verify_pg_load(interval_minutes=15):
     """Verify the load by querying row count and recent timestamps in PostgreSQL."""
@@ -321,9 +250,9 @@ def verify_pg_load(interval_minutes=15):
             with conn.cursor() as cur:
                 cur.execute(sql.SQL("SELECT COUNT(*) FROM staging.raw_data"))
                 result = cur.fetchone()
-                total_count = result[0] if result else 0  # Fixed: Safe None check
+                total_count = result[0] if result else 0
                 
-                # Fix: Use timedelta for INTERVAL
+                # Use timedelta for INTERVAL
                 recent_interval = timedelta(minutes=interval_minutes)
                 recent_query = sql.SQL("""
                     SELECT COUNT(*), MIN(loaded_at), MAX(loaded_at) 
@@ -335,7 +264,7 @@ def verify_pg_load(interval_minutes=15):
                 if result:
                     recent_count, min_loaded, max_loaded = result
                 else:
-                    recent_count, min_loaded, max_loaded = 0, None, None  # Fixed: Safe None check and unpack
+                    recent_count, min_loaded, max_loaded = 0, None, None
                 logger.info(f"📋 Total rows: {total_count} | Recent load: {recent_count} rows between {min_loaded} and {max_loaded}")
                 
                 crawl_query = sql.SQL("""
@@ -348,7 +277,7 @@ def verify_pg_load(interval_minutes=15):
                 if result:
                     crawl_min, crawl_max = result
                 else:
-                    crawl_min, crawl_max = None, None  # Fixed: Safe None check and unpack
+                    crawl_min, crawl_max = None, None
                 logger.info(f"📋 Recent crawl_timestamp range: {crawl_min} to {crawl_max}")
                 
                 null_query = sql.SQL("""
@@ -362,7 +291,7 @@ def verify_pg_load(interval_minutes=15):
                 if result:
                     nulls = result
                 else:
-                    nulls = (0, 0)  # Fixed: Safe None check
+                    nulls = (0, 0)
                 logger.info(f"Data quality check: {nulls[0]} null crawl_ts, {nulls[1]} null pub dates")
                 
     except Exception as e:
@@ -402,20 +331,13 @@ def ingest_realtime_parquet_to_snowflake(parquet_file_path, sf_conn):
         if not result:
             raise ValueError(f"Table {table_name} does not exist—run batch load first.")
 
-        # Pre-merge SF MAX(id) check
-        cursor.execute(f"SELECT COALESCE(MAX(ID), 0) FROM {table_name}")
-        result = cursor.fetchone()
-        sf_max_id = result[0] if result else 0  # Fixed: Safe None check
-        logger.info(f"📊 SF current MAX(ID): {sf_max_id} | Incoming PG IDs start from: min(source.ID) TBD")
-
         # --- Use a Temporary View over the Stage for MERGE ---
         cursor.execute(f"DROP VIEW IF EXISTS {temp_view_name}")
         create_view_sql = f"""
         CREATE TEMPORARY VIEW {temp_view_name} AS 
         SELECT
-            $1:id::INTEGER AS ID,
-            TRY_TO_TIMESTAMP_NTZ($1:crawl_timestamp::STRING) AS CRAWL_TIMESTAMP,
             $1:article_id::STRING AS ARTICLE_ID,
+            TRY_TO_TIMESTAMP_NTZ($1:crawl_timestamp::STRING) AS CRAWL_TIMESTAMP,
             TRY_TO_TIMESTAMP_NTZ($1:web_publication_date::STRING) AS WEB_PUBLICATION_DATE,
             $1:web_title::STRING AS WEB_TITLE,
             $1:body_text::STRING AS BODY_TEXT,
@@ -426,15 +348,13 @@ def ingest_realtime_parquet_to_snowflake(parquet_file_path, sf_conn):
         cursor.execute(create_view_sql)
         logger.info(f"✅ Created temporary view {temp_view_name} over the staged Parquet file.")
 
-
-        # --- CRITICAL FIX: MERGE INTO TARGET TABLE ---
+        # --- MERGE INTO TARGET TABLE ---
         merge_start = time.time()
         merge_sql = f"""
         MERGE INTO {table_name} AS target
         USING {temp_view_name} AS source
         ON target.ARTICLE_ID = source.ARTICLE_ID
         WHEN MATCHED THEN 
-            -- Update existing rows (if data changes or loaded_at needs refreshing)
             UPDATE SET 
                 target.CRAWL_TIMESTAMP = source.CRAWL_TIMESTAMP,
                 target.WEB_PUBLICATION_DATE = source.WEB_PUBLICATION_DATE,
@@ -444,13 +364,12 @@ def ingest_realtime_parquet_to_snowflake(parquet_file_path, sf_conn):
                 target.SECTION_NAME = source.SECTION_NAME,
                 target.LOADED_AT = CURRENT_TIMESTAMP()
         WHEN NOT MATCHED THEN
-            -- Insert new rows, using the ID generated by PostgreSQL
             INSERT (
-                ID, CRAWL_TIMESTAMP, ARTICLE_ID, WEB_PUBLICATION_DATE, WEB_TITLE, 
+                ARTICLE_ID, CRAWL_TIMESTAMP, WEB_PUBLICATION_DATE, WEB_TITLE, 
                 BODY_TEXT, WEB_URL, SECTION_NAME, LOADED_AT
             )
             VALUES (
-                source.ID, source.CRAWL_TIMESTAMP, source.ARTICLE_ID, source.WEB_PUBLICATION_DATE, 
+                source.ARTICLE_ID, source.CRAWL_TIMESTAMP, source.WEB_PUBLICATION_DATE, 
                 source.WEB_TITLE, source.BODY_TEXT, source.WEB_URL, source.SECTION_NAME, 
                 CURRENT_TIMESTAMP()
             )
@@ -460,29 +379,18 @@ def ingest_realtime_parquet_to_snowflake(parquet_file_path, sf_conn):
         logger.info(f"✅ MERGE INTO main table completed in {merge_time:.1f}s")
 
         # Fetch the results of the MERGE operation for logging
-        rows_inserted = 0
-        rows_updated = 0
-        # For MERGE, use DESCRIBE to get stats
         try:
             cursor.execute("SELECT * FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))")
             result = cursor.fetchall()
             if result:
-                # Assuming the result has columns like number of rows inserted, updated
-                # Adjust based on actual output; this is approximate
                 logger.info(f"✅ MERGE executed successfully. Check Snowflake query history for details.")
         except Exception as e:
             logger.warning(f"⚠️ Could not fetch MERGE result: {e}")
         
-        # After merge, log new SF MAX
-        cursor.execute(f"SELECT COALESCE(MAX(ID), 0) FROM {table_name}")
-        result = cursor.fetchone()
-        new_sf_max = result[0] if result else 0  # Fixed: Safe None check
-        logger.info(f"✅ Post-merge SF MAX(ID): {new_sf_max}")
-
         # Final Total Row Count (Safety check)
         cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
         result = cursor.fetchone()
-        total_row_count = result[0] if result else 0  # Fixed: Safe None check
+        total_row_count = result[0] if result else 0
         logger.info(f"✅ Load complete. Total unique rows in {table_name}: {total_row_count}")
 
         sf_conn.commit()
@@ -502,14 +410,14 @@ def ingest_realtime_parquet_to_snowflake(parquet_file_path, sf_conn):
         if parquet_file_path and os.path.exists(parquet_file_path):
              os.remove(parquet_file_path) # Clean up temp file
 
-def load_postgres_to_snowflake(start_id=1, sf_conn=None):
-    """Extract data from PostgreSQL, export to Parquet, load to Snowflake (reuses provided SF conn)."""
+def load_postgres_to_snowflake(sf_conn=None):
+    """Extract data from PostgreSQL (no id), export to Parquet, load to Snowflake (reuses provided SF conn)."""
     parquet_path = Path('temp_realtime.parquet')
     try:
         # Extract ALL data from staging.raw_data (which now contains all incremental history)
         with get_pg_connection() as pg_conn:
             query = sql.SQL("""
-                SELECT id, crawl_timestamp, article_id, web_publication_date, 
+                SELECT crawl_timestamp, article_id, web_publication_date, 
                         web_title, body_text, web_url, section_name 
                 FROM staging.raw_data
             """)
@@ -554,7 +462,7 @@ def verify_sf_load(sf_conn, interval_minutes=15):
              WHERE LOADED_AT >= CURRENT_TIMESTAMP - {recent_interval}
         """)
         result = cursor.fetchone()
-        recent_count = result[0] if result else 0  # Fixed: Safe None check
+        recent_count = result[0] if result else 0
         
         cursor.execute(f"""
              SELECT MIN(LOADED_AT), MAX(LOADED_AT) 
@@ -565,7 +473,7 @@ def verify_sf_load(sf_conn, interval_minutes=15):
         if result:
             load_range = result
         else:
-            load_range = (None, None)  # Fixed: Safe None check
+            load_range = (None, None)
         logger.info(f"📋 Recent Snowflake load: {recent_count} rows between {load_range[0]} and {load_range[1]}")
         
         cursor.execute(f"""
@@ -577,7 +485,7 @@ def verify_sf_load(sf_conn, interval_minutes=15):
         if result:
             crawl_range = result
         else:
-            crawl_range = (None, None)  # Fixed: Safe None check
+            crawl_range = (None, None)
         logger.info(f"📋 Recent CRAWL_TIMESTAMP range: {crawl_range[0]} to {crawl_range[1]}")
 
         cursor.execute(f"""
@@ -590,7 +498,7 @@ def verify_sf_load(sf_conn, interval_minutes=15):
         if result:
             nulls = result
         else:
-            nulls = (0, 0)  # Fixed: Safe None check
+            nulls = (0, 0)
         logger.info(f"Data quality check: {nulls[0]} null crawl_ts, {nulls[1]} null pub dates")
 
         # Check for duplicates based on the unique key ARTICLE_ID
@@ -606,14 +514,6 @@ def verify_sf_load(sf_conn, interval_minutes=15):
         else:
              logger.info("✅ No duplicate ARTICLE_IDs in Snowflake")
         
-        cursor.execute(f"SELECT MIN(ID), MAX(ID), COUNT(*) FROM {table}")
-        result = cursor.fetchone()
-        if result:
-            id_min, id_max, total = result
-        else:
-            id_min, id_max, total = None, None, 0  # Fixed: Safe None check and unpack
-        logger.info(f"📋 ID range: {id_min} to {id_max} (total rows: {total})")
-        
     except Exception as e:
         logger.error(f"❌ Verification failed: {e}")
 
@@ -623,21 +523,16 @@ def main():
     """Main function to orchestrate the full pipeline: Docker -> Parquet -> PostgreSQL -> Snowflake."""
     parser = argparse.ArgumentParser(description="End-to-end pipeline for loading data to PG and Snowflake.")
     parser.add_argument('--reset', action='store_true', help="Reset Docker Compose (down -v) before starting.")
-    parser.add_argument('--start-id', type=int, default=None, help="Override starting ID for sequence (from SF max+1).")
     args = parser.parse_args()
 
     print("🚀 End-to-End Pipeline: Docker -> Parquet -> PostgreSQL -> Snowflake")
     print("=" * 80)
 
-    parquet_path = os.getenv("REALTIME_PARQUET_PATH", r"data\external\guardian_real_time_articles.parquet")
+    parquet_path = os.getenv("REALTIME_PARQUET_PATH", r"data\real_time\guardian_real_time_articles.parquet")
     parquet_path = Path(parquet_path)
     if not parquet_path.exists():
         logger.error(f"❌ Parquet not found: {parquet_path}")
         sys.exit(1)
-
-    # Use dynamic computation or default; override with arg if provided
-    start_id = args.start_id if args.start_id is not None else get_next_id_from_sf()
-    start_id = max(start_id, DEFAULT_START_ID)
 
     # Step 0: Docker Start (Reset is optional)
     if args.reset:
@@ -650,15 +545,15 @@ def main():
         print("❌ Docker start failed. Exiting.")
         sys.exit(1)
 
-    # Step 1: Create table in PostgreSQL (sets sequence based on Snowflake max ID)
+    # Step 1: Create table in PostgreSQL (no id param needed)
     print("1️⃣ Creating/Verifying PostgreSQL table...")
-    if not create_raw_table(start_id=start_id):
+    if not create_raw_table():
         print("❌ Table creation failed. Exiting.")
         sys.exit(1)
 
     # Step 2: Load Parquet to PostgreSQL (APPEND/UPSERT ONLY)
     print("2️⃣ Loading Parquet to PostgreSQL (APPEND/UPSERT)...")
-    if not load_parquet_to_db(parquet_path, start_id=start_id):
+    if not load_parquet_to_db(parquet_path):
         print("❌ Parquet load to PostgreSQL failed. Exiting.")
         sys.exit(1)
 
@@ -666,14 +561,14 @@ def main():
     print("3️⃣ Verifying PostgreSQL load...")
     verify_pg_load()
 
-    # Step 4: Load from PostgreSQL to Snowflake (Transfers all PG data, now with sequential IDs)
+    # Step 4: Load from PostgreSQL to Snowflake (Transfers all PG data)
     print("4️⃣ Loading data from PostgreSQL to Snowflake (MERGE)...")
     
     # Init single SF connection post-PG
     global _sf_conn
     _sf_conn = get_sf_connection()
     
-    if not load_postgres_to_snowflake(start_id=start_id, sf_conn=_sf_conn):
+    if not load_postgres_to_snowflake(sf_conn=_sf_conn):
         print("❌ Load to Snowflake failed. Exiting.")
         sys.exit(1)
 

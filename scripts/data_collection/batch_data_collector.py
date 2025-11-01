@@ -210,18 +210,11 @@ def main():
             collector.raw_data_paths = existing_files
         
         # Profile the preprocessing
-        pr = cProfile.Profile()
-        pr.enable()
+        # pr = cProfile.Profile()
+        # pr.enable()
         collector.preprocess_data(existing_files)
-        pr.disable()
-        pr.print_stats(sort='cumtime')
-        
-        # Display first row of preprocessed data
-        try:
-            first_row = pl.read_parquet(collector.output_parquet, n_rows=1).to_pandas().to_dict(orient='records')[0]
-            print(f"First row of preprocessed data:\n{first_row}")
-        except Exception as e:
-            print(f"Failed to read first row of output Parquet: {e}")
+        # pr.disable()
+        # pr.print_stats(sort='cumtime')
         return True
     except Exception as e:
         print(f"Batch data collection failed: {e}")

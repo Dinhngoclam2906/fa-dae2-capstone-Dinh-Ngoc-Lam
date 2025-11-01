@@ -18,7 +18,6 @@ def get_snowflake_connection():
         user=os.getenv("SNOWFLAKE_USER"),
         authenticator="SNOWFLAKE_JWT",
         private_key_file=os.getenv("SNOWFLAKE_PRIVATE_KEY_FILE_PATH"),
-        private_key_file_pwd=os.getenv("SNOWFLAKE_PRIVATE_KEY_FILE_PWD"),
         warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
         database=os.getenv("SNOWFLAKE_DATABASE"),
         schema=os.getenv("SNOWFLAKE_SCHEMA"),
@@ -26,26 +25,7 @@ def get_snowflake_connection():
         timezone="Asia/Ho_Chi_Minh"
     )
 
-def get_next_id_from_sf():
-    """Dynamically get next available ID from Snowflake table (for incremental loads)."""
-    conn = None
-    try:
-        conn = get_snowflake_connection()
-        cursor = conn.cursor()
-        database = os.getenv("SNOWFLAKE_DATABASE")
-        schema = os.getenv("SNOWFLAKE_SCHEMA")
-        table_name = f"{database}.{schema}.raw_data"
-        cursor.execute(f"SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM {table_name}")
-        result = cursor.fetchone()
-        next_id = result[0] if result else 1  # Safe: Default to 1 if None (no rows)
-        logger.info(f"✅ Computed next ID from SF: {next_id}")
-        return int(next_id)
-    except Exception as e:
-        logger.error(f"❌ Failed to compute next ID: {e}")
-        return 1  # Fallback to 1 for fresh start
-    finally:
-        if conn:
-            conn.close()
+# CHANGED: Removed get_next_id_from_sf() - no longer needed without surrogate id
 
 def setup_schema_and_stage(cursor, database, schema):
     """Shared setup for schema, stage, and context (avoids duplication)."""
@@ -56,6 +36,11 @@ def setup_schema_and_stage(cursor, database, schema):
     sch = result[1] if result else os.getenv("SNOWFLAKE_SCHEMA", "UNKNOWN")
     role = result[2] if result else "UNKNOWN"
     logger.info(f"Current context: Database={db}, Schema={sch}, Role={role}")
+
+    # NEW: Drop schema with CASCADE to clear all tables/views/other objects
+    drop_schema_cmd = f"DROP SCHEMA IF EXISTS {database}.{schema} CASCADE"
+    cursor.execute(drop_schema_cmd)
+    logger.info(f"✅ Dropped schema {database}.{schema} with CASCADE (cleared all objects: tables, views, etc.)")
 
     # Create schema if not exists
     cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {database}.{schema}")
@@ -68,10 +53,8 @@ def setup_schema_and_stage(cursor, database, schema):
     cursor.execute(f"CREATE STAGE IF NOT EXISTS {database}.{schema}.CSV_STAGE")
     logger.info(f"✅ Stage {database}.{schema}.CSV_STAGE created or already exists")
 
-def ingest_parquet_to_snowflake(parquet_file_path, start_id=1):
-    """Full ingestion: Clear table, upload Parquet to stage, then load to table (single connection).
-    start_id: Optional offset for row_index if needed (default 1 for batch).
-    """
+def ingest_parquet_to_snowflake(parquet_file_path):
+    """Full ingestion: Clear table, upload Parquet to stage, then load to table (single connection)."""
     conn = None
     try:
         # Single connection init
@@ -82,14 +65,8 @@ def ingest_parquet_to_snowflake(parquet_file_path, start_id=1):
         stage_name = f"@{database}.{schema}.CSV_STAGE"
         table_name = f"{database}.{schema}.raw_data"
         
-        # Setup schema and stage
+        # Setup schema and stage (now includes CASCADE drop)
         setup_schema_and_stage(cursor, database, schema)
-
-        # Clear historical data (moved here for single connection; TRUNCATE for speed)
-        logger.info("🔄 Clearing historical data in Snowflake...")
-        cursor.execute(f"TRUNCATE TABLE IF EXISTS {table_name}")
-        logger.info(f"✅ Truncated {table_name} (historical data cleared before batch load)")
-        conn.commit()
 
         # Clear ALL files
         cursor.execute(f"REMOVE {stage_name}")
@@ -113,16 +90,11 @@ def ingest_parquet_to_snowflake(parquet_file_path, start_id=1):
         stage_contents = cursor.fetchall()
         logger.info("Stage contents: %s", [(row[0], row[1], row[2]) for row in stage_contents])
 
-        # Drop/recreate table for clean schema
-        cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
-        logger.info(f"✅ Dropped existing table {table_name} if it existed")
-
-        # Create table (unchanged)
+        # CHANGED: Create table without 'id'; article_id as PK (no drop needed now, since schema dropped)
         create_table_command = f"""
         CREATE TABLE {table_name} (
-            id INTEGER PRIMARY KEY,
+            article_id VARCHAR(2000) PRIMARY KEY,
             crawl_timestamp TIMESTAMP,
-            article_id VARCHAR(2000),
             web_publication_date TIMESTAMP,
             web_title STRING,
             body_text STRING,
@@ -134,18 +106,17 @@ def ingest_parquet_to_snowflake(parquet_file_path, start_id=1):
         cursor.execute(create_table_command)
         logger.info(f"✅ Table {table_name} created (aligned to PostgreSQL schema)")
 
-        # Load data with optional ID offset (for future incremental, but batch uses pre-assigned)
+        # CHANGED: Load data without 'id' (omit from SELECT/INSERT)
         load_start_time = time.time()
         copy_command = f"""
         COPY INTO {table_name} (
-            id, crawl_timestamp, article_id, web_publication_date, web_title,
+            article_id, crawl_timestamp, web_publication_date, web_title,
             body_text, web_url, section_name, loaded_at
         )
         FROM (
             SELECT
-                $1:id::INTEGER AS id,
-                TRY_TO_TIMESTAMP_NTZ($1:crawl_timestamp::STRING) AS crawl_timestamp,
                 $1:article_id::STRING AS article_id,
+                TRY_TO_TIMESTAMP_NTZ($1:crawl_timestamp::STRING) AS crawl_timestamp,
                 TRY_TO_TIMESTAMP_NTZ($1:web_publication_date::STRING) AS web_publication_date,
                 $1:web_title::STRING AS web_title,
                 $1:body_text::STRING AS body_text,
@@ -226,9 +197,8 @@ def main(parquet_file_path=None):
     if parquet_file_path is None:
         parquet_file_path = r"data\batch\guardian_historical_articles.parquet"
     
-    # Use dynamic start_id (1 for batch)
-    start_id = 1
-    success = ingest_parquet_to_snowflake(parquet_file_path, start_id=start_id)
+    # CHANGED: No start_id needed
+    success = ingest_parquet_to_snowflake(parquet_file_path)
     if not success:
         logger.error("❌ Ingestion failed—check logs above.")
         return False
