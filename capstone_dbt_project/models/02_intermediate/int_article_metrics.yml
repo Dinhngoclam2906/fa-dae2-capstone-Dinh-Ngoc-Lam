@@ -14,8 +14,7 @@ models:
         tests:
           - not_null
           - dbt_utils.expression_is_true:
-              arguments:
-                where: article_count > 0
+              expression: "{{ column_name }} > 0"
       - name: processed_at
         description: Aggregation timestamp
         tests:

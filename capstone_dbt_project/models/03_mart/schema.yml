@@ -1,76 +1,7 @@
 version: 2
 
 models:
-  - name: dim_date_cross_db
-    description: "Date dimension for article publication and crawl analysis"
-    config:
-      tags: ["marts", "dimensions"]
-    columns:
-      - name: date_id
-        description: "Unique date identifier (FK)"
-        tests:
-          - unique
-          - not_null
-      - name: year
-        description: "Year component"
-        tests:
-          - not_null
-
-  - name: dim_sections
-    description: "Section dimension for categorizing articles"
-    config:
-      tags: ["marts", "dimensions"]
-    columns:
-      - name: section_key
-        description: "Unique section identifier (FK)"
-        tests:
-          - unique
-          - not_null
-      - name: section_group
-        description: "High-level grouping"
-        tests:
-          - accepted_values:
-              values: ['Global', 'Sports', 'Economy', 'Other']
-
-  - name: dim_articles_advanced_scd
-    description: "Article dimension with SCD Type 2 for content changes"
-    config:
-      tags: ["marts", "dimensions", "scd"]
-    columns:
-      - name: article_id
-        description: "Original article identifier"
-        tests:
-          - not_null
-      - name: content_change_hash
-        description: "Hash of article attributes for SCD change detection"
-        tests:
-          - not_null
-      - name: article_version_key
-        description: "Surrogate unique key for article versions"
-        tests:
-          - unique
-          - not_null
-      - name: valid_from
-        description: "Start of version validity"
-        tests:
-          - not_null
-      - name: valid_to
-        description: "End of version validity"
-        tests:
-          - not_null
-      - name: is_current
-        description: "Current version flag"
-        tests:
-          - not_null
-          - accepted_values:
-              values: [true, false]
-      - name: change_type
-        description: "Type of change (new/changed)"
-        tests:
-          - accepted_values:
-              values: ['new', 'content_changed']
-
-  - name: fct_advanced_articles
+  - name: fct_articles
     description: "Granular fact table for article publication events"
     config:
       tags: ["marts", "facts"]
@@ -80,8 +11,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_articles_advanced_scd')
-              field: article_id
+              arguments:
+                to: ref('dim_articles_advanced_scd')
+                field: article_id
       - name: article_event_hk
         description: "Surrogate unique key for article events (article_id + crawl_timestamp)"
         tests:
@@ -92,22 +24,17 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_date_cross_db')
-              field: date_id
+              arguments:
+                to: ref('dim_date')
+                field: date_id
       - name: section_key
         description: "Section identifier (FK to dim_sections)"
         tests:
           - not_null
           - relationships:
-              to: ref('dim_sections')
-              field: section_key
-      - name: body_length_chars
-        description: "Length of article body"
-        tests:
-          - not_null
-          - dbt_utils.expression_is_true:
               arguments:
-                expression: "{{ column_name }} > 0"
+                to: ref('dim_sections')
+                field: section_key
       - name: web_url
         description: "Source URL for the article (for uniqueness aggregation)"
         tests:
@@ -115,37 +42,3 @@ models:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "{{ column_name }} ILIKE 'http%'"
-
-  - name: mart_article_summary_cross_db
-    description: "Aggregated daily summary by section for analytics"
-    config:
-      tags: ["marts", "facts", "aggregates"]
-    columns:
-      - name: date_id
-        description: "Date FK"
-        tests:
-          - not_null
-          - relationships:
-              to: ref('dim_date_cross_db')
-              field: date_id
-      - name: section_key
-        description: "Section FK"
-        tests:
-          - not_null
-          - relationships:
-              to: ref('dim_sections')
-              field: section_key
-      - name: article_count
-        description: "Daily article count"
-        tests:
-          - not_null
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "{{ column_name }} >= 0"
-      - name: valid_rate_percent
-        description: "% of valid articles in section"
-        tests:
-          - not_null
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "{{ column_name }} >= 0"

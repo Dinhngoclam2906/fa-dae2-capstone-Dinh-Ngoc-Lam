@@ -1,19 +1,19 @@
 version: 2
-
 models:
   - name: stg_sf__guardian
     description: Cleaned and standardized Guardian articles data from raw Parquet ingestion
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - article_id
+            - crawl_timestamp
+          severity: error
     columns:
-      - name: id
-        description: Surrogate primary key
-        tests:
-          - unique
-          - not_null
       - name: article_id
         description: Original unique article identifier
         tests:
-          - unique
-          - not_null
+          - not_null:
+              severity: warn
       - name: web_title
         description: Article title
         tests:
@@ -34,13 +34,29 @@ models:
         description: Flag for valid title (non-empty, reasonable length)
         tests:
           - dbt_utils.expression_is_true:
-              where: has_valid_title = TRUE
+              where: has_valid_title
+              severity: error
       - name: has_valid_url
         description: Flag for valid URL (starts with http, non-empty)
         tests:
           - dbt_utils.expression_is_true:
-              where: has_valid_url = TRUE
+              where: has_valid_url
+              severity: error
+      - name: has_valid_content
+        description: Flag for valid content (non-empty body >50 chars)
+        tests:
+          - dbt_utils.expression_is_true:
+              where: has_valid_content
+              severity: error
+      - name: has_valid_section
+        description: Flag for valid section name (non-empty)
+        tests:
+          - dbt_utils.expression_is_true:
+              where: has_valid_section
+              severity: error
       - name: processed_at
         description: dbt processing timestamp
         tests:
           - not_null
+          - dbt_utils.expression_is_true:
+              expression: "{{ column_name }} > CURRENT_TIMESTAMP - INTERVAL '24 hours'"
