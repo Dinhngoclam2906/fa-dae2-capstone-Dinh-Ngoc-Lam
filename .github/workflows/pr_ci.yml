@@ -11,6 +11,16 @@ on:
 jobs:
   PR_CI:
     runs-on: ubuntu-latest
+    # Move env vars here to avoid repetition across steps
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }}
+      SNOWFLAKE_DATABASE: ${{ vars.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_WAREHOUSE: ${{ vars.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_ROLE: ${{ vars.SNOWFLAKE_ROLE }}
+      SNOWFLAKE_SCHEMA: ${{ vars.SNOWFLAKE_SCHEMA }}
+      SNOWFLAKE_PRIVATE_KEY_FILE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE }}
+      SNOWFLAKE_PRIVATE_KEY_FILE_PWD: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE_PWD }}
 
     steps:
       - name: Checkout code
@@ -40,54 +50,58 @@ jobs:
         run: |
           uv sync --group pr_ci --no-dev
 
+      # Generate profiles.yml for CI using templating (matches your local ci target)
+      - name: Generate dbt profiles.yml for CI
+        run: |
+          # Create .dbt dir if missing
+          mkdir -p capstone_dbt_project/.dbt
+          
+          # Write private key content to temp file (PEM format; assumes secret is multiline PEM)
+          echo "$SNOWFLAKE_PRIVATE_KEY_FILE" > /tmp/snowflake_key.p8
+          chmod 600 /tmp/snowflake_key.p8  # Secure perms
+          
+          # Export override for templating (points to temp file)
+          export SNOWFLAKE_PRIVATE_KEY_FILE="/tmp/snowflake_key.p8"
+          
+          # Generate profiles.yml with your exact templating—dbt will interpolate at runtime
+          cat > capstone_dbt_project/.dbt/profiles.yml << EOF
+          capstone_dbt_project:
+            target: ci
+            outputs:
+              ci:
+                type: snowflake
+                account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+                user: "{{ env_var('SNOWFLAKE_USER') }}"
+                private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_FILE') }}"
+                private_key_passphrase: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_FILE_PWD') }}"
+                database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+                warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+                role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+                schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
+                threads: 1
+                client_session_keep_alive: True
+          EOF
+        shell: bash
+
       - name: Run dbt debug
         run: |
           uv run dbt debug --project-dir capstone_dbt_project --profiles-dir capstone_dbt_project/.dbt -t ci
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }}
-          SNOWFLAKE_DATABASE: ${{ vars.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_WAREHOUSE: ${{ vars.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_ROLE: ${{ vars.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_SCHEMA: ${{ vars.SNOWFLAKE_SCHEMA }}
-          SNOWFLAKE_PRIVATE_KEY_FILE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE }}
-          SNOWFLAKE_PRIVATE_KEY_FILE_PWD: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE_PWD }}
 
       - name: Run SQLFluff lint
         run: |
           uv run sqlfluff lint capstone_dbt_project/models --exclude dbt_packages/,target/,03_mart_backup/  # Focus on models, skip noise
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }}
-          SNOWFLAKE_DATABASE: ${{ vars.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_WAREHOUSE: ${{ vars.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_ROLE: ${{ vars.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_SCHEMA: ${{ vars.SNOWFLAKE_SCHEMA }}
-          SNOWFLAKE_PRIVATE_KEY_FILE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE }}
-          SNOWFLAKE_PRIVATE_KEY_FILE_PWD: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE_PWD }}
 
       - name: Run dbt deps
         run: |
           uv run dbt deps --project-dir capstone_dbt_project --profiles-dir capstone_dbt_project/.dbt -t ci
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }}
-          SNOWFLAKE_DATABASE: ${{ vars.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_WAREHOUSE: ${{ vars.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_ROLE: ${{ vars.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_SCHEMA: ${{ vars.SNOWFLAKE_SCHEMA }}
-          SNOWFLAKE_PRIVATE_KEY_FILE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE }}
-          SNOWFLAKE_PRIVATE_KEY_FILE_PWD: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE_PWD }}
 
       - name: Run dbt tests
         run: |
           uv run dbt test --project-dir capstone_dbt_project --profiles-dir capstone_dbt_project/.dbt -t ci
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }}
-          SNOWFLAKE_DATABASE: ${{ vars.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_WAREHOUSE: ${{ vars.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_ROLE: ${{ vars.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_SCHEMA: ${{ vars.SNOWFLAKE_SCHEMA }}
-          SNOWFLAKE_PRIVATE_KEY_FILE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE }}
-          SNOWFLAKE_PRIVATE_KEY_FILE_PWD: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE_PWD }}
+
+      # Cleanup (optional, but good practice)
+      - name: Cleanup temp files
+        if: always()  # Run even on failure
+        run: |
+          rm -f /tmp/snowflake_key.p8
+        shell: bash
