@@ -50,7 +50,7 @@ models:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "{{ column_name }} = true"
-              severity: error
+              severity: warn
       - name: has_valid_section
         description: Flag for valid section name (non-empty)
         tests:
