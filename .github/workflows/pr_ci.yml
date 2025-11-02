@@ -7,17 +7,17 @@ on:
       - "**.sql"
       - "capstone_dbt_project/**"  # Your dbt folder
       - ".github/workflows/pr_ci.yml"
+      - ".sqlfluffignore"
 
 jobs:
   PR_CI:
     runs-on: ubuntu-latest
-    # Env vars/secrets: User/role now secrets for security
     env:
       SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
-      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}  # Changed to secret
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
       SNOWFLAKE_DATABASE: ${{ vars.SNOWFLAKE_DATABASE }}
       SNOWFLAKE_WAREHOUSE: ${{ vars.SNOWFLAKE_WAREHOUSE }}
-      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}  # Changed to secret (was var)
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
       SNOWFLAKE_SCHEMA: ${{ vars.SNOWFLAKE_SCHEMA }}
       SNOWFLAKE_PRIVATE_KEY_FILE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE }}
       SNOWFLAKE_PRIVATE_KEY_FILE_PWD: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_FILE_PWD }}
@@ -50,7 +50,6 @@ jobs:
         run: |
           uv sync --group pr_ci --no-dev
 
-      # Generate profiles.yml: Hardcode key path; template others
       - name: Generate dbt profiles.yml for CI
         run: |
           # Create .dbt dir if missing
@@ -86,7 +85,7 @@ jobs:
 
       - name: Run SQLFluff lint
         run: |
-          uv run sqlfluff lint capstone_dbt_project/models --exclude dbt_packages/,target/,03_mart_backup/
+          uv run sqlfluff lint capstone_dbt_project/models
 
       - name: Run dbt deps
         run: |
