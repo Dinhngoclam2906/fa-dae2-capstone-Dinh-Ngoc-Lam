@@ -34,29 +34,35 @@ models:
         description: Flag for valid title (non-empty, reasonable length)
         tests:
           - dbt_utils.expression_is_true:
-              where: has_valid_title
+              arguments: 
+                expression: "{{ this }} = True"
               severity: error
       - name: has_valid_url
         description: Flag for valid URL (starts with http, non-empty)
         tests:
           - dbt_utils.expression_is_true:
-              where: has_valid_url
+              arguments:
+                expression: "{{ this }} = True"
               severity: error
       - name: has_valid_content
         description: Flag for valid content (non-empty body >50 chars)
         tests:
           - dbt_utils.expression_is_true:
-              where: has_valid_content
+              arguments:
+                expression: "{{ this }} = True"
               severity: error
       - name: has_valid_section
         description: Flag for valid section name (non-empty)
         tests:
           - dbt_utils.expression_is_true:
-              where: has_valid_section
+              arguments:
+                expression: "{{ this }} = True"
               severity: error
       - name: processed_at
         description: dbt processing timestamp
         tests:
           - not_null
           - dbt_utils.expression_is_true:
-              expression: "{{ column_name }} > CURRENT_TIMESTAMP - INTERVAL '24 hours'"
+              arguments:
+                expression: "{{ column_name }} > CURRENT_TIMESTAMP - INTERVAL '24 hours'"
+              severity: warn

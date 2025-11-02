@@ -12,7 +12,7 @@ models:
           - not_null
           - relationships:
               arguments:
-                to: ref('dim_articles_advanced_scd')
+                to: ref('dim_articles')
                 field: article_id
       - name: article_event_hk
         description: "Surrogate unique key for article events (article_id + crawl_timestamp)"
