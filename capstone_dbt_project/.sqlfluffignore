@@ -1,0 +1,3 @@
+# Ignore dbt-generated or backup dirs
+dbt_packages/
+target/

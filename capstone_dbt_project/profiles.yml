@@ -1,13 +1,27 @@
 capstone_dbt_project:
-  target: dev  
+  target: dev  # Default for local
   outputs:
     dev:  
       type: snowflake
-      account: GEZJPYC-FOUNDRY_AI_ACADEMY  
-      user: T26
-      role: RL_T26 
-      database: DB_T26  
-      warehouse: WH_T26  
-      schema: SC_T26  
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT', 'GEZJPYC-FOUNDRY_AI_ACADEMY') }}"
+      user: "{{ env_var('SNOWFLAKE_USER', 'T26') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'RL_T26') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'DB_T26') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'WH_T26') }}"
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA', 'SC_T26') }}"
       threads: 4
-      private_key_path: D:\FoundryAIAcademy\fa-c002-hub\fa-dae2-capstone-Dinh-Ngoc-Lam\rsa_key.p8
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH', 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\rsa_key.p8') }}"  # Escaped backslashes for YAML
+      private_key_passphrase: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PWD', '') }}"
+
+    ci: 
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_FILE') }}" 
+      private_key_passphrase: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_FILE_PWD') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
+      threads: 1 
+      client_session_keep_alive: True

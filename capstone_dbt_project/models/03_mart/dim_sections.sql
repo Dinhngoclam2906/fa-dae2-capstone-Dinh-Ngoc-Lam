@@ -9,10 +9,11 @@ WITH normalized_sections AS (
     UPPER(TRIM(section_name)) AS section_key,
     MIN(section_name) AS section_name
   FROM {{ ref('stg_sf__guardian') }}
-  WHERE section_name IS NOT NULL AND has_valid_section = TRUE
-  {% if is_incremental() %}
-    AND UPPER(TRIM(section_name)) NOT IN (SELECT section_key FROM {{ this }})
-  {% endif %}
+  WHERE
+    section_name IS NOT NULL AND has_valid_section = TRUE
+    {% if is_incremental() %}
+      AND UPPER(TRIM(section_name)) NOT IN (SELECT section_key FROM {{ this }})
+    {% endif %}
   GROUP BY 1
 )
 

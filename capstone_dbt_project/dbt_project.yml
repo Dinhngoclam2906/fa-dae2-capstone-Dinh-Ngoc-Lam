@@ -27,7 +27,8 @@ vars:
   start_date: '2001-01-01'
   date_start: '2001-01-01'
   spine_days: 100000
-
+  news_salt: "your-secret-salt"
+  
 # Documentation configuration
 docs-paths: ["docs"]
 asset-paths: ["target/compiled"]

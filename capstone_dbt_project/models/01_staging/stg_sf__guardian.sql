@@ -1,3 +1,4 @@
+-- CI Demo
 -- models/01_staging/stg_sf__guardian.sql (use article_id as PK filter)
 {{ config(materialized='table') }}  -- 'table' avoids view inlining issues
 

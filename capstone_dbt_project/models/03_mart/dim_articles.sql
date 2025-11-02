@@ -11,15 +11,18 @@ WITH base_articles AS (
     web_url,
     section_name,
     crawl_timestamp,
-    MD5(CONCAT(COALESCE(web_title, ''), '|', COALESCE(web_url, ''), '|', 
-    COALESCE(section_name, ''), '|', MD5(COALESCE(body_text, '')))) AS content_change_hash,
+    MD5(CONCAT(
+      COALESCE(web_title, ''), '|', COALESCE(web_url, ''), '|',
+      COALESCE(section_name, ''), '|', MD5(COALESCE(body_text, ''))
+    )) AS content_change_hash,
     body_text
   FROM {{ ref('stg_sf__guardian') }}
-  WHERE article_id IS NOT NULL 
+  WHERE
+    article_id IS NOT NULL
     AND has_valid_content = TRUE
-    {% if is_incremental() %}
-      AND crawl_timestamp > (SELECT MAX(valid_from) FROM {{ this }} ) - INTERVAL '7 days'  -- Incremental: Recent crawls only
-    {% endif %}
+  {% if is_incremental() %}
+    AND crawl_timestamp > (SELECT MAX(valid_from) FROM {{ this }}) - INTERVAL '7 days'  -- Incremental: Recent crawls only
+  {% endif %}
 ),
 
 change_detection_raw AS (
@@ -44,7 +47,8 @@ change_detection_raw AS (
 ),
 
 change_detection AS (
-  SELECT *,
+  SELECT
+    *,
     CASE
       WHEN existing_content_change_hash IS NULL THEN 'new'
       WHEN content_change_hash != existing_content_change_hash THEN 'content_changed'
@@ -81,9 +85,9 @@ new_versions AS (
     cd.web_url,
     cd.section_name,
     {{ generate_news_hash(['cd.article_id', 'cd.crawl_timestamp', 'cd.content_change_hash']) }} AS version_surrogate_key,
-    CASE 
+    CASE
       WHEN cd.change_type = 'content_changed' THEN CURRENT_TIMESTAMP()
-      ELSE COALESCE(cd.crawl_timestamp, CURRENT_TIMESTAMP()) 
+      ELSE COALESCE(cd.crawl_timestamp, CURRENT_TIMESTAMP())
     END AS valid_from,
     '9999-12-31'::TIMESTAMP_NTZ AS valid_to,
     TRUE AS is_current,
@@ -97,7 +101,7 @@ new_versions AS (
 
 -- Union & join sections
 joined_versions AS (
-  SELECT 
+  SELECT
     v.*,
     s.section_key
   FROM (
@@ -108,7 +112,7 @@ joined_versions AS (
   JOIN {{ ref('dim_sections') }} s ON UPPER(TRIM(v.section_name)) = s.section_key
 )
 
-SELECT 
+SELECT
   article_id,
   web_title,
   web_url,
