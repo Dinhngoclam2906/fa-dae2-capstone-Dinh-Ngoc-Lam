@@ -83,9 +83,16 @@ jobs:
         run: |
           uv run dbt deps --project-dir capstone_dbt_project --profiles-dir capstone_dbt_project/.dbt -t ci
 
+      - name: Patch SQLFluff config for CI
+        run: |
+          cp .sqlfluff .sqlfluff.ci
+          sed -i 's/target = dev/target = ci/g' .sqlfluff.ci
+        working-directory: capstone_dbt_project
+        shell: bash
+
       - name: Run SQLFluff lint
         run: |
-          uv run sqlfluff lint models
+          uv run sqlfluff lint models --config .sqlfluff.ci
         working-directory: capstone_dbt_project
 
       - name: Run dbt tests
