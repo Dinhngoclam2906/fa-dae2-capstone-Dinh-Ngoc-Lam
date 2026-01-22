@@ -32,6 +32,15 @@ sources:
               - not_null
           - name: section_name
             description: Section or category of the article (e.g., 'World', 'Sports')
+          - name: data_source
+            description: >
+              Data source classification:
+              - 'batch': Historical data from HuggingFace dataset (Stefan171/TheGuardian-Articles, last updated 2024-05-11)
+              - 'realtime': Live data from Guardian API (articles published after 2024-05-11)
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['batch', 'realtime']
           - name: loaded_at
             description: Timestamp when the row was loaded into Snowflake
             tests:

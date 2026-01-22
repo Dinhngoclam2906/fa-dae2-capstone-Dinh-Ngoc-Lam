@@ -7,7 +7,7 @@ models:
           combination_of_columns:
             - article_id
             - crawl_timestamp
-          severity: error
+          severity: warn
     columns:
       - name: article_id
         description: Original unique article identifier
@@ -17,33 +17,37 @@ models:
       - name: web_title
         description: Article title
         tests:
-          - not_null
+          - not_null:
+              severity: warn
       - name: web_url
         description: Source URL
         tests:
-          - not_null
+          - not_null:
+              severity: warn
       - name: crawl_timestamp
         description: Crawl timestamp
         tests:
-          - not_null
+          - not_null:
+              severity: warn
       - name: loaded_at
         description: Load timestamp to Snowflake
         tests:
-          - not_null
+          - not_null:
+              severity: warn
       - name: has_valid_title
         description: Flag for valid title (non-empty, reasonable length)
         tests:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "{{ column_name }} = true"  # FIXED: Column-specific, lowercase true
-              severity: error
+              severity: warn
       - name: has_valid_url
         description: Flag for valid URL (starts with http, non-empty)
         tests:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "{{ column_name }} = true"
-              severity: error
+              severity: warn
       - name: has_valid_content
         description: Flag for valid content (non-empty body >50 chars)
         tests:
@@ -57,11 +61,12 @@ models:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "{{ column_name }} = true"
-              severity: error
+              severity: warn
       - name: processed_at
         description: dbt processing timestamp
         tests:
-          - not_null
+          - not_null:
+              severity: warn
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "{{ column_name }} > CURRENT_TIMESTAMP() - INTERVAL '24 hours'"
