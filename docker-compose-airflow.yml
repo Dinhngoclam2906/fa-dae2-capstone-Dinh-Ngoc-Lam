@@ -1,3 +1,221 @@
+# # docker-compose-airflow.yml
+# x-airflow-common: &airflow-common
+#   # image: apache/airflow:latest
+#   build:
+#     context: .
+#     dockerfile: Dockerfile.airflow
+#   environment: &airflow-common-env
+#     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+#     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    
+#     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-metadata/airflow
+#     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-metadata/airflow
+#     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    
+#     # CRITICAL for Airflow 3.x Task SDK
+#     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-apiserver:8080/execution/"
+    
+#     AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+#     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+#     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+#     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    
+#     # Timezone
+#     AIRFLOW__CORE__DEFAULT_TIMEZONE: Asia/Ho_Chi_Minh
+#     TZ: Asia/Ho_Chi_Minh
+    
+#     _AIRFLOW_WWW_USER_USERNAME: admin
+#     _AIRFLOW_WWW_USER_PASSWORD: admin
+    
+#     # JWT signing secret - THIS FIXES THE "Signature verification failed" error
+#     AIRFLOW__API_AUTH__JWT_SECRET: "xypRNgYc644f5fnf_57UpdW-KAJ19p79HU5Sh2R8H7PNXHr-sXE0t-p5adKCbCeU_-CEtQgsQzKeJUNnOErsxg"
+#     SNOWFLAKE_PRIVATE_KEY_FILE_PATH: /opt/airflow/.secret/rsa_key.p8
+
+#     # ===== ADD THESE LINES =====
+#     # PostgreSQL Staging (for your data pipeline)
+#     POSTGRES_HOST: postgres-staging
+#     POSTGRES_PORT: 5432
+#     POSTGRES_DB: staging_db
+#     POSTGRES_USER: staging_user
+#     POSTGRES_PASSWORD: staging_password
+    
+#     # Kafka
+#     KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+#     KAFKA_TOPIC: raw_articles
+#     # ===========================
+    
+#   volumes:
+#     - ./dags:/opt/airflow/dags
+#     - ./logs:/opt/airflow/logs
+#     - ./plugins:/opt/airflow/plugins
+#     - ./.env:/opt/airflow/.env:ro
+#     - .:/opt/airflow/project
+#     - D:/FoundryAIAcademy/fa-c002-hub/fa-dae2-capstone-Dinh-Ngoc-Lam/capstone_dbt_project:/opt/airflow/capstone_dbt_project
+#     - D:/FoundryAIAcademy/fa-c002-hub/fa-dae2-capstone-Dinh-Ngoc-Lam/.dbt:/opt/airflow/.dbt
+#   user: "${AIRFLOW_UID:-50000}:0"
+#   networks:
+#     - kafka_network
+#   depends_on: &airflow-common-depends-on
+#     redis:
+#       condition: service_healthy
+#     airflow-metadata:
+#       condition: service_healthy
+
+# services:
+#   airflow-metadata:
+#     image: postgres:13
+#     environment:
+#       POSTGRES_USER: airflow
+#       POSTGRES_PASSWORD: airflow
+#       POSTGRES_DB: airflow
+#     volumes:
+#       - postgres-db-volume:/var/lib/postgresql/data
+#     healthcheck:
+#       test: ["CMD", "pg_isready", "-U", "airflow"]
+#       interval: 10s
+#       retries: 5
+#       start_period: 5s
+#     restart: always
+#     networks:
+#       - kafka_network
+
+#   postgres-staging:
+#     image: postgres:13
+#     environment:
+#       POSTGRES_USER: staging_user
+#       POSTGRES_PASSWORD: staging_password
+#       POSTGRES_DB: staging_db
+#     volumes:
+#       - postgres-staging-volume:/var/lib/postgresql/data
+#     healthcheck:
+#       test: ["CMD", "pg_isready", "-U", "staging_user", "-d", "staging_db"]
+#       interval: 10s
+#       retries: 5
+#       start_period: 5s
+#     restart: always
+#     networks:
+#       - kafka_network
+#     ports:
+#       - "5434:5432"  # Expose on a different host port to avoid conflict with airflow-metadata
+
+#   redis:
+#     image: redis:7.2-bookworm
+#     expose:
+#       - 6379
+#     healthcheck:
+#       test: ["CMD", "redis-cli", "ping"]
+#       interval: 10s
+#       timeout: 30s
+#       retries: 50
+#       start_period: 30s
+#     restart: always
+#     networks:
+#       - kafka_network
+
+#   airflow-apiserver:
+#     <<: *airflow-common
+#     command: api-server
+#     ports:
+#       - "8080:8080"
+#     healthcheck:
+#       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/monitor/health"]
+#       interval: 30s
+#       timeout: 10s
+#       retries: 10
+#       start_period: 60s
+#     restart: always
+#     depends_on:
+#       <<: *airflow-common-depends-on
+#       airflow-init:
+#         condition: service_completed_successfully
+
+#   airflow-scheduler:
+#     <<: *airflow-common
+#     command: scheduler
+#     restart: always
+#     depends_on:
+#       <<: *airflow-common-depends-on
+#       airflow-init:
+#         condition: service_completed_successfully
+
+#   airflow-dag-processor:
+#     <<: *airflow-common
+#     command: dag-processor
+#     restart: always
+#     depends_on:
+#       <<: *airflow-common-depends-on
+#       airflow-init:
+#         condition: service_completed_successfully
+
+#   airflow-worker:
+#     <<: *airflow-common
+#     command: celery worker
+#     environment:
+#       <<: *airflow-common-env
+#       DUMB_INIT_SETSID: "0"
+#     healthcheck:
+#       test: ["CMD", "celery", "--app=airflow.executors.celery_executor.app", "inspect", "ping"]
+#       interval: 30s
+#       timeout: 10s
+#       retries: 5
+#       start_period: 30s
+#     restart: always
+#     depends_on:
+#       <<: *airflow-common-depends-on
+#       postgres-staging:
+#         condition: service_healthy
+#       airflow-apiserver:
+#         condition: service_healthy
+#       airflow-init:
+#         condition: service_completed_successfully
+
+#   airflow-triggerer:
+#     <<: *airflow-common
+#     command: triggerer
+#     restart: always
+#     depends_on:
+#       <<: *airflow-common-depends-on
+#       airflow-init:
+#         condition: service_completed_successfully
+
+#   airflow-init:
+#     <<: *airflow-common
+#     user: "0:0"
+#     environment:
+#       <<: *airflow-common-env
+#       _AIRFLOW_DB_MIGRATE: "true"
+#       _AIRFLOW_WWW_USER_CREATE: "true"
+#     command: >
+#       bash -c "
+#         mkdir -p /opt/airflow/{logs,dags,plugins} &&
+#         echo 'Waiting for PostgreSQL to be ready...' &&
+#         while ! pg_isready -h airflow-metadata -p 5432 -U airflow > /dev/null 2>&1; do
+#           sleep 2
+#         done &&
+#         echo 'PostgreSQL ready. Running Airflow initialization...' &&
+#         /entrypoint airflow db migrate &&
+#         echo 'Creating admin user...' &&
+#         /entrypoint airflow users create \
+#           --username \"${_AIRFLOW_WWW_USER_USERNAME}\" \
+#           --password \"${_AIRFLOW_WWW_USER_PASSWORD}\" \
+#           --firstname Admin \
+#           --lastname User \
+#           --role Admin \
+#           --email admin@example.com || echo 'Admin user already exists' &&
+#         echo 'Fixing ownership on writable directories...' &&
+#         chown -R ${AIRFLOW_UID}:0 /opt/airflow/logs /opt/airflow/dags /opt/airflow/plugins || true &&
+#         echo 'Initialization complete.'
+#       "
+
+# volumes:
+#   postgres-db-volume:
+#   postgres-staging-volume:
+
+# networks:
+#   kafka_network:
+#     name: fa-dae2-capstone-dinh-ngoc-lam_kafka_network
+#     external: true
+
 # docker-compose-airflow.yml
 x-airflow-common: &airflow-common
   # image: apache/airflow:latest
@@ -8,14 +226,14 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-metadata/airflow
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-metadata/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-metadata/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-metadata/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     
     # CRITICAL for Airflow 3.x Task SDK
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-apiserver:8080/execution/"
     
-    AIRFLOW__CORE__FERNET_KEY: hBrMNzPwzBSOdqJS5M6F7CM0j3Kj30vxMOMmYlef774=
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
@@ -24,25 +242,23 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DEFAULT_TIMEZONE: Asia/Ho_Chi_Minh
     TZ: Asia/Ho_Chi_Minh
     
-    _AIRFLOW_WWW_USER_USERNAME: admin
-    _AIRFLOW_WWW_USER_PASSWORD: admin
+    _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-admin}
+    _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD}
     
-    # JWT signing secret - THIS FIXES THE "Signature verification failed" error
-    AIRFLOW__API_AUTH__JWT_SECRET: "xypRNgYc644f5fnf_57UpdW-KAJ19p79HU5Sh2R8H7PNXHr-sXE0t-p5adKCbCeU_-CEtQgsQzKeJUNnOErsxg"
+    # JWT signing secret
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET}
     SNOWFLAKE_PRIVATE_KEY_FILE_PATH: /opt/airflow/.secret/rsa_key.p8
 
-    # ===== ADD THESE LINES =====
-    # PostgreSQL Staging (for your data pipeline)
+    # PostgreSQL Staging
     POSTGRES_HOST: postgres-staging
     POSTGRES_PORT: 5432
-    POSTGRES_DB: staging_db
-    POSTGRES_USER: staging_user
-    POSTGRES_PASSWORD: staging_password
+    POSTGRES_DB: ${POSTGRES_DB:-staging_db}
+    POSTGRES_USER: ${POSTGRES_USER:-staging_user}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     
     # Kafka
     KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     KAFKA_TOPIC: raw_articles
-    # ===========================
     
   volumes:
     - ./dags:/opt/airflow/dags
@@ -66,7 +282,7 @@ services:
     image: postgres:13
     environment:
       POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
+      POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD}
       POSTGRES_DB: airflow
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
@@ -82,9 +298,9 @@ services:
   postgres-staging:
     image: postgres:13
     environment:
-      POSTGRES_USER: staging_user
-      POSTGRES_PASSWORD: staging_password
-      POSTGRES_DB: staging_db
+      POSTGRES_USER: ${POSTGRES_USER:-staging_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-staging_db}
     volumes:
       - postgres-staging-volume:/var/lib/postgresql/data
     healthcheck:
@@ -96,7 +312,7 @@ services:
     networks:
       - kafka_network
     ports:
-      - "5434:5432"  # Expose on a different host port to avoid conflict with airflow-metadata
+      - "5434:5432"
 
   redis:
     image: redis:7.2-bookworm
