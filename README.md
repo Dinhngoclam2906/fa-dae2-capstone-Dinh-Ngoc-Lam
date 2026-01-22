@@ -1,7 +1,13 @@
 # Daily News Summarization Project 
 
 ## Overview
-An end-to-end AI-powered data analytics system that processes real-time and historical news data from The Guardian to summarize and provide insights into news trends and sentiment. This enables users to receive updates from current and historical news trends and query insights using a natural language AI interface.
+The Guardian News Analyst is an intelligent chatbot powered by a **hybrid RAG (Retrieval-Augmented Generation)** architecture that combines:
+
+- **Dense Semantic Search** (Pinecone vector database) - Understanding meaning and context
+- **Lexical SQL Search** (Snowflake keyword matching) - Exact phrase and entity matching
+- **FlashRank Re-ranking** - Relevance optimization
+- **LangGraph Agent Framework** - Conversational AI with tool calling
+- **Persistent Memory** (PostgreSQL) - Conversation history across sessions
 
 ## Project Structure
 ### **1. Problem & Scope**:
@@ -17,32 +23,65 @@ The rapid pace of news publication requires real-time ingestion and analysis to 
 - **In Scope**: Real-time news ingestion, batch processing of historical news, AI-driven insights, data quality validation.  
 - **Out of Scope**: Real-time social media integration, multi-language support, advanced ML model training.
 
-### Data Sources
-**1. Real-time Source:**  
-- API Name: The Guardian API  
-- Endpoint: https://content.guardianapis.com/search  
-- Format: JSON  
-- Volume: 500 latest articles
-- Update Frequency: Hourly updates with new articles  
-- Description: Provides live news articles with metadata (title, publication date, section, etc.).
+### 4. Data Sources:
+The Guardian News Analytics system uses a hybrid data ingestion architecture combining:
 
-**2. Batch Source:**
-- Dataset Name: Hugging Face - "TheGuardian-Articles" (Stefan171)
-- Format: Parquet shards (downloaded via huggingface_hub, preprocessed to CSV)  
-- Volume: 500 articles (filtered to full data quality) 
-- Update Cadence: Static dataset  
-- Description: Historical news articles scraped from The Guardian (2010-2024) with fields like URL, category, publication date, title, contents, author, and data quality ('Full' or 'Partial').
+- Batch Processing - Historical archives from HuggingFace (500 articles)
+- Real-time Streaming - Live Guardian API via Kafka (continuous updates)
+- Incremental Loading - Smart sync to avoid duplicate processing
+- Automated Orchestration - Airflow DAGs for reliable scheduling
 
-### Architecture Overview:
+### 5. Architecture Overview:
 **High-level Diagram:** Data flows from The Guardian API (real-time) and Hugging Face Dataset (batch) into PostgreSQL for staging (real-time only), then to Snowflake for warehousing. dbt transforms data into analytics-ready models, Kafka handles streaming, Airflow orchestrates pipelines, and a LangGraph-based AI chatbot with RAG queries the warehouse.
 
-**Data Flow:**
-- **Real-time:** The Guardian API → Python ingestion script → PostgreSQL (staging) → Snowflake (RAW schema).  
-- **Batch:** Hugging Face Dataset → Python preprocessing script (BatchDataCollector: download, filter 'Full' quality, transform to schema-aligned CSV) → Python ingestion script → Snowflake (RAW schema).
-- **Transformation:** dbt models (stg_*, dim_*, fct_*) in Snowflake ANALYTICS schema.  
-- **Streaming:** Kafka processes real-time article updates.  
+#### **5.1. Data Pipeline:**
+**5.1.1. Real-time Streaming Pipeline:**
+**5.1.1.1. Kafka Producer:**
+Purpose: Continuously poll Guardian API and stream new articles to Kafka.
+Key Features:
+- State Tracking: PostgreSQL table tracks processed articles (avoid duplicates)
+- Incremental Polling: Only fetches articles not yet seen
+- Smart Deduplication: Checks article_id against state before sending
+- Rate Limiting: Handles Guardian API limits (sleeps on 429 errors)
+- Continuous Mode: Runs indefinitely with configurable poll interval
 
-**Technology Choices:**
+**5.1.1.2. Kafka Consumer:**
+Purpose: Consume articles from Kafka, validate, and sync to PostgreSQL → Snowflake.
+Key Features:
+- Batch Processing: Groups messages (50/batch) before Snowflake sync
+- UPSERT Logic: Handles duplicates gracefully (ON CONFLICT DO UPDATE)
+- Incremental Sync: Only uploads NEW rows to Snowflake (tracks loaded_at)
+- Data Source Tagging: Automatically labels batch vs realtime based on date
+- Connection Pooling: Reuses Snowflake connection (avoids overhead)
+- Idempotent: Safe to re-run (won't create duplicates)
+
+**5.1.2. Batch Data Processing Pipeline:**
+**5.1.2.1. Batch Data Collector:**
+Purpose: Download and preprocess historical Guardian articles from HuggingFace.
+Key Features:
+- Smart Caching: Only downloads if local data missing (idempotent)
+- Quality Filtering: Only Data Quality == "Full" articles
+- Schema Alignment: Transforms HuggingFace schema → Snowflake schema
+- Sampling: Random sample of 500 articles (configurable)
+- Streaming Processing: Uses Polars lazy evaluation for memory efficiency
+
+**5.1.2.2. Batch Data Ingestion:**
+Purpose: Upload preprocessed batch data to Snowflake using MERGE (safe upsert).
+Key Features:
+- Safe MERGE: Preserves existing data (updates data_source, never overwrites content)
+- Idempotent: Can run multiple times safely
+- Parquet Staging: Uses Snowflake internal stage for fast upload
+- Data Source Tagging: Automatically sets data_source = 'batch'
+
+**5.1.3. dbt Transformation:**
+The dbt (data build tool) layer transforms raw Guardian article data into a **star schema** optimized for analytics and RAG retrieval. The pipeline implements:
+- **Data Quality Validation** - Staging layer with comprehensive quality checks
+- **SCD Type 2** - Tracks article version history (title/content changes)
+- **Incremental Loading** - Efficient processing of only new/changed data
+- **Star Schema** - Dimensions + Facts for fast analytical queries
+- **Automated Testing** - 30+ data quality tests
+
+#### **5.2. Tech Stacks:**
 - **Python:** Flexible for data ingestion and processing (requests, polars).  
 - **PostgreSQL:** Local staging for rapid development and testing.  
 - **Snowflake:** Scalable cloud warehouse for analytics.  
@@ -50,9 +89,10 @@ The rapid pace of news publication requires real-time ingestion and analysis to 
 - **Kafka:** Robust for real-time streaming.  
 - **Airflow:** Reliable pipeline orchestration.  
 - **LangGraph/PineCone:** Enables conversational AI with grounded responses.  
+- **OpenAI**: Open-source LLM API
 - **GitHub Actions:** Simplifies CI/CD for deployment.  
 
-**ERD:**
+#### **ERD:**
 ```dbml
 Table raw_data {
   crawl_timestamp timestamp [pk]
@@ -154,11 +194,144 @@ Ref: "dim_date"."date_id" < "dim_date"."day"
 **Star Schema:**
 <image-card alt="Logo" src="Untitled.png" ></image-card>
 
+#### **5.3. AI Agent Architecture**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         USER QUERY                              │
+│              "What's the latest on climate change?"             │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    SMART QUERY ROUTING                          │
+│  • Greetings/meta questions → Direct response (no retrieval)    │
+│  • Factual queries → Hybrid retrieval pipeline                  │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                   ┌─────────┴─────────┐
+                   │                   │
+                   ▼                   ▼
+     ┌──────────────────────┐  ┌──────────────────────┐
+     │   DENSE SEARCH       │  │    SQL SEARCH        │
+     │   (Pinecone)         │  │    (Snowflake)       │
+     │                      │  │                      │
+     │ • Semantic matching  │  │ • Keyword extraction │
+     │ • 71,616+ vectors    │  │ • Multi-keyword OR   │
+     │ • 2 namespaces:      │  │ • Optimized view     │
+     │   - guardian_articles│  │ • Full-text search   │
+     │   - user_documents   │  │                      │
+     │ • K=10 results       │  │ • Limit=10 results   │
+     └──────────┬───────────┘  └──────────┬───────────┘
+                │                         │
+                └────────┬────────────────┘
+                         ▼
+           ┌─────────────────────────┐
+           │   MERGE & DEDUPLICATE   │
+           │                         │
+           │ • Remove duplicates     │
+           │ • By article_id         │
+           │ • By text similarity    │
+           └────────────┬────────────┘
+                        ▼
+           ┌─────────────────────────┐
+           │   FLASHRANK RERANKER    │
+           │                         │
+           │ • Local model (fast)    │
+           │ • Relevance scoring     │
+           │ • Top-K selection       │
+           │ • Skip if <3 results    │
+           └────────────┬────────────┘
+                        ▼
+           ┌─────────────────────────┐
+           │   CONTEXT FORMATTING    │
+           │                         │
+           │ • Source labeling       │
+           │ • Metadata enrichment   │
+           │ • Retrieval stats       │
+           └────────────┬────────────┘
+                        ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    LANGGRAPH AGENT                              │
+│                                                                 │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
+│  │   RETRIEVE   │───▶│   CHATBOT    │───▶│    TOOLS    │       │
+│  │              │    │              │    │              │       │
+│  │ • Query      │    │ • GPT-4o     │    │ • SQL search │       │
+│  │   routing    │    │   mini       │    │ • Trending   │       │
+│  │ • Hybrid     │    │ • Context    │    │ • Summaries  │       │
+│  │   search     │    │   aware      │    │ • Metadata   │       │
+│  │ • Context    │    │ • Tool       │    │              │       │
+│  │   building   │    │   calling    │    │              │       │
+│  └──────────────┘    └──────────────┘    └──────────────┘       │
+│                                                                 │
+│  Memory: PostgreSQL (conversation history, checkpoints)         │
+└────────────────────────────┬────────────────────────────────────┘
+                             ▼
+                    ┌──────────────────┐
+                    │  FINAL RESPONSE  │
+                    │                  │
+                    │ • Grounded       │
+                    │ • Cited sources  │
+                    │ • Conversational │
+                    └──────────────────┘
+```
+
+---
+
 **Project Structure:**
 ```
 capstone/
+├── .dbt
+|   ├── .user.yml
+|   ├── profiles.yml
 ├── .github/workflows
 |   ├── pr_ci.yml
+├── ai_agents/
+|   ├──__init__.py
+|   ├──__pycache__/
+|   │   ├── __init__.cpython-313.pyc
+|   │   ├── app.cpython-313.pyc
+|   │   ├── baseline_systems.cpython-313.pyc
+|   │   ├── capstone_tool_calling_agent.cpython-313.pyc
+|   │   ├── cli_interface.cpython-313.pyc
+|   │   ├── document_upload_ingestion.cpython-313.pyc
+|   │   ├── persistent_agent.cpython-313.pyc
+|   │   └── streamlit_app.cpython-313.pyc
+|   │
+|   ├── services/
+|   │   ├── __init__.py
+|   │   ├── __pycache__/
+|   │   │   ├── __init__.cpython-313.pyc
+|   │   │   ├── chunking_strategies.cpython-313.pyc
+|   │   │   ├── document_processor.cpython-313.pyc
+|   │   │   └── text_extractors.cpython-313.pyc
+|   │   ├── chunking_strategies.py
+|   │   ├── document_processor.py
+|   │   └── text_extractors.py
+|   │
+|   ├── app.py
+|   ├── baseline_systems.py
+|   ├── capstone_tool_calling_agent.py
+|   ├── cli_interface.py
+|   ├── data_ingestion_to_pinecone.py
+|   ├── demo_The_Guardian_article.pdf
+|   ├── diagnostic.py
+|   ├── document_upload_ingestion.py
+|   ├── evaluation.py
+|   ├── evaluation_results.json
+|   ├── evaluation_results.png
+|   ├── ground_truth.json
+|   ├── ground_truth_llm.json
+|   ├── improvement_chart.png
+|   ├── label_ground_truth.py
+|   ├── label_ground_truth_llm.py
+|   ├── metrics_comparison.png
+|   ├── test_document_upload.py
+|   ├── test_queries.json
+|   ├── test_retrieval_uploaded.py
+|   ├── update_tracking_table_manual.py
+|   └── visualize_results.py
 ├── capstone_dbt_project/
 |   ├── .dbt
 |   ├── .venv
@@ -180,22 +353,32 @@ capstone/
 |   ├── package-lock.yml
 |   ├── packages.yml
 |   ├── profiles.yml
+├── dags/  
+|   ├── capstone_crawling_ingestion                   # Batch data crawling orchestrator
+|   ├── capstone_dbt_orchestration                    # dbt run orchestration
 ├── scripts/  
-|   ├── data_collection                               # Data collection scripts
+|   ├── batch_data                                    # Batch Data scripts
 |      ├── real_time_data_collector.py                # Guardian API ingestion
-|      ├── batch_data_collector.py                    # HuggingFace historical news data ingestion
-|   ├── ingestion
-|      ├── load_parquet_to_postgre_then_snowflake.py  # Load local CSV to PostgreSQL
-|      ├── load_parquet_to_snowflake.py               # Load local CSV to Snowflake
-|   ├── sql
-|      ├── init.sql
+|      ├── batch_data_collector.py                    # HuggingFace historical news data crawling
+|      ├── batch_data_ingestion.py                    # HuggingFace historical news data ingestion to Snowflake
+|   ├── real_time_data
+|      ├── kafka_consumer.py                          # Kafka Events Consumer 
+|      ├── kafka_producer.py                          # Kafka Events Producer 
+├── sql
+|   ├── init.sql
 ├── .env.example 
 ├── .gitattributes/                    
 ├── .gitignore/                    
 ├── .python-version/                          
-├── docker-compose.yml/                      
+├── docker-compose-airflow.yml/    
+├── docker-compose-kafka.yml/ 
+├── docker-compose.yml/ 
+├── Dockerfile.airflow/                      
 ├── main.py/                        
 ├── pyproject.toml/ 
+├── requirements.txt/ 
+├── setup_airflow_postgres_connection
+├── setup_airflow_snowflake_connection
 ├── uv.lock/                       
 └── README.md                     # Documentation
 ```
@@ -220,10 +403,10 @@ docker-compose -f docker/compose.yml up -d
 **4. Run Pipelines:**
 
 Real-time: 
-```python scripts/data_collection/real_time_data_collector.py && python scripts/ingestion/load_parquet_to_postgres_then_snowflake.py```
+```python scripts/real_time_data/kafka_producer.py && python scripts/real_time_data/kafka_producer.py```
 
 Batch: 
-```python scripts/data_collection/batch_data_collector && python scripts/ingestion/load_parquet_to_snowflake.py```
+```python scripts/batch_data/batch_data_collector && python scripts/batch_data/batch_data_ingestion.py```
 
 **5. Verify Data:** 
 Check PostgreSQL and Snowflake for loaded data (500+ rows for batch, continuous updates for real-time).

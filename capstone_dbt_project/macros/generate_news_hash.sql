@@ -1,9 +1,3 @@
-{{
-  config(
-    materialized='ephemeral'
-  )
-}}
-
 {% macro generate_news_hash(fields, separator='|') %}
   {% set salt = var('news_salt', none) %}
   {% set exprs = [] %}

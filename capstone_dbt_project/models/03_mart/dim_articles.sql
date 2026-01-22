@@ -1,7 +1,7 @@
 {{ config(
     materialized='incremental',
     unique_key=['article_id', 'valid_from'],
-    cluster_by=['article_id', 'valid_from']
+    cluster_by=['article_id', 'valid_from', 'data_source']
 ) }}
 
 WITH base_articles AS (
@@ -11,6 +11,7 @@ WITH base_articles AS (
     web_url,
     section_name,
     crawl_timestamp,
+    data_source,
     MD5(CONCAT(
       COALESCE(web_title, ''), '|', COALESCE(web_url, ''), '|',
       COALESCE(section_name, ''), '|', MD5(COALESCE(body_text, ''))
@@ -31,7 +32,8 @@ change_detection_raw AS (
     e.content_change_hash AS existing_content_change_hash,
     e.valid_from AS existing_valid_from,
     e.web_title AS existing_title,
-    e.web_url AS existing_url
+    e.web_url AS existing_url,
+    e.data_source AS existing_data_source
   FROM base_articles b
   {% if is_incremental() %}
     LEFT JOIN {{ this }} e ON b.article_id = e.article_id AND e.is_current = TRUE
@@ -41,7 +43,8 @@ change_detection_raw AS (
         NULL::STRING AS content_change_hash,
         NULL::TIMESTAMP_NTZ AS valid_from,
         NULL::STRING AS web_title,
-        NULL::STRING AS web_url
+        NULL::STRING AS web_url,
+        NULL::STRING AS data_source
     ) e
   {% endif %}
 ),
@@ -55,16 +58,16 @@ change_detection AS (
       ELSE 'unchanged'
     END AS change_type
   FROM change_detection_raw
-  WHERE change_type != 'unchanged'  -- Filter early: Only new/changed
+  WHERE change_type != 'unchanged'
 ),
 
--- Generate closed copy of old version (for audit; appends alongside original)
 closed_old_versions AS (
   SELECT
     cd.article_id,
     cd.existing_title AS web_title,
     cd.existing_url AS web_url,
     cd.section_name,
+    cd.existing_data_source AS data_source,
     {{ generate_news_hash(['cd.article_id', 'cd.existing_valid_from']) }} AS version_surrogate_key,
     cd.existing_valid_from AS valid_from,
     CURRENT_TIMESTAMP() AS valid_to,
@@ -84,6 +87,7 @@ new_versions AS (
     cd.web_title,
     cd.web_url,
     cd.section_name,
+    cd.data_source,
     {{ generate_news_hash(['cd.article_id', 'cd.crawl_timestamp', 'cd.content_change_hash']) }} AS version_surrogate_key,
     CASE
       WHEN cd.change_type = 'content_changed' THEN CURRENT_TIMESTAMP()
@@ -117,6 +121,7 @@ SELECT
   web_title,
   web_url,
   section_key,
+  data_source,
   valid_from,
   valid_to,
   is_current,
