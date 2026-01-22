@@ -159,7 +159,9 @@ def create_checkpointer():
         port = os.getenv("LANGGRAPH_POSTGRES_PORT", "5433")
         database = os.getenv("LANGGRAPH_POSTGRES_DB", "langgraph_memory")
         user = os.getenv("LANGGRAPH_POSTGRES_USER", "postgres")
-        password = os.getenv("LANGGRAPH_POSTGRES_PASSWORD", "postgres")
+        password = os.getenv("LANGGRAPH_POSTGRES_PASSWORD")
+        if not password:
+            raise ValueError("LANGGRAPH_POSTGRES_PASSWORD environment variable is required")
         db_uri = f"postgresql://{user}:{password}@{host}:{port}/{database}"
         
         connection = psycopg.connect(db_uri, autocommit=True)
