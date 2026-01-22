@@ -1,5 +1,5 @@
 -- models/01_staging/stg_sf__guardian.sql
-{{ config(materialized='table') }} 
+{{ config(materialized='table') }}
 
 WITH raw_articles AS (
   SELECT

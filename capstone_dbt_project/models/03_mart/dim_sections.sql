@@ -19,7 +19,7 @@ WITH normalized_sections AS (
 
 SELECT
   section_key,
-  section_name, 
+  section_name,
   {{ section_group_macro('section_name') }} AS section_group,
   CURRENT_TIMESTAMP() AS dbt_updated_at
 FROM normalized_sections

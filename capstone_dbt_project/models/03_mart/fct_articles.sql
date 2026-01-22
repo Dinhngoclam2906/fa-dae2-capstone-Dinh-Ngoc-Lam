@@ -64,12 +64,12 @@ base_facts AS (
           OR ae.attribute_hash != COALESCE(f.attribute_hash, '00000000000000000000000000000000')
         {% endif %}
         OR ae.crawl_timestamp > (SELECT MAX(crawl_timestamp) FROM {{ this }})
-        OR a.loaded_at > (SELECT MAX(dbt_updated_at) FROM {{ this }}) 
+        OR a.loaded_at > (SELECT MAX(dbt_updated_at) FROM {{ this }})
       )
     {% endif %}
 )
 
-SELECT 
+SELECT
   article_event_hk,
   article_id,
   crawl_timestamp,
