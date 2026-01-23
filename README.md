@@ -203,7 +203,7 @@ Ref: "dim_date"."date_id" < "dim_date"."day"
 ```
 
 **Star Schema:**
-<image-card alt="Logo" src="Untitled.png" ></image-card>
+<image-card alt="Logo" src="ERD.png" ></image-card>
 
 #### **5.3. AI Agent Architecture**
 

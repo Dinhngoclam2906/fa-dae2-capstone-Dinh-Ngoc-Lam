@@ -60,7 +60,6 @@ snowflake_connection_test.log
 *.json
 *.parquet
 *.zip
-*.png
 data/
 
 # Snowflake private key
