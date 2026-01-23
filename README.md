@@ -35,7 +35,7 @@ The Guardian News Analytics system uses a hybrid data ingestion architecture com
 
 **High-level Diagram:**
 
-<img src="images/data_architecture.png" width="600" alt="Data Architecture">
+<img src="images/data_architecture.png" width="100%" alt="Data Architecture">
 
 #### **5.1. Data Pipeline:**
 
@@ -104,6 +104,7 @@ The dbt (data build tool) layer transforms raw Guardian article data into a **st
 - **GitHub Actions:** Simplifies CI/CD for deployment.  
 
 #### **ERD:**
+<img src="images/ERD.png" width="100%" alt="Data Architecture">
 ```dbml
 Table raw_data {
   crawl_timestamp timestamp [pk]
@@ -201,9 +202,6 @@ Ref: fct_articles.article_id > dim_articles.article_id  // Fact to article dim (
 Ref: dim_articles.section_key > dim_sections.section_key  // Article dim to section
 Ref: "dim_date"."date_id" < "dim_date"."day"
 ```
-
-**Star Schema:**
-<image-card alt="Logo" src="ERD.png" ></image-card>
 
 #### **5.3. AI Agent Architecture**
 
