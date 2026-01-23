@@ -1,3 +1,4 @@
+# CI Demo
 """
 Guardian Kafka Consumer → PostgreSQL → Snowflake
 Consumes articles from Kafka, upserts to PostgreSQL, and periodically syncs to Snowflake.
