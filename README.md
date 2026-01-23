@@ -104,7 +104,9 @@ The dbt (data build tool) layer transforms raw Guardian article data into a **st
 - **GitHub Actions:** Simplifies CI/CD for deployment.  
 
 #### **ERD:**
+
 <img src="images/ERD.png" width="100%" alt="Data Architecture">
+
 ```dbml
 Table raw_data {
   crawl_timestamp timestamp [pk]
