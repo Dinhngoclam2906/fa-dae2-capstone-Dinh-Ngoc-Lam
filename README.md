@@ -32,10 +32,15 @@ The Guardian News Analytics system uses a hybrid data ingestion architecture com
 - Automated Orchestration - Airflow DAGs for reliable scheduling
 
 ### 5. Architecture Overview:
-**High-level Diagram:** Data flows from The Guardian API (real-time) and Hugging Face Dataset (batch) into PostgreSQL for staging (real-time only), then to Snowflake for warehousing. dbt transforms data into analytics-ready models, Kafka handles streaming, Airflow orchestrates pipelines, and a LangGraph-based AI chatbot with RAG queries the warehouse.
+
+**High-level Diagram:**
+
+<img src="images/data_architecture.png" width="600" alt="Data Architecture">
 
 #### **5.1. Data Pipeline:**
+
 **5.1.1. Real-time Streaming Pipeline:**
+
 **5.1.1.1. Kafka Producer:**
 Purpose: Continuously poll Guardian API and stream new articles to Kafka.
 Key Features:
@@ -46,6 +51,7 @@ Key Features:
 - Continuous Mode: Runs indefinitely with configurable poll interval
 
 **5.1.1.2. Kafka Consumer:**
+
 Purpose: Consume articles from Kafka, validate, and sync to PostgreSQL → Snowflake.
 Key Features:
 - Batch Processing: Groups messages (50/batch) before Snowflake sync
@@ -56,7 +62,9 @@ Key Features:
 - Idempotent: Safe to re-run (won't create duplicates)
 
 **5.1.2. Batch Data Processing Pipeline:**
+
 **5.1.2.1. Batch Data Collector:**
+
 Purpose: Download and preprocess historical Guardian articles from HuggingFace.
 Key Features:
 - Smart Caching: Only downloads if local data missing (idempotent)
@@ -66,6 +74,7 @@ Key Features:
 - Streaming Processing: Uses Polars lazy evaluation for memory efficiency
 
 **5.1.2.2. Batch Data Ingestion:**
+
 Purpose: Upload preprocessed batch data to Snowflake using MERGE (safe upsert).
 Key Features:
 - Safe MERGE: Preserves existing data (updates data_source, never overwrites content)
@@ -74,6 +83,7 @@ Key Features:
 - Data Source Tagging: Automatically sets data_source = 'batch'
 
 **5.1.3. dbt Transformation:**
+
 The dbt (data build tool) layer transforms raw Guardian article data into a **star schema** optimized for analytics and RAG retrieval. The pipeline implements:
 - **Data Quality Validation** - Staging layer with comprehensive quality checks
 - **SCD Type 2** - Tracks article version history (title/content changes)
@@ -82,6 +92,7 @@ The dbt (data build tool) layer transforms raw Guardian article data into a **st
 - **Automated Testing** - 30+ data quality tests
 
 #### **5.2. Tech Stacks:**
+
 - **Python:** Flexible for data ingestion and processing (requests, polars).  
 - **PostgreSQL:** Local staging for rapid development and testing.  
 - **Snowflake:** Scalable cloud warehouse for analytics.  

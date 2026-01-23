@@ -18,7 +18,7 @@ Environment Variables Required:
 import json
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone 
 from pathlib import Path
 
 from confluent_kafka import Consumer, KafkaError
@@ -170,7 +170,6 @@ def upsert_article_to_postgres(article_data: dict) -> tuple[bool, str]:
     Returns:
         True if successful, False otherwise
     """
-    HUGGINGFACE_CUTOFF_DATE = datetime(2024, 5, 11, 23, 59, 59)
 
     try:
         # Parse timestamps
@@ -181,7 +180,7 @@ def upsert_article_to_postgres(article_data: dict) -> tuple[bool, str]:
             article_data['web_publication_date'].replace('Z', '+00:00')
         )
         
-        data_source = 'batch' if web_publication_date <= HUGGINGFACE_CUTOFF_DATE else 'realtime'
+        data_source = 'realtime'
 
         check_sql = "SELECT 1 FROM staging.raw_data WHERE article_id = %s"
 
@@ -189,7 +188,7 @@ def upsert_article_to_postgres(article_data: dict) -> tuple[bool, str]:
             INSERT INTO staging.raw_data (
                 crawl_timestamp, article_id, web_publication_date,
                 web_title, body_text, web_url, section_name, data_source
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (article_id) DO UPDATE SET
                 crawl_timestamp = EXCLUDED.crawl_timestamp,
                 web_publication_date = EXCLUDED.web_publication_date,

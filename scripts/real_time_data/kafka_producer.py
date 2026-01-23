@@ -325,8 +325,8 @@ def main():
     parser.add_argument(
         '--max-articles',
         type=int,
-        default=500,
-        help='Maximum articles to fetch per poll (default: 500)'
+        default=100,
+        help='Maximum articles to fetch per poll (default: 100)'
     )
     parser.add_argument(
         '--from-days-ago',
@@ -404,7 +404,7 @@ def main():
             new_articles = fetch_recent_articles(
                 from_date=from_date,
                 processed_ids=processed_ids,
-                max_pages=10,
+                max_pages=5,
                 max_articles=args.max_articles
             )
             

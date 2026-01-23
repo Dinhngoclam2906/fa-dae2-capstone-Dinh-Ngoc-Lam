@@ -492,10 +492,8 @@ def mark_articles_as_ingested(article_chunks: List[Dict[str, Any]], namespace: s
     Update tracking table after successful Pinecone upload.
     
     IMPROVEMENTS:
-    - Batched updates (100 articles per batch) for better performance
-    - Progress logging for each batch
-    - Timeout handling for search optimization check
-    - Better error recovery
+    - Bulk INSERT with single MERGE operation per batch
+    - Dramatically faster than row-by-row MERGE
     """
     
     if not article_chunks:
@@ -510,10 +508,12 @@ def mark_articles_as_ingested(article_chunks: List[Dict[str, Any]], namespace: s
     logger.info(f"📝 Updating tracking table for {len(article_counts)} articles...")
     
     conn = get_sf_connection()
+    database = os.getenv("SNOWFLAKE_DATABASE")
+    schema = "SC_T26_MARTS"
     
     try:
-        # Use batched updates for better performance
-        batch_size = 100
+        # Use batched bulk inserts with temp table for much better performance
+        batch_size = 1000  # Can handle larger batches with bulk insert
         article_items = list(article_counts.items())
         total_batches = (len(article_items) + batch_size - 1) // batch_size
         
@@ -523,23 +523,35 @@ def mark_articles_as_ingested(article_chunks: List[Dict[str, Any]], namespace: s
                 end_idx = min(start_idx + batch_size, len(article_items))
                 batch_items = article_items[start_idx:end_idx]
                 
+                # Build VALUES clause for bulk insert
+                values_list = []
                 for article_id, chunk_count in batch_items:
-                    cur.execute("""
-                        MERGE INTO PINECONE_INGESTION_LOG AS target
-                        USING (SELECT %s AS article_id, %s AS chunk_count, %s AS namespace) AS source
-                        ON target.ARTICLE_ID = source.article_id
-                        WHEN MATCHED THEN
-                            UPDATE SET 
-                                INGESTED_AT = CURRENT_TIMESTAMP(),
-                                CHUNK_COUNT = source.chunk_count,
-                                PINECONE_NAMESPACE = source.namespace,
-                                INGESTION_STATUS = 'SUCCESS'
-                        WHEN NOT MATCHED THEN
-                            INSERT (ARTICLE_ID, INGESTED_AT, CHUNK_COUNT, PINECONE_NAMESPACE, INGESTION_STATUS)
-                            VALUES (source.article_id, CURRENT_TIMESTAMP(), source.chunk_count, source.namespace, 'SUCCESS')
-                    """, (article_id, chunk_count, namespace))
+                    values_list.append(f"('{article_id}', {chunk_count}, '{namespace}')")
                 
-                # Commit each batch
+                values_clause = ", ".join(values_list)
+                
+                # Single MERGE with temp CTE - much faster
+                merge_sql = f"""
+                MERGE INTO {database}.{schema}.PINECONE_INGESTION_LOG AS target
+                USING (
+                    SELECT column1 AS article_id, 
+                           column2 AS chunk_count, 
+                           column3 AS namespace
+                    FROM VALUES {values_clause}
+                ) AS source
+                ON target.ARTICLE_ID = source.article_id
+                WHEN MATCHED THEN
+                    UPDATE SET 
+                        INGESTED_AT = CURRENT_TIMESTAMP(),
+                        CHUNK_COUNT = source.chunk_count,
+                        PINECONE_NAMESPACE = source.namespace,
+                        INGESTION_STATUS = 'SUCCESS'
+                WHEN NOT MATCHED THEN
+                    INSERT (ARTICLE_ID, INGESTED_AT, CHUNK_COUNT, PINECONE_NAMESPACE, INGESTION_STATUS)
+                    VALUES (source.article_id, CURRENT_TIMESTAMP(), source.chunk_count, source.namespace, 'SUCCESS')
+                """
+                
+                cur.execute(merge_sql)
                 conn.commit()
                 logger.info(f"   💾 Batch {batch_num + 1}/{total_batches} committed ({len(batch_items)} articles)")
         
@@ -548,7 +560,6 @@ def mark_articles_as_ingested(article_chunks: List[Dict[str, Any]], namespace: s
         # Skip search optimization check if it takes too long
         try:
             with conn.cursor() as cur:
-                # Set statement timeout to 30 seconds
                 cur.execute("ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = 30")
                 
                 cur.execute("""

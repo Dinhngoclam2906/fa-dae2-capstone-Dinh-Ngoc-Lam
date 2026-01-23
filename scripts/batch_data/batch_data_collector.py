@@ -154,7 +154,7 @@ class BatchDataCollector:
             raise
 
 def main():
-    collector = BatchDataCollector(max_articles=500)
+    collector = BatchDataCollector(max_articles=100)
     collector.run()
 
 if __name__ == "__main__":
