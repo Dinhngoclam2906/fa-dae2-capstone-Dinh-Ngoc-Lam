@@ -1,4 +1,4 @@
--- CI Demo
+-- CI Demo Now
 -- models/01_staging/stg_sf__guardian.sql
 {{ config(materialized='table') }}
 
