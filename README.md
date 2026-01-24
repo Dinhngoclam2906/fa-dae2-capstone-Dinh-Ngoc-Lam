@@ -1,7 +1,7 @@
-# Daily News Summarization Project 
+# Daily News AI Assistant 
 
 ## Overview
-The Guardian News Analyst is an intelligent chatbot powered by a **hybrid RAG (Retrieval-Augmented Generation)** architecture that combines:
+Daily News AI Assistant is an intelligent chatbot powered by a **hybrid RAG (Retrieval-Augmented Generation)** architecture that combines:
 
 - **Dense Semantic Search** (Pinecone vector database) - Understanding meaning and context
 - **Lexical SQL Search** (Snowflake keyword matching) - Exact phrase and entity matching

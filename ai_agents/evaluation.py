@@ -15,7 +15,11 @@ Metrics:
 - Normalized Discounted Cumulative Gain (NDCG@K)
 - Average Latency
 
-FIXED: NDCG calculation now properly normalized to max 1.0
+Together they tell the full story:
+- Precision → Quality (High precision means users don't waste time on irrelevant results. Users trust systems with high precision)
+- Recall → Completeness (High recall means comprehensive answers - users don't miss important information)
+- MRR → Speed (Users want immediate answers. First result is relevant (rank 1))
+- NDCG → Intelligence (Rewards putting highly relevant docs at top positions)
 """
 
 import json
@@ -68,7 +72,16 @@ class RAGEvaluator:
         """
         Calculate Precision@K.
         
-        Precision@K = (# relevant docs in top K) / K
+        Precision@K = (# relevant docs in top K) / K (Measures result quality/accuracy)
+
+        What it means: "Of the K results I showed, how many were actually relevant?"
+        Formula: (number of relevant results in top-K) / K
+        Range: 0.0 to 1.0 (higher is better)
+        
+        Example: If K=5 and 4 out of 5 results are relevant → Precision = 0.8 (80%)
+        
+        Why it matters: High precision means users don't waste time on irrelevant results.
+        Users trust systems with high precision.
         
         Args:
             retrieved_ids: List of retrieved article IDs (in rank order)
@@ -95,7 +108,16 @@ class RAGEvaluator:
         """
         Calculate Recall@K.
         
-        Recall@K = (# relevant docs in top K) / (total # relevant docs)
+        Recall@K = (# relevant docs in top K) / (total # relevant docs) (Measures result completeness/coverage)
+
+        What it means: "Of all relevant documents that exist, how many did I find in top-K?"
+        Formula: (number of relevant results in top-K) / (total relevant documents)
+        Range: 0.0 to 1.0 (higher is better)
+        
+        Example: If 10 relevant docs exist and you found 6 in top-5 → Recall = 0.6 (60%)
+        
+        Why it matters: High recall means comprehensive answers - users don't miss 
+        important information. Low recall means you're leaving relevant docs behind.
         
         Args:
             retrieved_ids: List of retrieved article IDs (in rank order)
@@ -121,9 +143,19 @@ class RAGEvaluator:
         """
         Calculate Mean Reciprocal Rank.
         
-        MRR = 1 / (rank of first relevant document)
+        MRR = 1 / (rank of first relevant document) (Measures speed to first answer)
         
-        This measures how quickly users find a relevant result.
+        What it means: "How quickly does the user find the first relevant result?"
+        Formula: 1 / (position of first relevant result)
+        Range: 0.0 to 1.0 (higher is better)
+        
+        Examples:
+        - First result is relevant (rank 1) → MRR = 1.0 (perfect!)
+        - First relevant at rank 2 → MRR = 0.5
+        - First relevant at rank 5 → MRR = 0.2
+        
+        Why it matters: Users want immediate answers. High MRR means they don't 
+        need to scroll. Critical for user satisfaction and engagement.
         
         Args:
             retrieved_ids: List of retrieved article IDs (in rank order)
@@ -144,8 +176,24 @@ class RAGEvaluator:
         relevance_scores: Dict[str, int], 
         k: int = 5
     ) -> float:
-        """NDCG for sparse ground truth - only uses labeled relevant docs."""
+        """
+        What it means: "Are the MOST relevant results ranked HIGHER than less relevant ones?"
+        Formula: (actual ranking score) / (perfect ranking score)
+        Range: 0.0 to 1.0 (higher is better, cannot exceed 1.0)
         
+        Key concepts:
+        - Rewards putting highly relevant docs at top positions
+        - Penalizes when mediocre docs appear before great docs
+        - Position matters: rank 1 > rank 2 > rank 3, etc.
+        
+        Example: If you have docs with relevance scores [3, 2, 1]:
+        - Perfect ranking: [3, 2, 1] → NDCG = 1.0
+        - Your ranking: [2, 3, 1] → NDCG = 0.97 (good but not perfect)
+        - Bad ranking: [1, 2, 3] → NDCG = 0.79 (best result at bottom!)
+        
+        Why it matters: Not all relevant results are equally valuable. NDCG ensures 
+        the BEST results appear FIRST, optimizing user experience.
+        """
         # Get relevances for retrieved (unlabeled = 0)
         retrieved_relevances = []
         for doc_id in retrieved_ids[:k]:
