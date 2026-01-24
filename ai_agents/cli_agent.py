@@ -29,6 +29,8 @@ from nltk.corpus import stopwords
 # Your tool-calling module
 from capstone_tool_calling_agent import tools
 
+# Demo: Trump said his health is 'perfect' while admitting to taking more aspirin than recommended. What do medical experts say about aspirin overuse, and has Guardian covered this?
+
 load_dotenv()
 
 # ==================== STRUCTURED LOGGING SETUP ====================
@@ -410,7 +412,7 @@ def should_retrieve(query: str) -> bool:
     Skip retrieval for:
     - Greetings and pleasantries
     - Meta questions about the assistant
-    - Acknowledgments and feedback (EXPANDED)
+    - Pure acknowledgments and feedback (NOT factual questions with context)
     - Clarification requests without new information needs
     
     Returns:
@@ -418,79 +420,96 @@ def should_retrieve(query: str) -> bool:
     """
     query_lower = query.lower().strip()
     
+    # ============================================================
+    # PRIORITY 1: Always retrieve if it's clearly a factual query
+    # ============================================================
+    
+    # Strong factual indicators
+    factual_indicators = [
+        r'\bwhat (do|does|did|are|is|was|were)\b',
+        r'\bhow (do|does|did|can|could|should|would)\b',
+        r'\b(why|when|where|which|who)\b',
+        r'\b(medical|experts?|doctors?|scientists?|researchers?)\b',
+        r'\b(guardian|article|news|coverage|report)\b',
+        r'\b(show|find|search|get|fetch|retrieve)\b',
+        r'\b(compare|analyze|summarize)\b',
+    ]
+    
+    # If query contains factual indicators, ALWAYS retrieve
+    if any(re.search(pattern, query_lower) for pattern in factual_indicators):
+        return True
+    
+    # If query contains a question mark, likely factual
+    if '?' in query:
+        # Exception: Single-word questions like "Why?" or "How so?"
+        if len(query_lower.split()) > 3:
+            return True
+    
+    # ============================================================
+    # PRIORITY 2: Check for NON-factual patterns (greetings, etc.)
+    # ============================================================
+    
     # Pattern 1: Greetings and pleasantries
     greetings = {
         'hi', 'hello', 'hey', 'good morning', 'good afternoon', 
         'good evening', 'howdy', 'greetings'
     }
-    if any(greeting in query_lower for greeting in greetings):
-        return False
+    
+    # Only skip if greeting is at START of query (with word boundary)
+    greeting_patterns = [rf'\b{g}\b' for g in greetings]
+    if len(query_lower.split()) <= 4:  # Short query
+        if any(re.match(pattern, query_lower) for pattern in greeting_patterns):
+            return False
     
     # Pattern 2: Meta questions about the assistant
     meta_patterns = [
-        r'\bwho are you\b',
-        r'\bwhat are you\b',
-        r'\bwhat can you do\b',
-        r'\bwhat do you do\b',
-        r'\byour (name|capabilities|purpose)\b',
-        r'\btell me about yourself\b',
-        r'\bintroduce yourself\b',
-        r'\bhow do you work\b',
-        r'\bwhat\'s your (role|job|function)\b'
+        r'^\s*(who|what) are you\b',
+        r'^\s*what can you do\b',
+        r'^\s*what do you do\b',
+        r'^\s*tell me about yourself\b',
+        r'^\s*introduce yourself\b',
     ]
     if any(re.search(pattern, query_lower) for pattern in meta_patterns):
         return False
     
-    # Pattern 3: Acknowledgments and feedback (EXPANDED!)
-    acknowledgments = {
+    # Pattern 3: Pure acknowledgments (MUST be short and at START)
+    acknowledgment_phrases = [
         'thanks', 'thank you', 'ok', 'okay', 'got it', 'understood',
-        'bye', 'goodbye', 'see you', 'cool', 'nice', 'great', 'perfect',
-        'interesting', 'fascinating', 'agree', 'makes sense', 'i see'
-    }
-    
-    # ✅ NEW: More sophisticated acknowledgment detection
-    acknowledgment_patterns = [
-        r'^(that\'?s?|it\'?s?|this is) (interesting|fascinating|cool|great|nice|good|helpful|useful)',
-        r'^i (find|found|think|agree|see)',
-        r'^(yes|yep|yeah|no|nope),?\s*(that\'?s?|it\'?s?)?',
-        r'^sounds (good|great|interesting|cool)',
-        r'^(makes sense|got it|understood|i understand)',
+        'bye', 'goodbye', 'see you', 'cool', 'nice', 'great', 'perfect'
     ]
     
-    # If query matches acknowledgment patterns OR is short acknowledgment
-    if any(re.search(pattern, query_lower) for pattern in acknowledgment_patterns):
-        return False
+    # Only skip if:
+    # 1. Query is SHORT (≤ 5 words)
+    # 2. Starts with acknowledgment
+    # 3. No question mark
+    if len(query_lower.split()) <= 5 and '?' not in query:
+        first_two_words = ' '.join(query_lower.split()[:2])
+        if any(ack in first_two_words for ack in acknowledgment_phrases):
+            return False
     
-    if len(query_lower.split()) <= 5 and any(ack in query_lower for ack in acknowledgments):
-        return False
-    
-    # Pattern 4: Clarification without new info needs
-    clarification_only = [
-        r'^(can you |could you |please )?(explain|clarify|tell me more|elaborate)\s*[?.!]*$',
-        r'^what do you mean\??$',
-        r'^how so\??$',
-        r'^why\??$'  # Single "why?" without context
+    # Pattern 4: Conversational reactions (MUST be at START)
+    reaction_patterns = [
+        r'^(that\'?s?|it\'?s?|this is) (interesting|fascinating|cool|great|nice|good)\s*[!.]*$',
+        r'^i (agree|see|understand)\s*[!.]*$',
+        r'^(makes sense|got it|understood)\s*[!.]*$',
+        r'^(yes|yep|yeah|no|nope),?\s*[!.]*$',
     ]
-    if any(re.search(pattern, query_lower) for pattern in clarification_only):
-        return False
     
-    # Pattern 5: Very short queries (likely not factual)
+    # Only skip if query is SHORT and matches reaction pattern
+    if len(query_lower.split()) <= 6:
+        if any(re.match(pattern, query_lower) for pattern in reaction_patterns):
+            return False
+    
+    # Pattern 5: Very short non-questions
     if len(query_lower.split()) <= 2 and '?' not in query_lower:
-        return False
-
-    # Pattern 6 - Analytical requests needing evidence
-    analytical_requests = [
-        r'\binfer from (his|her|their|the) (past|actions|behavior|record)\b',
-        r'\bbased on (his|her|their|the) (past|previous|prior|history)\b',
-        r'\blooking at (his|her|their|the) (history|record|track record)\b',
-        r'\b(give|show|find) (me )?(examples?|evidence|instances)\b',
-        r'\bwhat (did|has|have) (he|she|they|it) (done|said|do)\b',
-    ]
+        # Exception: Important entities like "Trump" or "Brexit"
+        important_entities = ['trump', 'brexit', 'covid', 'ukraine', 'climate']
+        if not any(entity in query_lower for entity in important_entities):
+            return False
     
-    if any(re.search(pattern, query_lower) for pattern in analytical_requests):
-        return True  # ✅ Retrieve for evidence-based analysis
-    
-    # Default: Retrieve for everything else (factual queries, specific questions)
+    # ============================================================
+    # DEFAULT: Retrieve for everything else
+    # ============================================================
     return True
 
 def get_instant_response(query: str) -> Optional[str]:
