@@ -4,10 +4,10 @@ Guardian Kafka Consumer → PostgreSQL → Snowflake
 Consumes articles from Kafka, upserts to PostgreSQL, and periodically syncs to Snowflake.
 
 Usage:
-    python guardian_kafka_consumer.py
-    python guardian_kafka_consumer.py --once  # Process available messages and exit
-    python guardian_kafka_consumer.py --once --max-messages 100  # Process max 100 messages
-    python guardian_kafka_consumer.py --no-state  # Skip incremental sync (re-sync all data)
+    python scripts/real_time_data/kafka_consumer.py
+    python scripts/real_time_data/kafka_consumer.py --once  # Process available messages and exit
+    python scripts/real_time_data/kafka_consumer.py --once --max-messages 100  # Process max 100 messages
+    python scripts/real_time_data/kafka_consumer.py --no-state  # Skip incremental sync (re-sync all data)
     
 Environment Variables Required:
     - KAFKA_BOOTSTRAP_SERVERS: Kafka broker address
@@ -305,10 +305,26 @@ def sync_postgres_to_snowflake(no_state_mode: bool = False) -> bool:
                 CREATE FILE FORMAT IF NOT EXISTS MY_PARQUET_FORMAT 
                 TYPE = PARQUET
             """)
+
+            # Create table if not exists
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS {db}.{schema}.RAW_DATA (
+                    crawl_timestamp TIMESTAMP,
+                    article_id VARCHAR(255) PRIMARY KEY,
+                    web_publication_date TIMESTAMP,
+                    web_title TEXT,
+                    body_text TEXT,
+                    web_url VARCHAR(500),
+                    section_name VARCHAR(255),
+                    data_source VARCHAR(20) DEFAULT 'realtime',
+                    loaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             
             stage = f"@{db}.{schema}.CSV_STAGE"
             table = f"{db}.{schema}.RAW_DATA"
             
+            cursor.execute(f"USE WAREHOUSE {os.getenv('SNOWFLAKE_WAREHOUSE')}")
             cursor.execute(f"USE SCHEMA {db}.{schema}")
             cursor.execute(f"REMOVE {stage}")
             

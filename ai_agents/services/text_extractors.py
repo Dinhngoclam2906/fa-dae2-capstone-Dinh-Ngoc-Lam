@@ -160,10 +160,10 @@ class PDFPlumberExtractor(TextExtractor):
             
             # Convert with poppler path
             if poppler_path:
-                images = convert_from_path(file_path, dpi=300, poppler_path=poppler_path)
+                images = convert_from_path(file_path, dpi=150, poppler_path=poppler_path)
             else:
                 print("  ⚠️  Poppler path not specified, trying system PATH...")
-                images = convert_from_path(file_path, dpi=300)
+                images = convert_from_path(file_path, dpi=150)
             
             print(f"  Processing {len(images)} pages with OCR...")
             

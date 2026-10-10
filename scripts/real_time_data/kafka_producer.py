@@ -4,7 +4,11 @@ Continuously crawls new articles from Guardian API and streams them to Kafka.
 No intermediate file storage - true real-time streaming.
 
 Usage:
-    python guardian_kafka_producer.py
+    python scripts/real_time_data/kafka_producer.py
+    python scripts/real_time_data/kafka_producer.py --once  # Process available messages and exit
+    python scripts/real_time_data/kafka_producer.py --once --max-articles 100  # Process max 100 articles
+    python scripts/real_time_data/kafka_producer.py --from-days-ago 7  # Process articles from last 7 days
+    python scripts/real_time_data/kafka_producer.py --no-state  # Skip incremental sync (re-sync all data)
     
 Environment Variables Required:
     - API_KEY: Guardian API key
@@ -218,7 +222,7 @@ def fetch_recent_articles(
     from_date: str,
     processed_ids: Set[str],
     max_pages: int = 10,
-    max_articles: int = 100
+    max_articles: int = 50
 ) -> list[GuardianArticle]:
     """
     Fetch recent articles from Guardian API.
@@ -325,8 +329,8 @@ def main():
     parser.add_argument(
         '--max-articles',
         type=int,
-        default=100,
-        help='Maximum articles to fetch per poll (default: 100)'
+        default=50,
+        help='Maximum articles to fetch per poll (default: 50)'
     )
     parser.add_argument(
         '--from-days-ago',
