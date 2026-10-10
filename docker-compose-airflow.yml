@@ -259,7 +259,23 @@ x-airflow-common: &airflow-common
     # Kafka
     KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     KAFKA_TOPIC: raw_articles
-    
+
+    # GCP / BigQuery (Phase 2/3 ingestion + dbt). Auth: mounted ADC token below - this
+    # is a local-dev workaround (uses the developer's own `gcloud auth
+    # application-default login` session), NOT how CI should authenticate - CI has no
+    # local gcloud session to borrow from and needs Workload Identity Federation
+    # instead (still unresolved, see PROGRESS_LOG.md). Fine for this container since
+    # it only ever runs on the same machine as that gcloud session.
+    GCP_PROJECT: ${GCP_PROJECT}
+    BQ_LOCATION: ${BQ_LOCATION:-asia-southeast1}
+    BQ_DATASET_RAW: ${BQ_DATASET_RAW:-raw}
+    BQ_DATASET_DEFAULT: ${BQ_DATASET_DEFAULT:-scratch}
+    GCS_LANDING_BUCKET: ${GCS_LANDING_BUCKET}
+    GCS_LANDING_PREFIX: ${GCS_LANDING_PREFIX:-guardian}
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/.gcp/adc.json
+    API_KEY: ${API_KEY}
+    API_URL: ${API_URL:-https://content.guardianapis.com}
+
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
@@ -268,6 +284,11 @@ x-airflow-common: &airflow-common
     - .:/opt/airflow/project
     - D:/FoundryAIAcademy/fa-c002-hub/fa-dae2-capstone-Dinh-Ngoc-Lam/capstone_dbt_project:/opt/airflow/capstone_dbt_project
     - D:/FoundryAIAcademy/fa-c002-hub/fa-dae2-capstone-Dinh-Ngoc-Lam/.dbt:/opt/airflow/.dbt
+    # Mounted read-only; machine-specific path (this dev's gcloud ADC token), same
+    # convention as the hardcoded D:/... mounts above. Re-run
+    # `gcloud auth application-default login` on the host if this ever expires/is
+    # revoked - the container picks up whatever's at this path on each task run.
+    - C:/Users/DELL/AppData/Roaming/gcloud/application_default_credentials.json:/opt/airflow/.gcp/adc.json:ro
   user: "${AIRFLOW_UID:-50000}:0"
   networks:
     - kafka_network

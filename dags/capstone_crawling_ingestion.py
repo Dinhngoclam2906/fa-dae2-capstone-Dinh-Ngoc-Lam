@@ -86,10 +86,16 @@ def guardian_ingestion():
 
     @task.bash(env=get_ingestion_env_vars(), append_env=True)
     def load_to_bigquery():
-        """Upload any newly-crawled Parquet to GCS and MERGE into raw.raw_data."""
+        """Upload any newly-crawled Parquet to GCS and MERGE into raw.raw_data.
+
+        --max-bytes-billed grows with the table (the MERGE scans bytes regardless of
+        how few rows actually change - same lesson learned three times already this
+        session running the equivalent command by hand). 6 GB gives headroom past the
+        ~3.83 GB this needed when raw.raw_data was at 412k rows; revisit upward as the
+        table keeps growing."""
         return """
         cd /opt/airflow/project
-        python scripts/batch_data/load_raw_to_bigquery.py --source api --max-bytes-billed 2000000000
+        python scripts/batch_data/load_raw_to_bigquery.py --source api --max-bytes-billed 6000000000
         """
 
     trigger_dbt = TriggerDagRunOperator(
