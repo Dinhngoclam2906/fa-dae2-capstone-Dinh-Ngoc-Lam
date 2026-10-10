@@ -2,12 +2,12 @@ version: 2
 
 sources:
   - name: raw
-    description: Raw ingested data from Guardian historical Parquet loads
-    schema: sc_t26
-    database: DB_T26
+    description: Raw ingested articles - Guardian (HF archive + Content API) and Vietnamese news (Tuổi Trẻ / Thanh Niên / VnEconomy)
+    database: "{{ env_var('GCP_PROJECT', 'project-f5433681-7b47-481f-9c7') }}"
+    schema: "{{ env_var('BQ_DATASET_RAW', 'raw') }}"
     tables:
       - name: raw_data
-        description: Raw articles data table loaded from Parquet files
+        description: Raw articles table, loaded via load_raw_to_bigquery.py (--source hf/api/vn)
         columns:
           - name: crawl_timestamp
             description: Timestamp when the article was crawled
@@ -31,17 +31,31 @@ sources:
             tests:
               - not_null
           - name: section_name
-            description: Section or category of the article (e.g., 'World', 'Sports')
+            description: Section or category of the article (e.g., 'World', 'Sports'; Vietnamese sections are source-language strings)
           - name: data_source
             description: >
               Data source classification:
-              - 'batch': Historical data from HuggingFace dataset (Stefan171/TheGuardian-Articles, last updated 2024-05-11)
-              - 'realtime': Live data from Guardian API (articles published after 2024-05-11)
+              - 'batch': Historical data (Guardian HF archive, or VN articles older than
+                7 days at crawl time)
+              - 'realtime': Live/recent data (Guardian Content API, or VN articles crawled
+                within 7 days of publication)
             tests:
               - not_null
               - accepted_values:
                   values: ['batch', 'realtime']
+          - name: source_name
+            description: "Origin site: 'guardian', 'tuoitre', 'thanhnien', or 'vneconomy'"
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy']
+          - name: language
+            description: "Article language: 'en' or 'vi'"
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['en', 'vi']
           - name: loaded_at
-            description: Timestamp when the row was loaded into Snowflake
+            description: Timestamp when the row was loaded into BigQuery
             tests:
               - not_null

@@ -1,31 +1,26 @@
 capstone_dbt_project:
   target: dev  # Default for local
   outputs:
-    dev:  
-      type: snowflake
-      account: "{{ env_var('SNOWFLAKE_ACCOUNT', 'GEZJPYC-FOUNDRY_AI_ACADEMY') }}"
-      user: "{{ env_var('SNOWFLAKE_USER', 'T26') }}"
-      role: "{{ env_var('SNOWFLAKE_ROLE', 'RL_T26') }}"
-      database: "{{ env_var('SNOWFLAKE_DATABASE', 'DB_T26') }}"
-      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'WH_T26') }}"
-      schema: "{{ env_var('SNOWFLAKE_SCHEMA', 'SC_T26') }}"
+    dev:
+      type: bigquery
+      method: oauth  # Application Default Credentials - no service-account key (org
+                     # policy blocks key creation; see docs/phase0_baseline.md §7)
+      project: "{{ env_var('GCP_PROJECT', 'project-f5433681-7b47-481f-9c7') }}"
+      # Fallback only - every model in models/ sets its own +schema (staging/marts/
+      # monitoring); a future model that forgets to would land here (7-day TTL) rather
+      # than silently polluting a permanent dataset.
+      dataset: "{{ env_var('BQ_DATASET_DEFAULT', 'scratch') }}"
+      location: "{{ env_var('BQ_LOCATION', 'asia-southeast1') }}"
       threads: 4
-      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PATH', 'D:\\FoundryAIAcademy\\fa-c002-hub\\fa-dae2-capstone-Dinh-Ngoc-Lam\\rsa_key.p8') }}"  # Escaped backslashes for YAML
-      private_key_passphrase: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_PWD', '') }}"
-      query_tag: dbt_capstone
-      connect_timeout: 60
-      client_session_keep_alive: true
-      timezone: 'Asia/Ho_Chi_Minh'
+      priority: interactive
+      maximum_bytes_billed: 10000000000  # 10 GB hard stop per query
 
-    ci: 
-      type: snowflake
-      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
-      user: "{{ env_var('SNOWFLAKE_USER') }}"
-      private_key_path: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_FILE') }}" 
-      private_key_passphrase: "{{ env_var('SNOWFLAKE_PRIVATE_KEY_FILE_PWD') }}"
-      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
-      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
-      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
-      schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
-      threads: 1 
-      client_session_keep_alive: True
+    ci:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT') }}"
+      dataset: "{{ env_var('BQ_DATASET_DEFAULT', 'scratch') }}"
+      location: "{{ env_var('BQ_LOCATION', 'asia-southeast1') }}"
+      threads: 1
+      priority: interactive
+      maximum_bytes_billed: 10000000000

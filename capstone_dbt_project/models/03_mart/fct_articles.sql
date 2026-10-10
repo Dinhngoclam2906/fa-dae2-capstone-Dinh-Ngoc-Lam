@@ -2,6 +2,7 @@
     materialized='incremental',
     incremental_strategy='merge',
     unique_key='article_event_hk',
+    partition_by={'field': 'web_publication_date', 'data_type': 'timestamp', 'granularity': 'month'},
     cluster_by=['date_id', 'section_key', 'data_source']
 ) }}
 
@@ -15,15 +16,15 @@ WITH article_events AS (
     body_text,
     data_source,
     {{ generate_news_hash(['article_id', 'crawl_timestamp', 'section_name']) }} AS article_event_hk,
-    MD5(CONCAT(
+    TO_HEX(MD5(CONCAT(
       COALESCE(article_id, ''),
       '|',
       COALESCE(web_title, ''),
       '|',
       COALESCE(section_name, ''),
       '|',
-      MD5(COALESCE(body_text, ''))
-    )) AS attribute_hash
+      TO_HEX(MD5(COALESCE(body_text, '')))
+    ))) AS attribute_hash
   FROM {{ ref('stg_sf__guardian') }}
   WHERE
     web_publication_date >= '{{ var("start_date", "2001-01-01") }}'

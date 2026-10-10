@@ -17,10 +17,10 @@ WITH normalized_sections AS (
   GROUP BY 1
 )
 
+-- No trailing ORDER BY: BigQuery rejects it combined with cluster_by (see dim_date.sql).
 SELECT
   section_key,
   section_name,
   {{ section_group_macro('section_name') }} AS section_group,
   CURRENT_TIMESTAMP() AS dbt_updated_at
 FROM normalized_sections
-ORDER BY section_name

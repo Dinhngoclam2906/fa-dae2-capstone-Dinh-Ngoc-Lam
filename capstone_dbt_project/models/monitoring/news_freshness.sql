@@ -1,33 +1,33 @@
 -- Monitoring model for news freshness and data quality (run with: dbt run --select tag:monitoring)
 {{ config(
-    materialized='table', 
+    materialized='table',
     tags=['monitoring']
 ) }}
 
 WITH latest_runs AS (
   SELECT
     MAX(web_publication_date) AS latest_pub_date,
-    COALESCE(MAX(DBT_UPDATED_AT), CURRENT_TIMESTAMP()) AS last_dbt_run,  -- Uppercase + COALESCE fallback if missing
+    COALESCE(MAX(dbt_updated_at), CURRENT_TIMESTAMP()) AS last_dbt_run,  -- COALESCE fallback if missing
     COUNT(DISTINCT article_id) AS recent_articles,
     CURRENT_TIMESTAMP() AS check_timestamp,
-    -- New: Track row drops for quality gating
+    -- Track row drops for quality gating
     (SELECT COUNT(*) FROM {{ ref('stg_sf__guardian') }}) AS staging_total,
     COUNT(DISTINCT article_id) AS fact_total  -- Reuse recent_articles as proxy; adjust if needed for full count
   FROM {{ ref('fct_articles') }}
-  WHERE web_publication_date >= DATEADD('day', -7, CURRENT_DATE())  -- Last week
+  WHERE web_publication_date >= TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY))  -- Last week
 )
 
 SELECT
   latest_pub_date,
   last_dbt_run,
-  DATEDIFF('hour', latest_pub_date, check_timestamp) AS freshness_hours,
+  TIMESTAMP_DIFF(check_timestamp, latest_pub_date, HOUR) AS freshness_hours,
   recent_articles,
   CASE
-    WHEN DATEDIFF('hour', latest_pub_date, check_timestamp) <= 24 THEN 'Fresh'
-    WHEN DATEDIFF('hour', latest_pub_date, check_timestamp) <= 72 THEN 'Moderate'
+    WHEN TIMESTAMP_DIFF(check_timestamp, latest_pub_date, HOUR) <= 24 THEN 'Fresh'
+    WHEN TIMESTAMP_DIFF(check_timestamp, latest_pub_date, HOUR) <= 72 THEN 'Moderate'
     ELSE 'Stale - Alert!'
   END AS freshness_status,
-  -- New: Data quality metrics
+  -- Data quality metrics
   staging_total,
   fact_total,
   staging_total - fact_total AS row_drop_count,

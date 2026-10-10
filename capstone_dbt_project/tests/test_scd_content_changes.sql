@@ -1,5 +1,5 @@
 -- Advanced test: Validate SCD model loads without null changes (passes if no bad rows; demo-ready)
-{% if adapter.type() == 'snowflake' %}
+{% if adapter.type() == 'bigquery' %}
     SELECT 1 AS validation_check
     FROM {{ ref('dim_articles') }}
     WHERE change_type IS NULL AND 1 = 0  -- Impossible: No rows = pass (nulls exist? Fix data)

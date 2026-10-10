@@ -17,6 +17,9 @@ models:
       schema: marts
       +cluster_by: ["loaded_at"]
       +enabled: true
+    monitoring:
+      materialized: table
+      schema: monitoring
 
 # Variables for environment-specific values
 vars:

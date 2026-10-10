@@ -3,18 +3,21 @@ name = "fa-dae2-capstone-dinh-ngoc-lam"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "aiohttp>=3.13.1",
+    "beautifulsoup4>=4.15.0",
     "choco>=1.0.5",
     "confluent-kafka>=2.13.0",
+    "dbt-bigquery>=1.10.0",
     "dbt-core>=1.10.13",
-    "dbt-snowflake>=1.10.2",
     "docx>=0.2.4",
     "en-core-web-sm",
     "faker>=37.6.0",
     "flashrank>=0.2.10",
     "git-filter-repo>=2.47.0",
+    "google-cloud-bigquery>=3.45.0",
+    "google-cloud-storage>=2.4,<3.2",  # dbt-bigquery (all current versions) caps this at <3.2
     "huggingface-hub[hf-xet]>=0.35.3",
     "ijson>=3.4.0",
     "joblib>=1.5.2",
@@ -59,20 +62,20 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "dbt-snowflake>=1.10.0",
+    "dbt-bigquery>=1.10.0",
     "pre-commit>=4.2.0",
     "pytest>=8.4.2",
     "sqlfluff>=3.4.2",
     "sqlfluff-templater-dbt>=3.4.2",
 ]
 pr-ci = [
-    "dbt-snowflake>=1.10.0",
+    "dbt-bigquery>=1.10.0",
     "sqlfluff>=3.4.2",
     "sqlfluff-templater-dbt>=3.4.2",
 ]
 airflow = [
     "dbt-core>=1.8.0",
-    "dbt-snowflake>=1.8.0",
+    "dbt-bigquery>=1.8.0",
     "dbt-postgres>=1.8.0",
     "snowflake-connector-python[pandas,secure-local-storage]>=3.17.0",
     "psycopg[binary]>=3.2",

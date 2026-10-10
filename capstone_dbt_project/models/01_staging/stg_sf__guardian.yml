@@ -69,5 +69,5 @@ models:
               severity: warn
           - dbt_utils.expression_is_true:
               arguments:
-                expression: "{{ column_name }} > CURRENT_TIMESTAMP() - INTERVAL '24 hours'"
+                expression: "{{ column_name }} > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)"
               severity: warn

@@ -1,6 +1,7 @@
 {{ config(
     materialized='incremental',
     unique_key=['article_id', 'valid_from'],
+    partition_by={'field': 'valid_from', 'data_type': 'timestamp', 'granularity': 'month'},
     cluster_by=['article_id', 'valid_from', 'data_source']
 ) }}
 
@@ -12,17 +13,17 @@ WITH base_articles AS (
     section_name,
     crawl_timestamp,
     data_source,
-    MD5(CONCAT(
+    TO_HEX(MD5(CONCAT(
       COALESCE(web_title, ''), '|', COALESCE(web_url, ''), '|',
-      COALESCE(section_name, ''), '|', MD5(COALESCE(body_text, ''))
-    )) AS content_change_hash,
+      COALESCE(section_name, ''), '|', TO_HEX(MD5(COALESCE(body_text, '')))
+    ))) AS content_change_hash,
     body_text
   FROM {{ ref('stg_sf__guardian') }}
   WHERE
     article_id IS NOT NULL
     AND has_valid_content = TRUE
   {% if is_incremental() %}
-    AND crawl_timestamp > (SELECT MAX(valid_from) FROM {{ this }}) - INTERVAL '7 days'  -- Incremental: Recent crawls only
+    AND crawl_timestamp > TIMESTAMP_SUB((SELECT MAX(valid_from) FROM {{ this }}), INTERVAL 7 DAY)  -- Incremental: Recent crawls only
   {% endif %}
 ),
 
@@ -39,17 +40,20 @@ change_detection_raw AS (
     LEFT JOIN {{ this }} e ON b.article_id = e.article_id AND e.is_current = TRUE
   {% else %}
     CROSS JOIN (
-      SELECT 
-        NULL::STRING AS content_change_hash,
-        NULL::TIMESTAMP_NTZ AS valid_from,
-        NULL::STRING AS web_title,
-        NULL::STRING AS web_url,
-        NULL::STRING AS data_source
+      SELECT
+        CAST(NULL AS STRING) AS content_change_hash,
+        CAST(NULL AS TIMESTAMP) AS valid_from,
+        CAST(NULL AS STRING) AS web_title,
+        CAST(NULL AS STRING) AS web_url,
+        CAST(NULL AS STRING) AS data_source
     ) e
   {% endif %}
 ),
 
-change_detection AS (
+-- Split into two CTEs: Snowflake tolerates referencing a same-SELECT alias in WHERE,
+-- BigQuery's stricter standard SQL does not ("Unrecognized name: change_type") - the
+-- alias must become a real column (via an outer CTE) before it can be filtered on.
+change_detection_typed AS (
   SELECT
     *,
     CASE
@@ -58,6 +62,10 @@ change_detection AS (
       ELSE 'unchanged'
     END AS change_type
   FROM change_detection_raw
+),
+
+change_detection AS (
+  SELECT * FROM change_detection_typed
   WHERE change_type != 'unchanged'
 ),
 
@@ -93,7 +101,7 @@ new_versions AS (
       WHEN cd.change_type = 'content_changed' THEN CURRENT_TIMESTAMP()
       ELSE COALESCE(cd.crawl_timestamp, CURRENT_TIMESTAMP())
     END AS valid_from,
-    '9999-12-31'::TIMESTAMP_NTZ AS valid_to,
+    TIMESTAMP('9999-12-31') AS valid_to,
     TRUE AS is_current,
     cd.content_change_hash,
     cd.change_type,
