@@ -394,8 +394,14 @@ def main() -> int:
         source_uris = gcs_uri
     else:
         if not local_dir.is_dir():
-            logger.error("Local dir not found: %s", local_dir)
-            return 1
+            # Not an error: the crawler only creates this directory when it actually
+            # has new rows to write. On an ephemeral filesystem (e.g. a Cloud Run Job,
+            # which starts from a clean container every invocation) a fully-caught-up
+            # run legitimately produces zero output and the directory never gets
+            # created at all - this is the normal "nothing new" case, same as the
+            # empty-pending-set check below, not a misconfiguration.
+            logger.info("Local dir not found (nothing new crawled this run): %s", local_dir)
+            return 0
         gcs_uri, new_blobs = upload_tree(cfg, local_dir, args.source)
         if args.truncate:
             # Target is about to be emptied - the full history must come back, not

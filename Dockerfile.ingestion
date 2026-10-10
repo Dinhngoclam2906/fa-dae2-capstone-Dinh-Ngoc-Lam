@@ -1,0 +1,14 @@
+# Dockerfile.ingestion - guardian-ingestion Cloud Run Job image.
+# Minimal: just the Guardian crawl + BigQuery load scripts, not the full project.
+FROM python:3.13-slim
+
+WORKDIR /app
+
+COPY scripts/batch_data/requirements-ingestion.txt ./
+RUN pip install --no-cache-dir -r requirements-ingestion.txt
+
+COPY scripts/batch_data/guardian_api_backfill.py scripts/batch_data/load_raw_to_bigquery.py scripts/batch_data/sync_job_state.py ./scripts/batch_data/
+COPY scripts/batch_data/run_ingestion_job.sh ./scripts/batch_data/
+RUN chmod +x scripts/batch_data/run_ingestion_job.sh
+
+CMD ["sh", "scripts/batch_data/run_ingestion_job.sh"]

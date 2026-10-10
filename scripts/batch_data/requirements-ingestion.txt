@@ -1,0 +1,8 @@
+# Minimal deps for the guardian-ingestion Cloud Run Job - just what
+# guardian_api_backfill.py, load_raw_to_bigquery.py, and sync_job_state.py import.
+# Deliberately not the full project pyproject.toml - keeps the image small.
+polars==1.37.0
+requests==2.32.5
+python-dotenv==1.1.1
+google-cloud-bigquery==3.45.0
+google-cloud-storage>=2.4,<3.2
