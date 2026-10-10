@@ -35,7 +35,7 @@ A multi-source, bilingual ingestion architecture:
 - **Guardian (English)** - HuggingFace historical archive (~87k articles) + Guardian Content API backfill/catch-up crawler, 1964 → present.
 - **Vietnamese news** - Tuổi Trẻ, Thanh Niên, and VnEconomy, crawled via a sitemap-driven resumable backfill script (`scripts/batch_data/vn_news_backfill.py`).
 - **Incremental Loading** - Per-source cursor + dedupe sidecar to avoid re-crawling/re-processing.
-- **Automated Orchestration** - Airflow DAGs for scheduled batch loads + dbt builds.
+- **Automated Orchestration** - Guardian ingestion runs unattended every 4 hours via **Cloud Scheduler + Cloud Run Jobs** (serverless, scale-to-zero); Airflow DAGs handle the dbt build step and remain available for local/manual runs.
 
 All sources land in one BigQuery table (`raw.raw_data`), tagged by `source_name` (`guardian`/`tuoitre`/`thanhnien`/`vneconomy`) and `language` (`en`/`vi`).
 
@@ -74,6 +74,12 @@ Key Features:
 
 **5.1.2.3. BigQuery loader** (`scripts/batch_data/load_raw_to_bigquery.py`):
 - Parquet → GCS landing bucket → BigQuery staging table → `MERGE` into `raw.raw_data` (idempotent, dedupes on `article_id`). One command, `--source hf|api|vn`, handles all sources.
+- Only stages/merges files pending since the last successful merge (tracked in a persistent `.pending_merge.<source>.json`), not the source's entire accumulated history - keeps `MERGE` cost proportional to what's new (~70x reduction measured vs. the naive full-wildcard approach).
+
+**5.1.2.4. Automated recurring ingestion** (`Dockerfile.ingestion`, `scripts/batch_data/run_ingestion_job.sh`, `sync_job_state.py`):
+- A minimal Cloud Run Job (just the Guardian crawler + BigQuery loader, not the full project image) runs on a **Cloud Scheduler** cron (`0 */4 * * *`), authenticated via OAuth as the `dbt-runner` service account calling the Cloud Run Jobs Admin API directly - no persistent VM or Airflow scheduler process required.
+- Cloud Run Jobs start from a clean container every invocation (no local disk persists between runs), so `sync_job_state.py` round-trips the crawler's cursor file and the loader's pending-merge state through a GCS prefix (pull before the run, push after - always, even on a partial failure, so an advanced cursor is never lost).
+- Verified end-to-end: a forced trigger produces a real Cloud Run execution run by the `dbt-runner` service account (confirmed via `gcloud run jobs executions list`), not a manual one.
 
 **5.1.3. dbt Transformation:**
 
@@ -91,7 +97,8 @@ The dbt (data build tool) layer transforms raw multi-source article data into a 
 - **BigQuery:** Scalable, serverless cloud warehouse for analytics (migrated from Snowflake).
 - **dbt:** Industry-standard for data transformations (`dbt-bigquery` adapter).
 - **Kafka:** Real-time streaming primitive for the Guardian API path (currently lands in PostgreSQL only, not yet wired to BigQuery).
-- **Airflow:** Pipeline orchestration.
+- **Cloud Scheduler + Cloud Run Jobs:** Serverless cron for the recurring Guardian ingestion in production (chosen over an always-on VM or Cloud Composer to stay under the $5-10/mo BigQuery/GCP budget cap).
+- **Airflow:** dbt build orchestration, and available for running/debugging the ingestion + dbt steps locally.
 - **LangGraph/Pinecone:** Enables conversational AI with grounded responses.
 - **OpenAI**: LLM + embeddings API.
 - **GitHub Actions:** CI (currently still configured for Snowflake; BigQuery CI auth needs Workload Identity Federation - not yet set up).
@@ -329,7 +336,10 @@ fa-dae2-capstone-Dinh-Ngoc-Lam/
 │   │   ├── hf_archive_to_parquet.py                             # HF archive → Parquet
 │   │   ├── guardian_api_backfill.py                             # Guardian Content API crawler
 │   │   ├── vn_news_backfill.py / run_vn_backfill_all.sh         # Tuổi Trẻ / Thanh Niên / VnEconomy crawler
-│   │   └── load_raw_to_bigquery.py                              # Parquet → GCS → BigQuery raw.raw_data
+│   │   ├── load_raw_to_bigquery.py                              # Parquet → GCS → BigQuery raw.raw_data
+│   │   ├── sync_job_state.py                                    # Cloud Run Job: pull/push cursor + pending-merge state to GCS
+│   │   ├── run_ingestion_job.sh                                 # Cloud Run Job entrypoint (sync state → crawl → load → sync state)
+│   │   └── requirements-ingestion.txt                           # Minimal deps for the ingestion container image
 │   └── real_time_data/
 │       ├── kafka_producer.py / kafka_consumer.py   # Guardian API → Kafka → PostgreSQL
 │       └── migrate_add_data_source.py
@@ -343,6 +353,7 @@ fa-dae2-capstone-Dinh-Ngoc-Lam/
 ├── docker-compose-kafka.yml                        # kafka + kafdrop + airflow metadata pg
 ├── docker-compose-airflow.yml                      # airflow
 ├── Dockerfile.airflow
+├── Dockerfile.ingestion                            # Minimal image for the recurring Cloud Run Job (crawl + load only)
 ├── main.py                                         # Legacy orchestrator script (broken - see CLAUDE.md gotchas)
 ├── pyproject.toml / uv.lock                        # uv-managed deps (dbt-bigquery, polars, langchain, ...)
 ├── requirements.txt                                # Airflow-image dependency subset
@@ -376,6 +387,10 @@ docker compose -f docker-compose-airflow.yml up -d     # airflow
 ```
 
 **5. Run Ingestion:**
+
+> In production, Guardian ingestion runs unattended every 4 hours via Cloud Scheduler +
+> Cloud Run Jobs (see 5.1.2.4 above) - the commands below are for local development,
+> manual catch-up runs, or debugging.
 
 Guardian (batch + API backfill):
 ```
