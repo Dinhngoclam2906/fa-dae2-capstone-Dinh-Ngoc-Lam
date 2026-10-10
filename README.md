@@ -1,35 +1,43 @@
-# Daily News AI Assistant 
+# Daily News AI Assistant
 
 ## Overview
 Daily News AI Assistant is an intelligent chatbot powered by a **hybrid RAG (Retrieval-Augmented Generation)** architecture that combines:
 
 - **Dense Semantic Search** (Pinecone vector database) - Understanding meaning and context
-- **Lexical SQL Search** (Snowflake keyword matching) - Exact phrase and entity matching
+- **Lexical SQL Search** (warehouse keyword matching) - Exact phrase and entity matching
 - **FlashRank Re-ranking** - Relevance optimization
 - **LangGraph Agent Framework** - Conversational AI with tool calling
 - **Persistent Memory** (PostgreSQL) - Conversation history across sessions
 
+> **Migration note:** the data warehouse moved from Snowflake to **BigQuery** (the
+> Snowflake trial expired). The dbt transformation layer and raw ingestion already run
+> on BigQuery. The AI agent's SQL tool layer (`ai_agents/capstone_tool_calling_agent.py`)
+> is intentionally still frozen on the old Snowflake-based code pending a later
+> migration phase - see `PROGRESS_LOG.md` for the full roadmap and current phase status.
+
 ## Project Structure
 ### **1. Problem & Scope**:
-The rapid pace of news publication requires real-time ingestion and analysis to stay relevant, while historical data provides context for long-term trends. Constraints include API rate limits, data quality issues, and ensuring AI responses are grounded in accurate data.
+The rapid pace of news publication requires frequent ingestion and analysis to stay relevant, while historical data provides context for long-term trends. Constraints include API rate limits, per-IP crawl throttling, data quality issues, warehouse query-cost budgets, and ensuring AI responses are grounded in accurate data.
 
-### **2. Personas/Stakeholders and Primary Use Cases:**  
-- **Journalists:** Query news trends and sentiment for reporting.  
-- **Analysts:** Analyze historical news patterns for research.  
-- **General Users:** Ask natural language questions about news topics.  
-- **Use Cases:** Real-time news monitoring, historical trend analysis, sentiment analysis via AI chatbot.
+### **2. Personas/Stakeholders and Primary Use Cases:**
+- **Journalists:** Query news trends and sentiment for reporting.
+- **Analysts:** Analyze historical news patterns for research.
+- **General Users:** Ask natural language questions about news topics.
+- **Use Cases:** Recent-news monitoring, historical trend analysis, sentiment analysis via AI chatbot.
 
-### **3. In/Out of Scope:**  
-- **In Scope**: Real-time news ingestion, batch processing of historical news, AI-driven insights, data quality validation.  
-- **Out of Scope**: Real-time social media integration, multi-language support, advanced ML model training.
+### **3. In/Out of Scope:**
+- **In Scope**: Frequent (near-real-time) news ingestion, batch processing of historical news, multi-source/bilingual data (English + Vietnamese), AI-driven insights, data quality validation.
+- **Out of Scope**: True sub-minute streaming, social media integration, advanced ML model training.
 
 ### 4. Data Sources:
-The Guardian News Analytics system uses a hybrid data ingestion architecture combining:
+A multi-source, bilingual ingestion architecture:
 
-- Batch Processing - Historical archives from HuggingFace (500 articles)
-- Real-time Streaming - Live Guardian API via Kafka (continuous updates)
-- Incremental Loading - Smart sync to avoid duplicate processing
-- Automated Orchestration - Airflow DAGs for reliable scheduling
+- **Guardian (English)** - HuggingFace historical archive (~87k articles) + Guardian Content API backfill/catch-up crawler, 1964 → present.
+- **Vietnamese news** - Tuổi Trẻ, Thanh Niên, and VnEconomy, crawled via a sitemap-driven resumable backfill script (`scripts/batch_data/vn_news_backfill.py`).
+- **Incremental Loading** - Per-source cursor + dedupe sidecar to avoid re-crawling/re-processing.
+- **Automated Orchestration** - Airflow DAGs for scheduled batch loads + dbt builds.
+
+All sources land in one BigQuery table (`raw.raw_data`), tagged by `source_name` (`guardian`/`tuoitre`/`thanhnien`/`vneconomy`) and `language` (`en`/`vi`).
 
 ### 5. Architecture Overview:
 
@@ -37,71 +45,56 @@ The Guardian News Analytics system uses a hybrid data ingestion architecture com
 
 <img src="images/data_architecture.png" width="100%" alt="Data Architecture">
 
+> Note: the diagram above predates the BigQuery migration and still shows Snowflake -
+> refresh it to match the pipeline described below when there's time.
+
 #### **5.1. Data Pipeline:**
 
-**5.1.1. Real-time Streaming Pipeline:**
+**5.1.1. Real-time / frequent-poll Pipeline:**
 
-**5.1.1.1. Kafka Producer:**
-Purpose: Continuously poll Guardian API and stream new articles to Kafka.
+**5.1.1.1. Kafka Producer/Consumer** (`scripts/real_time_data/`):
+Purpose: poll the Guardian API and stream new articles through Kafka to PostgreSQL staging.
 Key Features:
 - State Tracking: PostgreSQL table tracks processed articles (avoid duplicates)
 - Incremental Polling: Only fetches articles not yet seen
-- Smart Deduplication: Checks article_id against state before sending
 - Rate Limiting: Handles Guardian API limits (sleeps on 429 errors)
-- Continuous Mode: Runs indefinitely with configurable poll interval
-
-**5.1.1.2. Kafka Consumer:**
-
-Purpose: Consume articles from Kafka, validate, and sync to PostgreSQL → Snowflake.
-Key Features:
-- Batch Processing: Groups messages (50/batch) before Snowflake sync
-- UPSERT Logic: Handles duplicates gracefully (ON CONFLICT DO UPDATE)
-- Incremental Sync: Only uploads NEW rows to Snowflake (tracks loaded_at)
-- Data Source Tagging: Automatically labels batch vs realtime based on date
-- Connection Pooling: Reuses Snowflake connection (avoids overhead)
 - Idempotent: Safe to re-run (won't create duplicates)
 
-**5.1.2. Batch Data Processing Pipeline:**
+> This path currently lands data in local PostgreSQL only - it has not yet been pointed
+> at BigQuery (see `PROGRESS_LOG.md`, Phase 2). The DAG's real-time tasks are disabled;
+> the actively-running ingestion today is the batch/backfill crawlers below.
 
-**5.1.2.1. Batch Data Collector:**
+**5.1.2. Batch & Backfill Data Processing:**
 
-Purpose: Download and preprocess historical Guardian articles from HuggingFace.
-Key Features:
-- Smart Caching: Only downloads if local data missing (idempotent)
-- Quality Filtering: Only Data Quality == "Full" articles
-- Schema Alignment: Transforms HuggingFace schema → Snowflake schema
-- Sampling: Random sample of 500 articles (configurable)
-- Streaming Processing: Uses Polars lazy evaluation for memory efficiency
+**5.1.2.1. Guardian - HF archive + API backfill** (`scripts/batch_data/hf_archive_to_parquet.py`, `guardian_api_backfill.py`):
+- Downloads/cleans the HuggingFace historical archive and crawls the Guardian Content API for everything since, with a resumable cursor, lock file, and daily-quota handling.
 
-**5.1.2.2. Batch Data Ingestion:**
+**5.1.2.2. Vietnamese news crawler** (`scripts/batch_data/vn_news_backfill.py`, `run_vn_backfill_all.sh`):
+- Sitemap-driven crawler for Tuổi Trẻ / Thanh Niên / VnEconomy. Per-source resumable state, incremental Parquet flushing (every 100 articles, not just at month-end), concurrency tuned for stability over raw speed.
 
-Purpose: Upload preprocessed batch data to Snowflake using MERGE (safe upsert).
-Key Features:
-- Safe MERGE: Preserves existing data (updates data_source, never overwrites content)
-- Idempotent: Can run multiple times safely
-- Parquet Staging: Uses Snowflake internal stage for fast upload
-- Data Source Tagging: Automatically sets data_source = 'batch'
+**5.1.2.3. BigQuery loader** (`scripts/batch_data/load_raw_to_bigquery.py`):
+- Parquet → GCS landing bucket → BigQuery staging table → `MERGE` into `raw.raw_data` (idempotent, dedupes on `article_id`). One command, `--source hf|api|vn`, handles all sources.
 
 **5.1.3. dbt Transformation:**
 
-The dbt (data build tool) layer transforms raw Guardian article data into a **star schema** optimized for analytics and RAG retrieval. The pipeline implements:
-- **Data Quality Validation** - Staging layer with comprehensive quality checks
+The dbt (data build tool) layer transforms raw multi-source article data into a **star schema** optimized for analytics and RAG retrieval, running on **BigQuery**:
+- **Data Quality Validation** - Staging layer with comprehensive quality checks (source-aware: Guardian's fixed batch/realtime cutoff date vs. the VN crawler's crawl-relative rule)
 - **SCD Type 2** - Tracks article version history (title/content changes)
-- **Incremental Loading** - Efficient processing of only new/changed data
+- **Incremental Loading** - Efficient processing of only new/changed data, partitioned by month
 - **Star Schema** - Dimensions + Facts for fast analytical queries
-- **Automated Testing** - 30+ data quality tests
+- **Automated Testing** - 40+ data quality tests
 
 #### **5.2. Tech Stacks:**
 
-- **Python:** Flexible for data ingestion and processing (requests, polars).  
-- **PostgreSQL:** Local staging for rapid development and testing.  
-- **Snowflake:** Scalable cloud warehouse for analytics.  
-- **dbt:** Industry-standard for data transformations.  
-- **Kafka:** Robust for real-time streaming.  
-- **Airflow:** Reliable pipeline orchestration.  
-- **LangGraph/PineCone:** Enables conversational AI with grounded responses.  
-- **OpenAI**: Open-source LLM API
-- **GitHub Actions:** Simplifies CI/CD for deployment.  
+- **Python:** Flexible for data ingestion and processing (requests, polars, BeautifulSoup).
+- **PostgreSQL:** Local staging for rapid development, and the agent's conversation-memory checkpointer.
+- **BigQuery:** Scalable, serverless cloud warehouse for analytics (migrated from Snowflake).
+- **dbt:** Industry-standard for data transformations (`dbt-bigquery` adapter).
+- **Kafka:** Real-time streaming primitive for the Guardian API path (currently lands in PostgreSQL only, not yet wired to BigQuery).
+- **Airflow:** Pipeline orchestration.
+- **LangGraph/Pinecone:** Enables conversational AI with grounded responses.
+- **OpenAI**: LLM + embeddings API.
+- **GitHub Actions:** CI (currently still configured for Snowflake; BigQuery CI auth needs Workload Identity Federation - not yet set up).
 
 #### **ERD:**
 
@@ -109,32 +102,40 @@ The dbt (data build tool) layer transforms raw Guardian article data into a **st
 
 ```dbml
 Table raw_data {
-  crawl_timestamp timestamp [pk]
   article_id string [pk, unique]
+  crawl_timestamp timestamp
   web_publication_date timestamp
   web_title string
   body_text text
   web_url string
   section_name string
+  data_source string  // 'batch' | 'realtime'
+  source_name string  // 'guardian' | 'tuoitre' | 'thanhnien' | 'vneconomy'
+  language string      // 'en' | 'vi'
   loaded_at timestamp
-  Note: 'Raw Guardian articles from Parquet ingestion'
+  Note: 'Raw multi-source articles, loaded via load_raw_to_bigquery.py'
 }
 
 Table stg_sf__guardian {
-  crawl_timestamp timestamp [pk]
   article_id string [pk]
+  crawl_timestamp timestamp [pk]
   web_publication_date timestamp
   web_title string
   body_text text
   web_url string
   section_name string
+  data_source string
+  source_name string
+  language string
   loaded_at timestamp
   has_valid_title boolean
   has_valid_url boolean
   has_valid_content boolean
   has_valid_section boolean
+  has_consistent_data_source boolean
   processed_at timestamp
-  Note: 'Staging: Cleaned raw with quality flags'
+  processing_source string
+  Note: 'Staging: Cleaned raw with quality flags (source-aware consistency check)'
 }
 
 Table dim_date {
@@ -143,13 +144,13 @@ Table dim_date {
   month integer
   day integer
   day_of_week integer
-  quarter string
+  quarter integer
   fiscal_quarter string
   is_weekend boolean
   is_holiday boolean
   holiday_name string
   dbt_updated_at timestamp
-  Note: 'Date dimension with UK holidays (Guardian-focused)'
+  Note: 'Date dimension with UK holidays (Guardian-focused); 100k-day spine via GENERATE_DATE_ARRAY'
 }
 
 Table dim_sections {
@@ -157,15 +158,16 @@ Table dim_sections {
   section_name string
   section_group string
   dbt_updated_at timestamp
-  Note: 'Section dimension with bucketing macro'
+  Note: 'Section dimension with bucketing macro (English-keyword grouping; VN sections mostly bucket to Other today)'
 }
 
 Table dim_articles {
-  article_id string [pk]  // Composite PK with valid_from
+  article_id string [pk]
+  valid_from timestamp [pk]
   web_title string
   web_url string
   section_key string
-  valid_from timestamp [pk]  // Composite PK with article_id
+  data_source string
   valid_to timestamp
   is_current boolean
   version_surrogate_key string
@@ -173,7 +175,7 @@ Table dim_articles {
   change_type string
   crawl_timestamp timestamp
   dbt_updated_at timestamp
-  Note: 'SCD Type 2: Versions on title/URL/section/body changes (PK: [article_id, valid_from])'
+  Note: 'SCD Type 2: Versions on title/URL/section/body changes, partitioned by valid_from (month)'
 }
 
 Table fct_articles {
@@ -181,31 +183,34 @@ Table fct_articles {
   article_id string
   crawl_timestamp timestamp
   web_publication_date timestamp
+  attribute_hash string
   web_title string
   body_text text
+  data_source string
   date_id date
   section_key string
   is_current boolean
-  body_length_chars integer
   valid_content integer
-  title_to_body_ratio float
   web_url string
   loaded_at timestamp
   dbt_updated_at timestamp
-  Note: 'Fact: Article events with metrics (granular per crawl)'
+  Note: 'Fact: Article events (granular per crawl), partitioned by web_publication_date (month)'
 }
 
 // Relationships (star schema)
-Ref: stg_sf__guardian.article_id > dim_articles.article_id  // Staging feeds SCD dim
-Ref: stg_sf__guardian.section_name > dim_sections.section_key  // Normalized sections
-Ref: fct_articles.date_id > dim_date.date_id  // Fact to date dim
-Ref: fct_articles.section_key > dim_sections.section_key  // Fact to section dim
-Ref: fct_articles.article_id > dim_articles.article_id  // Fact to article dim (current only)
-Ref: dim_articles.section_key > dim_sections.section_key  // Article dim to section
-Ref: "dim_date"."date_id" < "dim_date"."day"
+Ref: stg_sf__guardian.article_id > dim_articles.article_id
+Ref: stg_sf__guardian.section_name > dim_sections.section_key
+Ref: fct_articles.date_id > dim_date.date_id
+Ref: fct_articles.section_key > dim_sections.section_key
+Ref: fct_articles.article_id > dim_articles.article_id
+Ref: dim_articles.section_key > dim_sections.section_key
 ```
 
 #### **5.3. AI Agent Architecture**
+
+> As noted above, the agent's SQL tool currently still targets the old Snowflake-based
+> layer (frozen, not yet repointed at BigQuery) - the box below reflects the live code,
+> not the current data platform.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -228,10 +233,9 @@ Ref: "dim_date"."date_id" < "dim_date"."day"
      │   (Pinecone)         │  │    (Snowflake)       │
      │                      │  │                      │
      │ • Semantic matching  │  │ • Keyword extraction │
-     │ • 71,616+ vectors    │  │ • Multi-keyword OR   │
-     │ • 2 namespaces:      │  │ • Optimized view     │
-     │   - guardian_articles│  │ • Full-text search   │
-     │   - user_documents   │  │                      │
+     │ • 2 namespaces:      │  │ • Multi-keyword OR   │
+     │   - guardian_articles│  │ • Optimized view     │
+     │   - user_documents   │  │ • Full-text search   │
      │ • K=10 results       │  │ • Limit=10 results   │
      └──────────┬───────────┘  └──────────┬───────────┘
                 │                         │
@@ -290,134 +294,125 @@ Ref: "dim_date"."date_id" < "dim_date"."day"
 
 ---
 
-**Project Structure:**
+**Project Structure** (abridged - omits `__pycache__`, `.venv`, `target`, `dbt_packages`, `logs`):
 ```
-capstone/
-├── .dbt
-|   ├── .user.yml
-|   ├── profiles.yml
-├── .github/workflows
-|   ├── pr_ci.yml
-├── ai_agents/
-|   ├──__init__.py
-|   ├──__pycache__/
-|   │   ├── __init__.cpython-313.pyc
-|   │   ├── app.cpython-313.pyc
-|   │   ├── baseline_systems.cpython-313.pyc
-|   │   ├── capstone_tool_calling_agent.cpython-313.pyc
-|   │   ├── cli_interface.cpython-313.pyc
-|   │   ├── document_upload_ingestion.cpython-313.pyc
-|   │   ├── persistent_agent.cpython-313.pyc
-|   │   └── streamlit_app.cpython-313.pyc
-|   │
-|   ├── services/
-|   │   ├── __init__.py
-|   │   ├── __pycache__/
-|   │   │   ├── __init__.cpython-313.pyc
-|   │   │   ├── chunking_strategies.cpython-313.pyc
-|   │   │   ├── document_processor.cpython-313.pyc
-|   │   │   └── text_extractors.cpython-313.pyc
-|   │   ├── chunking_strategies.py
-|   │   ├── document_processor.py
-|   │   └── text_extractors.py
-|   │
-|   ├── app.py
-|   ├── baseline_systems.py
-|   ├── capstone_tool_calling_agent.py
-|   ├── cli_interface.py
-|   ├── data_ingestion_to_pinecone.py
-|   ├── demo_The_Guardian_article.pdf
-|   ├── diagnostic.py
-|   ├── document_upload_ingestion.py
-|   ├── evaluation.py
-|   ├── evaluation_results.json
-|   ├── evaluation_results.png
-|   ├── ground_truth.json
-|   ├── ground_truth_llm.json
-|   ├── improvement_chart.png
-|   ├── label_ground_truth.py
-|   ├── label_ground_truth_llm.py
-|   ├── metrics_comparison.png
-|   ├── test_document_upload.py
-|   ├── test_queries.json
-|   ├── test_retrieval_uploaded.py
-|   ├── update_tracking_table_manual.py
-|   └── visualize_results.py
-├── capstone_dbt_project/
-|   ├── .dbt
-|   ├── .venv
-|   ├── dbt_packages
-|   ├── logs
-|   ├── macros
-|   ├── models
-|   ├── seeds
-|   ├── snapshot
-|   ├── target
-|   ├── tests
-|   ├── .gitignore/
-|   ├── README.md
-|   ├── expressions.txt
-|   ├── pyproject.toml/
-|   ├── .sqlfluff
-|   ├── .user.yml
-|   ├── .dbt_project.yml
-|   ├── package-lock.yml
-|   ├── packages.yml
-|   ├── profiles.yml
-├── dags/  
-|   ├── capstone_crawling_ingestion                   # Batch data crawling orchestrator
-|   ├── capstone_dbt_orchestration                    # dbt run orchestration
-├── scripts/  
-|   ├── batch_data                                    # Batch Data scripts
-|      ├── real_time_data_collector.py                # Guardian API ingestion
-|      ├── batch_data_collector.py                    # HuggingFace historical news data crawling
-|      ├── batch_data_ingestion.py                    # HuggingFace historical news data ingestion to Snowflake
-|   ├── real_time_data
-|      ├── kafka_consumer.py                          # Kafka Events Consumer 
-|      ├── kafka_producer.py                          # Kafka Events Producer 
-├── sql
-|   ├── init.sql
-├── .env.example 
-├── .gitattributes/                    
-├── .gitignore/                    
-├── .python-version/                          
-├── docker-compose-airflow.yml/    
-├── docker-compose-kafka.yml/ 
-├── docker-compose.yml/ 
-├── Dockerfile.airflow/                      
-├── main.py/                        
-├── pyproject.toml/ 
-├── requirements.txt/ 
-├── setup_airflow_postgres_connection
-├── setup_airflow_snowflake_connection
-├── uv.lock/                       
-└── README.md                     # Documentation
+fa-dae2-capstone-Dinh-Ngoc-Lam/
+├── .dbt/
+│   └── profiles.yml                              # dbt BigQuery profile (root copy)
+├── .github/workflows/
+│   └── pr_ci.yml                                  # PR CI: lint + dbt test (still Snowflake-configured)
+├── ai_agents/                                      # RAG agent (frozen on Snowflake pending migration)
+│   ├── app.py / app_demo.py / cli_agent.py         # Three entrypoints, same pipeline
+│   ├── capstone_tool_calling_agent.py              # Snowflake tool-calling layer
+│   ├── data_ingestion_to_pinecone.py               # Snowflake → Pinecone embedding pipeline
+│   ├── document_upload_ingestion.py + services/    # User-uploaded doc ingestion
+│   ├── evaluation.py / baseline_systems.py         # Retrieval strategy comparison + eval harness
+│   └── label_ground_truth*.py / visualize_results.py
+├── capstone_dbt_project/                           # dbt project (BigQuery)
+│   ├── .dbt/profiles.yml                           # dbt profile actually used by CI / --profiles-dir
+│   ├── macros/                                     # generate_news_hash, section_utils, generate_schema_name
+│   ├── models/
+│   │   ├── 01_staging/                             # stg_sf__guardian, _sources.yml
+│   │   ├── 02_intermediate/                        # int_article_metrics (ephemeral)
+│   │   ├── 03_mart/                                # dim_date, dim_sections, dim_articles, fct_articles, vw_articles_search_optimized
+│   │   └── monitoring/                             # news_freshness
+│   ├── tests/                                      # assert_data_source_consistency, test_scd_content_changes
+│   ├── dbt_project.yml
+│   ├── packages.yml                                # dbt_utils
+│   └── profiles.yml
+├── dags/
+│   ├── capstone_crawling_ingestion.py               # DAG: guardian_ingestion (batch load → trigger dbt)
+│   └── capstone_dbt_orchestration.py                # DAG: capstone_dbt_orchestration (debug → clean → build)
+├── scripts/
+│   ├── batch_data/
+│   │   ├── batch_data_collector.py / batch_data_ingestion.py   # Legacy Snowflake path
+│   │   ├── hf_archive_to_parquet.py                             # HF archive → Parquet
+│   │   ├── guardian_api_backfill.py                             # Guardian Content API crawler
+│   │   ├── vn_news_backfill.py / run_vn_backfill_all.sh         # Tuổi Trẻ / Thanh Niên / VnEconomy crawler
+│   │   └── load_raw_to_bigquery.py                              # Parquet → GCS → BigQuery raw.raw_data
+│   └── real_time_data/
+│       ├── kafka_producer.py / kafka_consumer.py   # Guardian API → Kafka → PostgreSQL
+│       └── migrate_add_data_source.py
+├── sql/init.sql                                    # PostgreSQL staging schema bootstrap
+├── docs/                                           # phase0_baseline, phase1_load_report, phase3_5_vn_crawler
+├── images/                                         # architecture diagram + ERD
+├── data/                                           # local Parquet/CSV working data
+├── CLAUDE.md                                       # repo guidance for AI assistants / contributors
+├── PROGRESS_LOG.md                                 # milestone status, roadmap, change log
+├── docker-compose.yml                              # langgraph-postgres (agent memory)
+├── docker-compose-kafka.yml                        # kafka + kafdrop + airflow metadata pg
+├── docker-compose-airflow.yml                      # airflow
+├── Dockerfile.airflow
+├── main.py                                         # Legacy orchestrator script (broken - see CLAUDE.md gotchas)
+├── pyproject.toml / uv.lock                        # uv-managed deps (dbt-bigquery, polars, langchain, ...)
+├── requirements.txt                                # Airflow-image dependency subset
+└── .env.example                                    # Guardian / GCP / BigQuery / Pinecone / Postgres config
 ```
 
 **Setup Instructions:**
 
 **1. Clone Repository:**
-``` 
+```
 git clone https://github.com/Dinhngoclam2906/fa-dae2-capstone-Dinh-Ngoc-Lam/
 ```
 
-**2. Install Dependencies:**  
+**2. Install Dependencies:**
 ```
 uv sync
 ```
 
-**3. Start Docker Services:**
-```  
-docker-compose -f docker/compose.yml up -d
+**3. Authenticate to GCP (BigQuery/GCS use Application Default Credentials - no service-account key exists):**
+```
+gcloud auth login
+gcloud config set project <your GCP project id>
+gcloud auth application-default login
 ```
 
-**4. Run Pipelines:**
+**4. Start Local Docker Services** (split by concern - start only what you need):
+```
+docker compose -f docker-compose.yml up -d            # agent memory (Postgres, port 5433)
+docker compose -f docker-compose-kafka.yml up -d       # kafka + kafdrop + airflow metadata pg
+docker compose -f docker-compose-airflow.yml up -d     # airflow
+```
 
-Real-time: 
-```python scripts/real_time_data/kafka_producer.py && python scripts/real_time_data/kafka_producer.py```
+**5. Run Ingestion:**
 
-Batch: 
-```python scripts/batch_data/batch_data_collector && python scripts/batch_data/batch_data_ingestion.py```
+Guardian (batch + API backfill):
+```
+uv run python scripts/batch_data/hf_archive_to_parquet.py
+uv run python scripts/batch_data/guardian_api_backfill.py
+```
 
-**5. Verify Data:** 
-Check PostgreSQL and Snowflake for loaded data (500+ rows for batch, continuous updates for real-time).
+Vietnamese news (Tuổi Trẻ / Thanh Niên / VnEconomy, resumable):
+```
+bash scripts/batch_data/run_vn_backfill_all.sh
+```
+
+Load everything to BigQuery:
+```
+uv run python scripts/batch_data/load_raw_to_bigquery.py --source hf
+uv run python scripts/batch_data/load_raw_to_bigquery.py --source api
+uv run python scripts/batch_data/load_raw_to_bigquery.py --source vn --max-bytes-billed 5000000000
+```
+
+Real-time (Guardian API → Kafka → PostgreSQL only, not yet wired to BigQuery):
+```
+uv run python scripts/real_time_data/kafka_producer.py --once --max-articles 100
+uv run python scripts/real_time_data/kafka_consumer.py --once
+```
+
+**6. Build the warehouse (dbt, from `capstone_dbt_project/`):**
+```
+uv run dbt deps
+uv run dbt build
+```
+
+**7. Run the Agent:**
+```
+uv run streamlit run ai_agents/app.py
+# or
+uv run python ai_agents/cli_agent.py
+```
+
+**8. Verify Data:**
+Check `raw.raw_data` in BigQuery (multi-source row counts, per `source_name`/`language`), and the `staging`/`marts`/`monitoring` datasets after a dbt build.
