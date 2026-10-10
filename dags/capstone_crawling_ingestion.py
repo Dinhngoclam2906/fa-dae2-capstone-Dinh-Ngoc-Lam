@@ -88,11 +88,13 @@ def guardian_ingestion():
     def load_to_bigquery():
         """Upload any newly-crawled Parquet to GCS and MERGE into raw.raw_data.
 
-        --max-bytes-billed grows with the table (the MERGE scans bytes regardless of
-        how few rows actually change - same lesson learned three times already this
-        session running the equivalent command by hand). 6 GB gives headroom past the
-        ~3.83 GB this needed when raw.raw_data was at 412k rows; revisit upward as the
-        table keeps growing."""
+        load_raw_to_bigquery.py now stages+merges only files pending from this run
+        (tracked in data/batch/.pending_merge.<source>.json, cleared on a successful
+        merge) instead of the source's entire accumulated Parquet history - a normal
+        incremental run bills tens of MB, not multiple GB (confirmed: a 96-article
+        test run billed 37 MB, vs. 2.58 GB for the same scale before this fix). 6 GB
+        is just a generous ceiling for an unusual multi-day catch-up batch, not the
+        expected cost - it should basically never actually bind now."""
         return """
         cd /opt/airflow/project
         python scripts/batch_data/load_raw_to_bigquery.py --source api --max-bytes-billed 6000000000

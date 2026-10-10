@@ -37,6 +37,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -133,9 +134,12 @@ class Config:
 # --------------------------------------------------------------------------- upload
 
 
-def upload_tree(cfg: Config, local_dir: Path, source: str) -> str:
+def upload_tree(cfg: Config, local_dir: Path, source: str) -> tuple[str, list[str]]:
     """Upload local *.parquet to gs://bucket/prefix/source/... Skips blobs whose
-    size already matches. Returns the gs:// wildcard URI for the load step."""
+    size already matches. Returns (gs:// wildcard URI, blob names uploaded this run) -
+    the wildcard is kept for --skip-upload/--truncate's full-reload path; the blob
+    list is what lets the caller stage+merge only what's new instead of everything
+    ever uploaded for this source (see pending-merge tracking below)."""
     client = storage.Client(project=cfg.project)
     bucket = client.bucket(cfg.bucket)
     base_prefix = f"{cfg.prefix}/{source}"
@@ -146,6 +150,7 @@ def upload_tree(cfg: Config, local_dir: Path, source: str) -> str:
 
     existing = {b.name: b.size for b in client.list_blobs(bucket, prefix=base_prefix + "/")}
     uploaded = skipped = uploaded_bytes = 0
+    new_blobs: list[str] = []
     for f in files:
         rel = f.relative_to(local_dir).as_posix()
         blob_name = f"{base_prefix}/{rel}"
@@ -156,6 +161,7 @@ def upload_tree(cfg: Config, local_dir: Path, source: str) -> str:
         bucket.blob(blob_name).upload_from_filename(str(f), content_type="application/octet-stream")
         uploaded += 1
         uploaded_bytes += size
+        new_blobs.append(blob_name)
 
     logger.info(
         "GCS upload: %d uploaded (%.1f MB), %d already current -> gs://%s/%s/",
@@ -165,7 +171,31 @@ def upload_tree(cfg: Config, local_dir: Path, source: str) -> str:
         cfg.bucket,
         base_prefix,
     )
-    return f"gs://{cfg.bucket}/{base_prefix}/*.parquet"
+    return f"gs://{cfg.bucket}/{base_prefix}/*.parquet", new_blobs
+
+
+# -------------------------------------------------------------------- pending merge
+
+
+def pending_path(source: str) -> Path:
+    """Blobs uploaded to GCS but not yet confirmed MERGEd into raw.raw_data. Entries
+    persist across runs - a merge failure (e.g. the --max-bytes-billed errors hit
+    repeatedly during development) must not drop them, so the next run retries
+    exactly those files instead of either silently losing them or re-staging the
+    source's entire multi-month Parquet history (which is what made every MERGE scan
+    - and bill for - every previously-matched row, not just new ones)."""
+    return Path(f"data/batch/.pending_merge.{source}.json")
+
+
+def load_pending(source: str) -> set[str]:
+    p = pending_path(source)
+    return set(json.loads(p.read_text())) if p.exists() else set()
+
+
+def save_pending(source: str, blobs: set[str]) -> None:
+    p = pending_path(source)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(sorted(blobs)))
 
 
 # ------------------------------------------------------------------------ bigquery
@@ -198,7 +228,7 @@ def ensure_columns(bq: bigquery.Client, cfg: Config) -> None:
     logger.info("Ensured columns present on %s: %s", cfg.table_fqn, ", ".join(NEW_COLUMNS))
 
 
-def load_stage(bq: bigquery.Client, cfg: Config, source: str, gcs_uri: str) -> int:
+def load_stage(bq: bigquery.Client, cfg: Config, source: str, source_uris: str | list[str]) -> int:
     stage = cfg.stage_fqn(source)
     cols = parquet_columns(source)
     job_cfg = bigquery.LoadJobConfig(
@@ -206,8 +236,12 @@ def load_stage(bq: bigquery.Client, cfg: Config, source: str, gcs_uri: str) -> i
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
         schema=[f for f in RAW_DATA_SCHEMA if f.name in cols],
     )
-    logger.info("Loading %s -> %s (%d cols)", gcs_uri, stage, len(cols))
-    job = bq.load_table_from_uri(gcs_uri, stage, job_config=job_cfg)
+    logger.info(
+        "Loading %s -> %s (%d cols)",
+        source_uris if isinstance(source_uris, str) else f"{len(source_uris)} file(s)",
+        stage, len(cols),
+    )
+    job = bq.load_table_from_uri(source_uris, stage, job_config=job_cfg)
     job.result()
     n = bq.get_table(stage).num_rows or 0
     logger.info("Staged %s rows into %s", f"{n:,}", stage)
@@ -331,9 +365,13 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--source", choices=["hf", "api", "vn"], default="hf")
     ap.add_argument("--local-dir", type=Path, default=None)
-    ap.add_argument("--skip-upload", action="store_true", help="load from GCS as-is")
     ap.add_argument(
-        "--truncate", action="store_true", help="empty raw_data before the MERGE"
+        "--skip-upload", action="store_true",
+        help="load everything currently in GCS as-is (full reload, bypasses pending-merge tracking)",
+    )
+    ap.add_argument(
+        "--truncate", action="store_true",
+        help="empty raw_data before the MERGE (full reload - the whole GCS history must come back, not just what's pending)",
     )
     ap.add_argument("--dry-run", action="store_true", help="upload + stage, no MERGE")
     ap.add_argument("--max-bytes-billed", type=int, default=2_000_000_000)
@@ -349,27 +387,45 @@ def main() -> int:
         cfg.table_fqn,
     )
 
+    source_uris: str | list[str]
     if args.skip_upload:
         gcs_uri = f"gs://{cfg.bucket}/{cfg.prefix}/{args.source}/*.parquet"
         logger.info("Skipping upload; loading %s", gcs_uri)
+        source_uris = gcs_uri
     else:
         if not local_dir.is_dir():
             logger.error("Local dir not found: %s", local_dir)
             return 1
-        gcs_uri = upload_tree(cfg, local_dir, args.source)
+        gcs_uri, new_blobs = upload_tree(cfg, local_dir, args.source)
+        if args.truncate:
+            # Target is about to be emptied - the full history must come back, not
+            # just what's pending.
+            source_uris = gcs_uri
+        else:
+            pending = load_pending(args.source) | set(new_blobs)
+            if not pending:
+                logger.info("Nothing new to merge for source=%s", args.source)
+                return 0
+            save_pending(args.source, pending)
+            logger.info("%d file(s) pending merge for source=%s", len(pending), args.source)
+            source_uris = [f"gs://{cfg.bucket}/{b}" for b in sorted(pending)]
 
     bq = bigquery.Client(project=cfg.project, location=cfg.location)
     ensure_table(bq, cfg)
     ensure_columns(bq, cfg)
-    load_stage(bq, cfg, args.source, gcs_uri)
+    load_stage(bq, cfg, args.source, source_uris)
 
     if args.dry_run:
-        logger.info("--dry-run: staged only, skipping MERGE")
+        logger.info("--dry-run: staged only, skipping MERGE (pending list, if any, left untouched)")
         return 0
 
     if args.truncate:
         truncate_table(bq, cfg, args.max_bytes_billed)
     merge_stage(bq, cfg, args.source, args.max_bytes_billed)
+    # Merge succeeded (merge_stage raises/exits nonzero otherwise) - whatever was
+    # staged (the pending set, or everything on a full reload) is now safely in
+    # raw.raw_data, so nothing is left pending.
+    save_pending(args.source, set())
     report(bq, cfg, args.max_bytes_billed)
     return 0
 
