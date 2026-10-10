@@ -64,4 +64,9 @@ data/
 
 # Snowflake private key
 rsa_key.p8
-rsa_key.pubproject/keys/
+rsa_key.pub
+project/keys/
+
+# Local working docs (not committed)
+CLAUDE.md
+PROGRESS_LOG.md
