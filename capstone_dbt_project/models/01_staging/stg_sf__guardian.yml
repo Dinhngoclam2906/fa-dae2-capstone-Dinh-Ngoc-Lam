@@ -30,10 +30,16 @@ models:
           - not_null:
               severity: warn
       - name: loaded_at
-        description: Load timestamp to Snowflake
+        description: Load timestamp to BigQuery (UTC)
         tests:
           - not_null:
               severity: warn
+      - name: crawl_ts_local
+        description: crawl_timestamp as local wall-clock DATETIME (var local_timezone, Asia/Ho_Chi_Minh). Display only.
+      - name: web_publication_date_local
+        description: web_publication_date as local wall-clock DATETIME. Display only.
+      - name: loaded_at_local
+        description: loaded_at as local wall-clock DATETIME. Display only.
       - name: has_valid_title
         description: Flag for valid title (non-empty, reasonable length)
         tests:

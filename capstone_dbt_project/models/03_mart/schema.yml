@@ -14,6 +14,14 @@ models:
               arguments:
                 to: ref('dim_articles')
                 field: article_id
+      - name: crawl_ts_local
+        description: "crawl_timestamp as local wall-clock DATETIME (var local_timezone). Display only."
+      - name: web_publication_date_local
+        description: "web_publication_date as local wall-clock DATETIME. Display only."
+      - name: loaded_at_local
+        description: "loaded_at as local wall-clock DATETIME. Display only."
+      - name: dbt_updated_at_local
+        description: "dbt_updated_at as local wall-clock DATETIME. Display only."
       - name: article_event_hk
         description: "Surrogate unique key for article events (article_id + crawl_timestamp)"
         tests:

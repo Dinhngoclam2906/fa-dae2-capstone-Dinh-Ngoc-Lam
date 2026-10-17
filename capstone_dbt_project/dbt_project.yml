@@ -31,6 +31,7 @@ vars:
   date_start: '2001-01-01'
   spine_days: 100000
   news_salt: "your-secret-salt"
+  local_timezone: 'Asia/Ho_Chi_Minh'  # display-only *_local columns; storage stays UTC
   
 # Documentation configuration
 docs-paths: ["docs"]

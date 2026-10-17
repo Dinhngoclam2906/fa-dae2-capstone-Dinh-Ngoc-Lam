@@ -20,6 +20,8 @@ WITH latest_runs AS (
 SELECT
   latest_pub_date,
   last_dbt_run,
+  {{ to_local_ts('latest_pub_date') }} AS latest_pub_date_local,
+  {{ to_local_ts('last_dbt_run') }} AS last_dbt_run_local,
   TIMESTAMP_DIFF(check_timestamp, latest_pub_date, HOUR) AS freshness_hours,
   recent_articles,
   CASE
@@ -37,7 +39,8 @@ SELECT
     WHEN (staging_total - fact_total) > 0 THEN 'Minor Drop - Expected'
     ELSE 'Full Retention'
   END AS drop_status,
-  check_timestamp
+  check_timestamp,
+  {{ to_local_ts('check_timestamp') }} AS check_timestamp_local
 FROM latest_runs
 ORDER BY check_timestamp DESC
 LIMIT 1

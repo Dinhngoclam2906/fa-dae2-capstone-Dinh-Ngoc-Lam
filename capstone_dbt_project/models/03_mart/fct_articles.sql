@@ -2,6 +2,7 @@
     materialized='incremental',
     incremental_strategy='merge',
     unique_key='article_event_hk',
+    on_schema_change='append_new_columns',
     partition_by={'field': 'web_publication_date', 'data_type': 'timestamp', 'granularity': 'month'},
     cluster_by=['date_id', 'section_key', 'data_source']
 ) }}
@@ -85,5 +86,9 @@ SELECT
   valid_content,
   web_url,
   loaded_at,
-  CURRENT_TIMESTAMP() AS dbt_updated_at
+  CURRENT_TIMESTAMP() AS dbt_updated_at,
+  {{ to_local_ts('crawl_timestamp') }} AS crawl_ts_local,
+  {{ to_local_ts('web_publication_date') }} AS web_publication_date_local,
+  {{ to_local_ts('loaded_at') }} AS loaded_at_local,
+  {{ to_local_ts('CURRENT_TIMESTAMP()') }} AS dbt_updated_at_local
 FROM base_facts

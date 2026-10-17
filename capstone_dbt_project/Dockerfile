@@ -22,4 +22,6 @@ COPY snapshots/ ./snapshots/
 RUN dbt deps --profiles-dir .dbt
 
 ENV DBT_PROFILES_DIR=/app/.dbt
-CMD ["dbt", "build", "--target", "dev"]
+# Freshness gate first: a stale raw.raw_data (ingestion "succeeding" but landing
+# nothing) fails the execution and skips the ~7.7 GB build. Warn-level exits 0.
+CMD ["sh", "-c", "dbt source freshness --target dev && dbt build --target dev"]
