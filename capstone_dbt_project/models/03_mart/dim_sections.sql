@@ -9,11 +9,10 @@ WITH normalized_sections AS (
     UPPER(TRIM(section_name)) AS section_key,
     MIN(section_name) AS section_name
   FROM {{ ref('stg_sf__guardian') }}
-  WHERE
-    section_name IS NOT NULL AND has_valid_section = TRUE
-    {% if is_incremental() %}
-      AND UPPER(TRIM(section_name)) NOT IN (SELECT section_key FROM {{ this }})
-    {% endif %}
+  -- Every run re-merges all sections (a few hundred rows), so a change to
+  -- section_group_macro reclassifies existing sections too. Incremental merge
+  -- (not a full rebuild) keeps keys whose articles have left staging.
+  WHERE section_name IS NOT NULL AND has_valid_section = TRUE
   GROUP BY 1
 )
 

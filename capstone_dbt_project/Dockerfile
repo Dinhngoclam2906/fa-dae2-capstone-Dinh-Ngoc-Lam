@@ -22,6 +22,8 @@ COPY snapshots/ ./snapshots/
 RUN dbt deps --profiles-dir .dbt
 
 ENV DBT_PROFILES_DIR=/app/.dbt
-# Freshness gate first: a stale raw.raw_data (ingestion "succeeding" but landing
-# nothing) fails the execution and skips the ~7.7 GB build. Warn-level exits 0.
-CMD ["sh", "-c", "dbt source freshness --target dev && dbt build --target dev"]
+# Freshness check first (Guardian + one per VN site): a stale source (ingestion
+# "succeeding" but landing nothing) fails the execution, which fires the email
+# alert. The build still runs, so one stale site doesn't freeze the fresh ones.
+# Warn-level freshness exits 0.
+CMD ["sh", "-c", "dbt source freshness --target dev; f=$?; dbt build --target dev; b=$?; [ $f -eq 0 ] && [ $b -eq 0 ]"]

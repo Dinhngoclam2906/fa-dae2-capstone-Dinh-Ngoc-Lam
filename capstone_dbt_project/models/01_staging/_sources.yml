@@ -69,3 +69,35 @@ sources:
             description: Timestamp when the row was loaded into BigQuery
             tests:
               - not_null
+
+      # Per-site freshness for the Vietnamese sources (vn-ingestion Cloud Run Job).
+      # Aliases of raw_data (same table via `identifier`), one per site so a single
+      # broken parser cannot hide behind the other two sites' fresh rows. Freshness
+      # only - columns and tests live on raw_data above.
+      - name: raw_data_tuoitre
+        identifier: raw_data
+        description: raw_data rows for Tuổi Trẻ (freshness only)
+        config:
+          loaded_at_field: loaded_at
+          freshness:
+            warn_after: {count: 12, period: hour}
+            error_after: {count: 24, period: hour}
+            filter: "source_name = 'tuoitre'"
+      - name: raw_data_thanhnien
+        identifier: raw_data
+        description: raw_data rows for Thanh Niên (freshness only)
+        config:
+          loaded_at_field: loaded_at
+          freshness:
+            warn_after: {count: 12, period: hour}
+            error_after: {count: 24, period: hour}
+            filter: "source_name = 'thanhnien'"
+      - name: raw_data_vneconomy
+        identifier: raw_data
+        description: raw_data rows for VnEconomy (freshness only)
+        config:
+          loaded_at_field: loaded_at
+          freshness:
+            warn_after: {count: 12, period: hour}
+            error_after: {count: 24, period: hour}
+            filter: "source_name = 'vneconomy'"

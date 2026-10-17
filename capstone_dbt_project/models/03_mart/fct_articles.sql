@@ -47,7 +47,9 @@ base_facts AS (
     art.is_current,
     CASE WHEN a.has_valid_content THEN 1 ELSE 0 END AS valid_content,
     a.web_url,
-    a.loaded_at
+    a.loaded_at,
+    a.source_name,
+    a.language
   FROM article_events ae
   JOIN {{ ref('stg_sf__guardian') }} a ON ae.article_id = a.article_id AND ae.crawl_timestamp = a.crawl_timestamp
   JOIN {{ ref('dim_date') }} d ON DATE(ae.web_publication_date) = d.date_id
@@ -87,6 +89,8 @@ SELECT
   web_url,
   loaded_at,
   CURRENT_TIMESTAMP() AS dbt_updated_at,
+  source_name,
+  language,  -- noqa: RF04
   {{ to_local_ts('crawl_timestamp') }} AS crawl_ts_local,
   {{ to_local_ts('web_publication_date') }} AS web_publication_date_local,
   {{ to_local_ts('loaded_at') }} AS loaded_at_local,

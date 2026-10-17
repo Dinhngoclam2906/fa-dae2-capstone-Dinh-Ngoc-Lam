@@ -14,6 +14,20 @@ models:
               arguments:
                 to: ref('dim_articles')
                 field: article_id
+      - name: source_name
+        description: "Origin site: guardian, tuoitre, thanhnien, vneconomy"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy']
+      - name: language
+        description: "Article language: en or vi"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['en', 'vi']
       - name: crawl_ts_local
         description: "crawl_timestamp as local wall-clock DATETIME (var local_timezone). Display only."
       - name: web_publication_date_local
