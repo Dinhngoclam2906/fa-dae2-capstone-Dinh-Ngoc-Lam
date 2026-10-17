@@ -345,8 +345,38 @@ class VnEconomy(HtmlNewsSource):
         return hits or [f"{self.base_url}{want}"]
 
 
+class TuoiTreEn(VccorpStyleSource):
+    """Tuoi Tre News, the English edition (news.tuoitre.vn): same Vccorp CMS, ids and
+    sitemap layout (/sitemaps/index.rss -> 5-day StaticSitemaps chunks) as tuoitre.vn.
+    The category link sits in `.list-cate`. Pages declare <html lang="vi"> although
+    the content is English, so the language comes from here, not from the page."""
+    name = "tuoitre_en"
+    language = "en"
+    base_url = "https://news.tuoitre.vn"
+    sitemap_index_url = "https://news.tuoitre.vn/sitemaps/index.rss"
+    SECTION_SELECTORS = (".list-cate a", ".detail-cate a", "[class*='breadcrumb'] a")
+
+
+class VnEconomyEn(VnEconomy):
+    """VnEconomy's English edition (en.vneconomy.vn). A different template from
+    vneconomy.vn (BEM classes; JSON-LD NewsArticle carries articleSection) and
+    unpadded monthly sitemap names (sitemap/news-2026-9.xml). Archive from 2021-06."""
+    name = "vneconomy_en"
+    language = "en"
+    base_url = "https://en.vneconomy.vn"
+    sitemap_index_url = "https://en.vneconomy.vn/sitemap.xml"
+    BODY_SELECTORS = ("div.detail__content",)
+    SECTION_SELECTORS = ("[class*='breadcrumb'] a",)
+    H1_SELECTORS = ("h1.detail__title", "h1")
+
+    def month_sitemap_urls(self, index_children, year, month):
+        want = f"/sitemap/news-{year}-{month}.xml"
+        hits = [u for u in index_children if u.endswith(want)]
+        return hits or [f"{self.base_url}{want}"]
+
+
 SOURCES: dict[str, NewsSource] = {
-    s.name: s for s in (TuoiTre(), ThanhNien(), VnEconomy())
+    s.name: s for s in (TuoiTre(), ThanhNien(), VnEconomy(), TuoiTreEn(), VnEconomyEn())
 }
 
 

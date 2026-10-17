@@ -50,7 +50,7 @@ CONCURRENCY="${2:-8}"
 SLEEP="${3:-0.5}"
 MAX="${4:-0}"
 TO="${5:-}"
-SOURCES=(tuoitre thanhnien vneconomy)
+SOURCES=(tuoitre thanhnien vneconomy tuoitre_en vneconomy_en)
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"

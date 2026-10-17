@@ -1,6 +1,7 @@
 {#
   Bucket a section name into a coarse group. English (Guardian) and Vietnamese
-  (tuoitre / thanhnien / vneconomy) keywords share the same buckets. The input is
+  (tuoitre / thanhnien / vneconomy) keywords share the same buckets; the English
+  editions (tuoitre_en / vneconomy_en) match the English keywords. The input is
   NFC-normalised first: Vietnamese diacritics can arrive precomposed or combining.
   Order matters - the first match wins.
 #}
