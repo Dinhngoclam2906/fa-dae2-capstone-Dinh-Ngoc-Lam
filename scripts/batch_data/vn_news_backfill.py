@@ -22,6 +22,8 @@ Design (mirrors the Guardian crawler):
     with no coordination. Default state file: data/batch/vn_news_state.<source>.json
     (see scripts/batch_data/run_vn_backfill_all.sh).
   * Month-granularity cursor in the state file; a crash loses at most one month.
+    The cursor never moves past the month of `--to-date` (minus `--tail-days`), so
+    scheduled runs (the vn-ingestion Cloud Run Job) keep re-reading the live month.
   * `<state>.seen` sidecar lists every written article id -> re-runs skip
     already-fetched articles (VN months are large; a bare month cursor would re-fetch).
   * Each finished month is flushed to Parquet immediately, partitioned
@@ -714,7 +716,11 @@ def main() -> int:
     )
     ap.add_argument("--source", required=True, choices=sorted(SOURCES))
     ap.add_argument("--from-date", default="2024-01-01", help="YYYY-MM-DD (month floor)")
-    ap.add_argument("--to-date", default=date.today().isoformat(), help="YYYY-MM-DD")
+    ap.add_argument("--to-date", default=datetime.now(timezone.utc).date().isoformat(),
+                    help="YYYY-MM-DD, default today in UTC")
+    ap.add_argument("--tail-days", type=int, default=2,
+                    help="never park the cursor past the month of (to-date - tail-days + 1), "
+                         "so scheduled runs keep re-reading the current month's sitemaps")
     ap.add_argument("--max-articles", type=int, default=5000, help="run cap (0 = unlimited)")
     ap.add_argument("--realtime-cutoff-days", type=int, default=7, help="newer than this -> data_source=realtime")
     ap.add_argument("--concurrency", type=int, default=8, help="parallel article fetches per source")
@@ -768,6 +774,15 @@ def main() -> int:
             else start
         )
         cursor = max(cursor, start)
+        # The month cursor must never move past the month still being published
+        # into, or every later run skips the rest of it (the same bug as the
+        # Guardian crawler's day cursor, 2026-10-12). The .seen sidecar makes
+        # re-reading the tail month cheap: only unseen URLs are fetched.
+        tail_month = max(end - timedelta(days=args.tail_days - 1), start).replace(day=1)
+        if cursor > tail_month:
+            logger.info("[%s] saved cursor %s is past the tail month; re-reading from %s",
+                        args.source, cursor.strftime("%Y-%m"), tail_month.strftime("%Y-%m"))
+            cursor = tail_month
         seen = set() if args.reset else load_seen(seen_path)
 
         session = make_session(pool=max(16, args.concurrency + 4))
@@ -814,7 +829,7 @@ def main() -> int:
 
             st = {
                 "source": args.source,
-                "cursor_month": _next_month(y, m).strftime("%Y-%m"),
+                "cursor_month": min(_next_month(y, m), tail_month).strftime("%Y-%m"),
                 "months_done": st.get("months_done", 0) + 1,
                 "articles_total": totals,
                 "last_run": datetime.now(timezone.utc).isoformat(),

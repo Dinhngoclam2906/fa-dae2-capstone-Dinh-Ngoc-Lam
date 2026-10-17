@@ -9,9 +9,15 @@ history every 4 hours. The bulk Parquet data itself does NOT need this treatment
 each run's crawl output gets uploaded to GCS by load_raw_to_bigquery.py's own
 upload_tree() regardless, so only these two small JSON files need to round-trip.
 
+The vn-ingestion job round-trips its three per-source crawler states plus their
+`.seen` sidecars (~1.5 MB each: the VN crawler's dedupe set) the same way.
+
 Usage:
-    python sync_job_state.py pull   # before running the crawl+load
-    python sync_job_state.py push   # after, regardless of crawl/load exit status
+    python sync_job_state.py pull [JOB]   # before running the crawl+load
+    python sync_job_state.py push [JOB]   # after, regardless of crawl/load exit status
+
+JOB is guardian-ingestion (default) or vn-ingestion; state lives under
+gs://$GCS_LANDING_BUCKET/job-state/<JOB>/.
 """
 from __future__ import annotations
 
@@ -24,27 +30,37 @@ from google.cloud import storage
 
 load_dotenv()
 
-STATE_FILES = [
-    "data/batch/guardian_api_state.json",
-    "data/batch/.pending_merge.api.json",
-]
-GCS_STATE_PREFIX = "job-state/guardian-ingestion"
+VN_SOURCES = ("tuoitre", "thanhnien", "vneconomy")
+STATE_FILES = {
+    "guardian-ingestion": [
+        "data/batch/guardian_api_state.json",
+        "data/batch/.pending_merge.api.json",
+    ],
+    "vn-ingestion": [
+        *(f"data/batch/vn_news_state.{s}.{ext}" for s in VN_SOURCES for ext in ("json", "seen")),
+        "data/batch/.pending_merge.vn.json",
+    ],
+}
 
 
 def main() -> int:
-    if len(sys.argv) != 2 or sys.argv[1] not in ("pull", "push"):
-        print("usage: sync_job_state.py pull|push", file=sys.stderr)
+    if len(sys.argv) not in (2, 3) or sys.argv[1] not in ("pull", "push"):
+        print("usage: sync_job_state.py pull|push [JOB]", file=sys.stderr)
         return 1
     mode = sys.argv[1]
+    job = sys.argv[2] if len(sys.argv) == 3 else "guardian-ingestion"
+    if job not in STATE_FILES:
+        print(f"unknown job {job!r}; expected one of {sorted(STATE_FILES)}", file=sys.stderr)
+        return 1
 
     project = os.environ["GCP_PROJECT"]
     bucket_name = os.environ["GCS_LANDING_BUCKET"]
     client = storage.Client(project=project)
     bucket = client.bucket(bucket_name)
 
-    for f in STATE_FILES:
+    for f in STATE_FILES[job]:
         local = Path(f)
-        blob = bucket.blob(f"{GCS_STATE_PREFIX}/{local.name}")
+        blob = bucket.blob(f"job-state/{job}/{local.name}")
         if mode == "pull":
             local.parent.mkdir(parents=True, exist_ok=True)
             if blob.exists():
