@@ -1,13 +1,11 @@
 name: PR CI - SQLFluff Linting and dbt Testing
 
+# No `paths:` filter on purpose: PR_CI is a required status check on main (branch
+# protection), and a required check that never starts (a PR touching no SQL/dbt
+# files) would block the merge forever.
 on:
   pull_request:
     branches: [main, develop]
-    paths:
-      - "**.sql"
-      - "capstone_dbt_project/**"
-      - ".github/workflows/pr_ci.yml"
-      - "capstone_dbt_project/.sqlfluff"
 
 # Keyless BigQuery auth: GitHub's OIDC token is exchanged through Workload Identity
 # Federation (pool github-pool, provider restricted to this repository) for a
