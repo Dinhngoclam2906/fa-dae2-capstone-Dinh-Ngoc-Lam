@@ -15,12 +15,12 @@ models:
                 to: ref('dim_articles')
                 field: article_id
       - name: source_name
-        description: "Origin site: guardian, tuoitre, thanhnien, vneconomy, tuoitre_en, vneconomy_en, vietnamnet, vietnamnet_en"
+        description: "Origin site: guardian, tuoitre, thanhnien, vneconomy, tuoitre_en, vneconomy_en, vietnamnet, vietnamnet_en, vnexpress, vnexpress_en"
         tests:
           - not_null
           - accepted_values:
               arguments:
-                values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'tuoitre_en', 'vneconomy_en', 'vietnamnet', 'vietnamnet_en']
+                values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'tuoitre_en', 'vneconomy_en', 'vietnamnet', 'vietnamnet_en', 'vnexpress', 'vnexpress_en']
       - name: language
         description: "Article language: en or vi"
         tests:

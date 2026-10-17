@@ -69,6 +69,7 @@ import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 import polars as pl
@@ -429,9 +430,76 @@ class VietnamNetEn(VietnamNet):
         return [f"{self.base_url}/en/sitemap-news.xml"]
 
 
+class VnExpressRss(HtmlNewsSource):
+    """Base for VnExpress: RSS-only and FORWARD-ONLY, by policy. Its sitemaps are
+    served to search engines only (302 to the homepage for anyone else) and robots.txt
+    disallows scraping/dataset crawlers, so we read only the RSS feeds it publishes
+    for readers - never spoofed user agents, listing pages or id enumeration. Each
+    feed holds its latest ~60 items (2-15 days for most categories), read for the
+    current month only. Ids are the trailing 7-digit number, prefixed with the source
+    name (vietnamnet uses bare numbers too)."""
+    sitemap_index_url = ""
+    FEEDS: tuple[str, ...] = ()
+    _ID_RE = re.compile(r"-(\d{6,})\.html?(?:$|[?#])")
+
+    def article_id(self, url):
+        m = self._ID_RE.search(url)
+        return f"{self.name}-{m.group(1)}" if m else super().article_id(url)
+
+    def month_sitemap_urls(self, index_children, year, month):
+        today = datetime.now(timezone.utc).date()
+        if (year, month) != (today.year, today.month):
+            return []
+        return [f"{self.base_url}/rss/{f}.rss" for f in self.FEEDS]
+
+
+class VnExpress(VnExpressRss):
+    """vnexpress.net. Title h1.title-detail, body article.fck_detail; the section is
+    the FIRST breadcrumb link (the last one is a sub-category, e.g. 'Vĩ mô').
+    Left out: tin-moi-nhat (CDN-stale, ~3 h window), tin-xem-nhieu and spotlight
+    (stale), startup (empty), vne-go."""
+    name = "vnexpress"
+    base_url = "https://vnexpress.net"
+    FEEDS = (
+        "thoi-su", "the-gioi", "kinh-doanh", "bat-dong-san", "khoa-hoc-cong-nghe", "suc-khoe",
+        "the-thao", "giai-tri", "phap-luat", "giao-duc", "gia-dinh", "du-lich",
+        "oto-xe-may", "y-kien", "goc-nhin", "tam-su", "thu-gian", "tin-noi-bat",
+    )
+    BODY_SELECTORS = ("article.fck_detail", "div.fck_detail")
+    SECTION_SELECTORS = ("ul.breadcrumb > li:first-child a",)
+    H1_SELECTORS = ("h1.title-detail", "h1")
+
+
+class VnExpressEn(VnExpressRss):
+    """VnExpress International (e.vnexpress.net). Title h1.title_post, body
+    div.fck_detail. No breadcrumb, so the section comes from the URL path:
+    /news/<section>/<sub>/slug-<id>.html -> <section> ('business', 'travel', ...),
+    except the generic 'news' section, which uses <sub> ('environment', 'politics')."""
+    name = "vnexpress_en"
+    language = "en"
+    base_url = "https://e.vnexpress.net"
+    FEEDS = ("home", "news", "business", "world", "life", "travel", "sports", "tech", "perspectives")
+    BODY_SELECTORS = ("div.fck_detail",)
+    SECTION_SELECTORS: tuple[str, ...] = ()
+    H1_SELECTORS = ("h1.title_post", "h1")
+
+    def parse_article(self, html, url, lastmod):
+        art = super().parse_article(html, url, lastmod)
+        if art is not None and not art.section_name:
+            parts = url.split("://", 1)[-1].split("/")[1:-1]  # path segments without the slug
+            if parts and parts[0] == "news":
+                parts = parts[1:]
+            if parts and parts[0] == "news" and len(parts) > 1:
+                parts = parts[1:]
+            if parts:
+                art.section_name = parts[0].replace("-", " ").title()
+        return art
+
+
 SOURCES: dict[str, NewsSource] = {
     s.name: s
-    for s in (TuoiTre(), ThanhNien(), VnEconomy(), TuoiTreEn(), VnEconomyEn(), VietnamNet(), VietnamNetEn())
+    for s in (TuoiTre(), ThanhNien(), VnEconomy(), TuoiTreEn(), VnEconomyEn(), VietnamNet(),
+              VietnamNetEn(), VnExpress(), VnExpressEn())
 }
 
 
@@ -473,7 +541,11 @@ def _parse_dt(s: str | None) -> datetime | None:
             return dt.astimezone(timezone.utc).replace(tzinfo=None) if dt.tzinfo else dt
         except ValueError:
             continue
-    return None
+    try:  # RFC 822, as in RSS <pubDate>: "Sat, 17 Oct 2026 23:28:53 +0700"
+        dt = parsedate_to_datetime(s)
+        return dt.astimezone(timezone.utc).replace(tzinfo=None) if dt.tzinfo else dt
+    except (TypeError, ValueError):
+        return None
 
 
 def _decode_vccorp_ts(d: str | None) -> datetime | None:
@@ -565,7 +637,8 @@ def fetch(
 
 
 def _xml_locs(xml_bytes: bytes) -> list[tuple[str, datetime | None]]:
-    """Yield (loc, lastmod) for every <url>/<sitemap> node, namespace-agnostic.
+    """Yield (loc, lastmod) for every <url>/<sitemap> node (sitemaps) and every RSS
+    <item> (link, pubDate), namespace-agnostic.
 
     Raises SitemapError on unparseable XML instead of returning []: an empty list
     would read as "no articles in this chunk" and the month would count as complete,
@@ -576,14 +649,14 @@ def _xml_locs(xml_bytes: bytes) -> list[tuple[str, datetime | None]]:
         raise SitemapError(f"unparseable sitemap ({e}) - truncated response?") from e
     out: list[tuple[str, datetime | None]] = []
     for node in root.iter():
-        if node.tag.rsplit("}", 1)[-1] not in ("url", "sitemap"):
+        if node.tag.rsplit("}", 1)[-1] not in ("url", "sitemap", "item"):
             continue
         loc = lastmod = None
         for child in node:
             tag = child.tag.rsplit("}", 1)[-1]
-            if tag == "loc":
+            if tag in ("loc", "link"):
                 loc = (child.text or "").strip()
-            elif tag == "lastmod":
+            elif tag in ("lastmod", "pubDate"):
                 lastmod = _parse_dt((child.text or "").strip())
         if loc:
             out.append((loc, lastmod))
@@ -912,7 +985,11 @@ def main() -> int:
 
         session = make_session(pool=max(16, args.concurrency + 4))
         logger.info("[%s] sitemap index: %s", args.source, source.sitemap_index_url)
-        index_children = load_sitemap_index(session, source.sitemap_index_url, sleep=args.sleep)
+        # RSS-only sources (VnExpress) have no sitemap index to load.
+        index_children = (
+            load_sitemap_index(session, source.sitemap_index_url, sleep=args.sleep)
+            if source.sitemap_index_url else []
+        )
         logger.info(
             "[%s] %d child sitemaps | crawl %s -> %s | seen=%d",
             args.source,
