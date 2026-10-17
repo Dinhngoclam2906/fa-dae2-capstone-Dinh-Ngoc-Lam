@@ -113,6 +113,10 @@ class FetchError(Exception):
     """A URL could not be retrieved after retries (or returned 4xx)."""
 
 
+class SitemapError(Exception):
+    """A sitemap that should exist could not be read completely, even after retries."""
+
+
 # --------------------------------------------------------------------------- model
 
 
@@ -474,12 +478,15 @@ def fetch(
 
 
 def _xml_locs(xml_bytes: bytes) -> list[tuple[str, datetime | None]]:
-    """Yield (loc, lastmod) for every <url>/<sitemap> node, namespace-agnostic."""
+    """Yield (loc, lastmod) for every <url>/<sitemap> node, namespace-agnostic.
+
+    Raises SitemapError on unparseable XML instead of returning []: an empty list
+    would read as "no articles in this chunk" and the month would count as complete,
+    so a malformed response must fail (and be retried) rather than be skipped."""
     try:
         root = ET.fromstring(xml_bytes)
     except ET.ParseError as e:
-        logger.warning("sitemap parse error: %s", e)
-        return []
+        raise SitemapError(f"unparseable sitemap ({e}) - truncated response?") from e
     out: list[tuple[str, datetime | None]] = []
     for node in root.iter():
         if node.tag.rsplit("}", 1)[-1] not in ("url", "sitemap"):
@@ -496,12 +503,39 @@ def _xml_locs(xml_bytes: bytes) -> list[tuple[str, datetime | None]]:
     return out
 
 
+def fetch_sitemap(
+    session: requests.Session,
+    url: str,
+    *,
+    sleep: float,
+    listed: bool = True,
+    tries: int = 4,
+) -> list[tuple[str, datetime | None]]:
+    """Entries of one sitemap, retrying truncated bodies and flaky errors.
+
+    Only a 404 on a URL we guessed ourselves (listed=False, e.g. a day-chunk that
+    may not exist) means "no such sitemap" and returns []. A 404 on a sitemap the
+    index lists is retried like any other failure (news.tuoitre.vn flips the same
+    URL between 200 and 404). Raises SitemapError when every attempt fails."""
+    last: Exception | None = None
+    for attempt in range(tries):
+        try:
+            return _xml_locs(fetch(session, url, sleep=sleep))
+        except FetchError as e:
+            if str(e).startswith("404") and not listed:
+                return []
+            last = e
+        except SitemapError as e:
+            last = e
+        logger.warning("sitemap %s: %s - retry %d/%d", url, last, attempt + 1, tries)
+        time.sleep(min(30, 3 * 2**attempt))
+    raise SitemapError(f"{url}: {last}")
+
+
 def load_sitemap_index(session: requests.Session, url: str, *, sleep: float) -> list[str]:
-    try:
-        return [loc for loc, _ in _xml_locs(fetch(session, url, sleep=sleep))]
-    except FetchError as e:
-        logger.warning("sitemap index %s: %s", url, e)
-        return []
+    """Raises SitemapError: an incomplete index would silently send months to guessed
+    chunk URLs, so the run must fail instead."""
+    return [loc for loc, _ in fetch_sitemap(session, url, sleep=sleep)]
 
 
 # ------------------------------------------------------------------------ output
@@ -599,16 +633,16 @@ def crawl_month(
 
     frontier: dict[str, tuple[str, datetime | None]] = {}
     sitemaps_ok = True
+    listed = set(index_children)
     for sm in source.month_sitemap_urls(index_children, year, month):
         try:
-            xml = fetch(session, sm, sleep=sleep)
-        except FetchError as e:
-            if str(e).startswith("404"):
-                continue  # non-existent day-chunk / month - expected
+            entries = fetch_sitemap(session, sm, sleep=sleep, listed=sm in listed)
+        except SitemapError as e:
+            # Month incomplete: the caller must not advance the cursor past it.
             logger.error("sitemap %s failed: %s", sm, e)
             sitemaps_ok = False
             break
-        for loc, lastmod in _xml_locs(xml):
+        for loc, lastmod in entries:
             if not _is_article(loc):
                 continue
             aid = source.article_id(loc)
@@ -699,11 +733,14 @@ def crawl_month(
 
 def dry_run_month(session, source, index_children, year, month, *, sleep) -> int:
     n = 0
+    listed = set(index_children)
     for sm in source.month_sitemap_urls(index_children, year, month):
         try:
-            n += sum(1 for loc, _ in _xml_locs(fetch(session, sm, sleep=sleep)) if _is_article(loc))
-        except FetchError:
-            pass
+            entries = fetch_sitemap(session, sm, sleep=sleep, listed=sm in listed)
+        except SitemapError as e:
+            logger.warning("[dry-run] %s unreadable (%s) - count is a lower bound", sm, e)
+            continue
+        n += sum(1 for loc, _ in entries if _is_article(loc))
     return n
 
 
@@ -835,6 +872,11 @@ def main() -> int:
                 "last_run": datetime.now(timezone.utc).isoformat(),
             }
             save_state(state_file, st)
+    except SitemapError as e:
+        # Only the sitemap index raises this far (month sitemaps fail the month in
+        # crawl_month). Exit non-zero so the job fails and the alert fires.
+        logger.error("[%s] sitemap index unreadable: %s - state unchanged", args.source, e)
+        return 1
     except KeyboardInterrupt:
         logger.warning("interrupted - state is saved at the last completed month")
         return 130
