@@ -12,7 +12,7 @@ WITH raw_articles AS (
     CAST(section_name AS STRING) AS section_name,
     CAST(data_source AS STRING) AS data_source,
     COALESCE(CAST(source_name AS STRING), 'guardian') AS source_name,
-    COALESCE(CAST(language AS STRING), 'en') AS language,
+    COALESCE(CAST(language AS STRING), 'en') AS language,  -- noqa: RF04
     CAST(loaded_at AS TIMESTAMP) AS loaded_at
   FROM {{ source('raw', 'raw_data') }}
   WHERE article_id IS NOT NULL

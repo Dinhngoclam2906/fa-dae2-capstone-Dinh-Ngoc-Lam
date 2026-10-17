@@ -1,6 +1,6 @@
 [sqlfluff]
-# Database dialect (Snowflake-specific for your project)
-dialect = snowflake
+# Database dialect (BigQuery since the Phase 3 port)
+dialect = bigquery
 
 # Templater for dbt projects
 templater = dbt
