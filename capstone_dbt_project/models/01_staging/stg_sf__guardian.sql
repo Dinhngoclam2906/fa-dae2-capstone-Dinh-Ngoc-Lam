@@ -1,7 +1,8 @@
 -- models/01_staging/stg_sf__guardian.sql
 --
 -- Incremental by publication month: each run re-reads and replaces only the whole
--- month partitions from (today - stg_lookback_days) onwards. raw_data is MONTH-
+-- month partitions from (today - incremental_lookback_days) onwards (macro
+-- recent_publication_months, shared with fct_articles). raw_data is MONTH-
 -- partitioned on web_publication_date, so this filter prunes the read to 2-3 months
 -- instead of the full table (BigQuery bills scanned columns per partition; a filter
 -- on crawl_timestamp/loaded_at would not reduce the bill). Every new or re-crawled
@@ -11,7 +12,7 @@
 --
 -- Staging is fully derivable from raw, so --full-refresh is always safe here (unlike
 -- fct_articles / dim_articles). Use it after any load of OLD articles (a deep backfill
--- or load_raw_to_bigquery.py --truncate): dbt build --full-refresh --select stg_sf__guardian
+-- or load_raw_to_bigquery.py --truncate) - see the macro for the full procedure.
 {{ config(
     materialized='incremental',
     incremental_strategy='insert_overwrite',
@@ -37,10 +38,7 @@ WITH raw_articles AS (
   WHERE
     article_id IS NOT NULL
     {% if is_incremental() %}
-      -- A constant expression on the raw partition column, so BigQuery prunes.
-      AND web_publication_date >= TIMESTAMP(DATE_TRUNC(
-        DATE_SUB(CURRENT_DATE(), INTERVAL {{ var('stg_lookback_days', 40) }} DAY), MONTH
-      ))
+      AND {{ recent_publication_months('web_publication_date') }}
     {% endif %}
 ),
 

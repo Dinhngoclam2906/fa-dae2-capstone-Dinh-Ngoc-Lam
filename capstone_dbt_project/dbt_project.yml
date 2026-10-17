@@ -32,7 +32,7 @@ vars:
   spine_days: 100000
   news_salt: "your-secret-salt"
   local_timezone: 'Asia/Ho_Chi_Minh'  # display-only *_local columns; storage stays UTC
-  stg_lookback_days: 40  # stg_sf__guardian re-reads publication months from today - 40d
+  incremental_lookback_days: 40  # stg/fct reprocess publication months from today - 40d (macro recent_publication_months)
   
 # Documentation configuration
 docs-paths: ["docs"]

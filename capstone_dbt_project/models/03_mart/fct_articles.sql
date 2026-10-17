@@ -7,7 +7,19 @@
     cluster_by=['date_id', 'section_key', 'data_source']
 ) }}
 
-WITH article_events AS (
+-- Incremental runs read only the recent publication months of staging (the only
+-- months stg_sf__guardian itself rewrites), so BigQuery prunes the read instead of
+-- hashing body_text for every staging row. NEVER full-refresh this model: it holds
+-- crawl events that no longer exist in staging. For old-article backfills widen the
+-- window for one run instead (see macros/recent_publication_months.sql).
+WITH stg AS (
+  SELECT * FROM {{ ref('stg_sf__guardian') }}
+  {% if is_incremental() %}
+    WHERE {{ recent_publication_months('web_publication_date') }}
+  {% endif %}
+),
+
+article_events AS (
   SELECT
     article_id,
     crawl_timestamp,
@@ -26,7 +38,7 @@ WITH article_events AS (
       '|',
       TO_HEX(MD5(COALESCE(body_text, '')))
     ))) AS attribute_hash
-  FROM {{ ref('stg_sf__guardian') }}
+  FROM stg
   WHERE
     web_publication_date >= '{{ var("start_date", "2001-01-01") }}'
     AND has_valid_title = TRUE
@@ -51,7 +63,7 @@ base_facts AS (
     a.source_name,
     a.language
   FROM article_events ae
-  JOIN {{ ref('stg_sf__guardian') }} a ON ae.article_id = a.article_id AND ae.crawl_timestamp = a.crawl_timestamp
+  JOIN stg a ON ae.article_id = a.article_id AND ae.crawl_timestamp = a.crawl_timestamp
   JOIN {{ ref('dim_date') }} d ON DATE(ae.web_publication_date) = d.date_id
   JOIN {{ ref('dim_sections') }} s ON UPPER(TRIM(ae.section_name)) = UPPER(TRIM(s.section_name))
   JOIN {{ ref('dim_articles') }} art ON ae.article_id = art.article_id AND art.is_current = TRUE
