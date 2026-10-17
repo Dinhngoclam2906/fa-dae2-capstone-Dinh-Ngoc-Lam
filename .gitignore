@@ -69,4 +69,4 @@ project/keys/
 
 # Local working docs (not committed)
 CLAUDE.md
-PROGRESS_LOG.md
+PROGRESS_LOG*.md
