@@ -3,7 +3,7 @@ version: 2
 sources:
   - name: raw
     description: Raw ingested articles - Guardian (HF archive + Content API) and Vietnamese news (Tuổi Trẻ / Thanh Niên / VnEconomy)
-    database: "{{ env_var('GCP_PROJECT', 'project-f5433681-7b47-481f-9c7') }}"
+    database: "{{ env_var('GCP_PROJECT') }}"
     schema: "{{ env_var('BQ_DATASET_RAW', 'raw') }}"
     tables:
       - name: raw_data

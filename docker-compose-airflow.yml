@@ -37,7 +37,7 @@
 #     POSTGRES_PORT: 5432
 #     POSTGRES_DB: staging_db
 #     POSTGRES_USER: staging_user
-#     POSTGRES_PASSWORD: staging_password
+#     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     
 #     # Kafka
 #     KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -83,7 +83,7 @@
 #     image: postgres:13
 #     environment:
 #       POSTGRES_USER: staging_user
-#       POSTGRES_PASSWORD: staging_password
+#       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 #       POSTGRES_DB: staging_db
 #     volumes:
 #       - postgres-staging-volume:/var/lib/postgresql/data
@@ -267,6 +267,7 @@ x-airflow-common: &airflow-common
     # instead (still unresolved, see PROGRESS_LOG.md). Fine for this container since
     # it only ever runs on the same machine as that gcloud session.
     GCP_PROJECT: ${GCP_PROJECT}
+    NEWS_SALT: ${NEWS_SALT}
     BQ_LOCATION: ${BQ_LOCATION:-asia-southeast1}
     BQ_DATASET_RAW: ${BQ_DATASET_RAW:-raw}
     BQ_DATASET_DEFAULT: ${BQ_DATASET_DEFAULT:-scratch}

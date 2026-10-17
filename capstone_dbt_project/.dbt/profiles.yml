@@ -5,7 +5,7 @@ capstone_dbt_project:
       type: bigquery
       method: oauth  # Application Default Credentials - no service-account key (org
                      # policy blocks key creation; see docs/phase0_baseline.md §7)
-      project: "{{ env_var('GCP_PROJECT', 'project-f5433681-7b47-481f-9c7') }}"
+      project: "{{ env_var('GCP_PROJECT') }}"
       # Fallback only - every model in models/ sets its own +schema (staging/marts/
       # monitoring); a future model that forgets to would land here (7-day TTL) rather
       # than silently polluting a permanent dataset.

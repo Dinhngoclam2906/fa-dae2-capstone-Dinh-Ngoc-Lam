@@ -40,7 +40,7 @@ def get_ingestion_env_vars():
     return {
         "API_KEY": os.environ.get("API_KEY", ""),
         "API_URL": os.environ.get("API_URL", "https://content.guardianapis.com"),
-        "GCP_PROJECT": os.environ.get("GCP_PROJECT", "project-f5433681-7b47-481f-9c7"),
+        "GCP_PROJECT": os.environ["GCP_PROJECT"],  # required - fail fast, no fallback
         "BQ_LOCATION": os.environ.get("BQ_LOCATION", "asia-southeast1"),
         "BQ_DATASET_RAW": os.environ.get("BQ_DATASET_RAW", "raw"),
         "GCS_LANDING_BUCKET": os.environ.get("GCS_LANDING_BUCKET", ""),

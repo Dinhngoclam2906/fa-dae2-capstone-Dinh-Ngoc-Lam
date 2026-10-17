@@ -110,7 +110,7 @@ The dbt (data build tool) layer transforms raw multi-source article data into a 
 - **Airflow:** Local/manual orchestration of the ingestion + dbt steps (validated end-to-end; production uses Cloud Run).
 - **LangGraph/Pinecone:** Enables conversational AI with grounded responses.
 - **OpenAI**: LLM + embeddings API.
-- **GitHub Actions:** CI (currently still configured for Snowflake; BigQuery CI auth needs Workload Identity Federation - not yet set up).
+- **GitHub Actions:** PR CI (`dbt debug` → `deps` → SQLFluff → `dbt test`) against BigQuery, authenticated **keylessly** via Workload Identity Federation as a read-only `ci-runner` service account.
 
 #### **ERD:**
 
@@ -426,11 +426,12 @@ uv run python scripts/real_time_data/kafka_consumer.py --once
 **6. Build the warehouse (dbt, from `capstone_dbt_project/`):**
 
 In production this runs daily as the `dbt-build` Cloud Run Job (5.1.2.5). Locally, always
-pass `--profiles-dir .dbt` - it is the project's only profile:
+pass `--profiles-dir .dbt` (the project's only profile) and load `.env`. `GCP_PROJECT` and
+`NEWS_SALT` are required and have no defaults:
 ```
-uv run dbt deps --profiles-dir .dbt
-uv run dbt source freshness --profiles-dir .dbt
-uv run dbt build --profiles-dir .dbt
+uv run --env-file ../.env dbt deps --profiles-dir .dbt
+uv run --env-file ../.env dbt source freshness --profiles-dir .dbt
+uv run --env-file ../.env dbt build --profiles-dir .dbt
 ```
 
 **7. Run the Agent:**

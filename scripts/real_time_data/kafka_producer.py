@@ -70,7 +70,7 @@ def get_postgres_config():
         "port": int(os.getenv("POSTGRES_PORT", "5432")) if is_docker else 5434,
         "dbname": os.getenv("POSTGRES_DB", "staging_db"),
         "user": os.getenv("POSTGRES_USER", "staging_user"),
-        "password": os.getenv("POSTGRES_PASSWORD", "staging_password"),
+        "password": os.environ["POSTGRES_PASSWORD"],
     }
 
 KAFKA_BOOTSTRAP_SERVERS = get_kafka_bootstrap_servers()

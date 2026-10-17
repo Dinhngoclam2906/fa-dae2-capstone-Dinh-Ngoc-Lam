@@ -30,7 +30,9 @@ vars:
   start_date: '2001-01-01'
   date_start: '2001-01-01'
   spine_days: 100000
-  news_salt: "your-secret-salt"
+  # Required, no default: every surrogate key was hashed with it, so a missing or
+  # different value would silently re-key rows. Cloud Run: Secret Manager news-salt.
+  news_salt: "{{ env_var('NEWS_SALT') }}"
   local_timezone: 'Asia/Ho_Chi_Minh'  # display-only *_local columns; storage stays UTC
   incremental_lookback_days: 40  # stg/fct reprocess publication months from today - 40d (macro recent_publication_months)
   

@@ -24,7 +24,8 @@ def get_dbt_env_vars():
     return {
         "DBT_PROJECT_DIR": "/opt/airflow/capstone_dbt_project",
         "DBT_PROFILES_DIR": "/opt/airflow/.dbt",
-        "GCP_PROJECT": os.environ.get("GCP_PROJECT", "project-f5433681-7b47-481f-9c7"),
+        "GCP_PROJECT": os.environ["GCP_PROJECT"],  # required - fail fast, no fallback
+        "NEWS_SALT": os.environ["NEWS_SALT"],  # required - see dbt_project.yml
         "BQ_LOCATION": os.environ.get("BQ_LOCATION", "asia-southeast1"),
         "BQ_DATASET_DEFAULT": os.environ.get("BQ_DATASET_DEFAULT", "scratch"),
         # Unresolved - see docstring above.
