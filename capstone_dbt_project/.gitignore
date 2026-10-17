@@ -2,4 +2,6 @@
 target/
 dbt_packages/
 logs/
-.dbt/
+# .dbt/profiles.yml is tracked: the single dbt profile (no secrets - ADC/oauth +
+# env_var). Only the per-machine anonymous-usage id stays out of git.
+.dbt/.user.yml

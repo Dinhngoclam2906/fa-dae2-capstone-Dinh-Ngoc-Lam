@@ -51,7 +51,7 @@
 #     - ./.env:/opt/airflow/.env:ro
 #     - .:/opt/airflow/project
 #     - D:/FoundryAIAcademy/fa-c002-hub/fa-dae2-capstone-Dinh-Ngoc-Lam/capstone_dbt_project:/opt/airflow/capstone_dbt_project
-#     - D:/FoundryAIAcademy/fa-c002-hub/fa-dae2-capstone-Dinh-Ngoc-Lam/.dbt:/opt/airflow/.dbt
+#     - D:/FoundryAIAcademy/fa-c002-hub/fa-dae2-capstone-Dinh-Ngoc-Lam/capstone_dbt_project/.dbt:/opt/airflow/.dbt
 #   user: "${AIRFLOW_UID:-50000}:0"
 #   networks:
 #     - kafka_network
@@ -283,7 +283,7 @@ x-airflow-common: &airflow-common
     - ./.env:/opt/airflow/.env:ro
     - .:/opt/airflow/project
     - D:/FoundryAIAcademy/fa-c002-hub/fa-dae2-capstone-Dinh-Ngoc-Lam/capstone_dbt_project:/opt/airflow/capstone_dbt_project
-    - D:/FoundryAIAcademy/fa-c002-hub/fa-dae2-capstone-Dinh-Ngoc-Lam/.dbt:/opt/airflow/.dbt
+    - D:/FoundryAIAcademy/fa-c002-hub/fa-dae2-capstone-Dinh-Ngoc-Lam/capstone_dbt_project/.dbt:/opt/airflow/.dbt
     # Mounted read-only; machine-specific path (this dev's gcloud ADC token), same
     # convention as the hardcoded D:/... mounts above. Re-run
     # `gcloud auth application-default login` on the host if this ever expires/is
