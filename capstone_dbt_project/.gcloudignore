@@ -1,0 +1,8 @@
+# Cloud Build upload filter for the dbt-build image (gcloud builds submit from this dir).
+.gcloudignore
+.venv/
+.env
+.user.yml
+target/
+logs/
+dbt_packages/
