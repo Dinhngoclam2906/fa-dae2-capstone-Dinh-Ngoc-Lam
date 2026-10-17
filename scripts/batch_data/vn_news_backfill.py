@@ -375,8 +375,63 @@ class VnEconomyEn(VnEconomy):
         return hits or [f"{self.base_url}{want}"]
 
 
+class VietnamNet(HtmlNewsSource):
+    """VietNamNet (vietnamnet.vn). Monthly article sitemaps in 1,000-URL parts
+    (`sitemap-article-MM-YYYY-PP.xml`, back to 2005); JSON-LD NewsArticle carries
+    headline / datePublished / articleSection. Section comes from JSON-LD only: the
+    breadcrumb also holds the site's top navigation, so its last link is not the section.
+
+    Ids are the trailing number (`...-2565868.html`), prefixed with the source name:
+    VnExpress also uses bare 7-digit ids, and raw_data merges on article_id across
+    all sources, so bare numbers could collide."""
+    name = "vietnamnet"
+    base_url = "https://vietnamnet.vn"
+    sitemap_index_url = "https://vietnamnet.vn/sitemap.xml"
+    BODY_SELECTORS = ("div.maincontent.main-content", "div.content-detail")
+    SECTION_SELECTORS: tuple[str, ...] = ()
+    H1_SELECTORS = ("h1.content-detail-title", "h1")
+    _ID_RE = re.compile(r"-(\d{6,})\.html?(?:$|[?#])")
+
+    def article_id(self, url):
+        m = self._ID_RE.search(url)
+        return f"{self.name}-{m.group(1)}" if m else super().article_id(url)
+
+    def month_sitemap_urls(self, index_children, year, month):
+        pat = re.compile(rf"/sitemap-article-{month:02d}-{year}-\d+\.xml$")
+        return sorted(u for u in index_children if pat.search(u))
+
+
+class VietnamNetEn(VietnamNet):
+    """VietNamNet Global, the English edition (vietnamnet.vn/en). FORWARD-ONLY: its
+    index lists monthly article sitemaps but they all 404, so the only enumeration is
+    `/en/sitemap-news.xml` (~2.5 days of articles), read for the current month only.
+    The pages carry no category (JSON-LD has no articleSection, only free-form tags),
+    so the section is the breadcrumb's 'Vietnamnet global', which section_utils maps
+    to National News."""
+    name = "vietnamnet_en"
+    language = "en"
+    sitemap_index_url = "https://vietnamnet.vn/en/sitemap.xml"
+    SECTION_SELECTORS = ("[class*='bread'] a",)
+    DEFAULT_SECTION = "Vietnamnet global"
+
+    def parse_article(self, html, url, lastmod):
+        # An empty section would drop the row from fct_articles (inner join on
+        # dim_sections), so fall back to the edition's own label.
+        art = super().parse_article(html, url, lastmod)
+        if art is not None and not art.section_name:
+            art.section_name = self.DEFAULT_SECTION
+        return art
+
+    def month_sitemap_urls(self, index_children, year, month):
+        today = datetime.now(timezone.utc).date()
+        if (year, month) != (today.year, today.month):
+            return []
+        return [f"{self.base_url}/en/sitemap-news.xml"]
+
+
 SOURCES: dict[str, NewsSource] = {
-    s.name: s for s in (TuoiTre(), ThanhNien(), VnEconomy(), TuoiTreEn(), VnEconomyEn())
+    s.name: s
+    for s in (TuoiTre(), ThanhNien(), VnEconomy(), TuoiTreEn(), VnEconomyEn(), VietnamNet(), VietnamNetEn())
 }
 
 
@@ -405,6 +460,8 @@ def _parse_dt(s: str | None) -> datetime | None:
     if not s:
         return None
     s = _html.unescape(s).strip().replace("Z", "+00:00")
+    # vietnamnet.vn/en writes "2026-10-17T18:03:00.000 +07:00" (space before offset).
+    s = re.sub(r"\s+([+-]\d{2}:?\d{2})$", r"\1", s)
     try:
         dt = datetime.fromisoformat(s)
         return dt.astimezone(timezone.utc).replace(tzinfo=None) if dt.tzinfo else dt
