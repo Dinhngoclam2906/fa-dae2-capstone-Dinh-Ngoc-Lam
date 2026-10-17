@@ -33,11 +33,11 @@ The rapid pace of news publication requires frequent ingestion and analysis to s
 A multi-source, bilingual ingestion architecture:
 
 - **Guardian (English)** - HuggingFace historical archive (~87k articles) + Guardian Content API backfill/catch-up crawler, 1964 → present.
-- **Vietnamese news** - Tuổi Trẻ, Thanh Niên, and VnEconomy, crawled via a sitemap-driven resumable crawler (`scripts/batch_data/vn_news_backfill.py`), backfilled from 2026-01 and kept current every 4 hours.
+- **Vietnamese news** - Tuổi Trẻ, Thanh Niên, and VnEconomy, plus the **English editions** of Tuổi Trẻ (news.tuoitre.vn) and VnEconomy (en.vneconomy.vn), crawled via a sitemap-driven resumable crawler (`scripts/batch_data/vn_news_backfill.py`), backfilled from 2026-01 and kept current every 4 hours.
 - **Incremental Loading** - Per-source cursor + dedupe sidecar to avoid re-crawling/re-processing.
 - **Automated Orchestration** - Guardian and Vietnamese ingestion run unattended every 4 hours and `dbt build` runs daily, all via **Cloud Scheduler + Cloud Run Jobs** (serverless, scale-to-zero), with source-freshness checks and an email alert on any failed run. The Airflow DAGs remain available for local/manual runs.
 
-All sources land in one BigQuery table (`raw.raw_data`), tagged by `source_name` (`guardian`/`tuoitre`/`thanhnien`/`vneconomy`) and `language` (`en`/`vi`).
+All sources land in one BigQuery table (`raw.raw_data`), tagged by `source_name` (`guardian`/`tuoitre`/`thanhnien`/`vneconomy`/`tuoitre_en`/`vneconomy_en`) and `language` (`en`/`vi`).
 
 ### 5. Architecture Overview:
 
