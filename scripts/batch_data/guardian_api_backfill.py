@@ -17,6 +17,9 @@ Design:
   * A lock file (`<state>.lock`) refuses a second concurrent run - two crawlers racing
     on the same state file corrupts the cursor and doubles quota burn.
   * Downstream MERGE de-dupes on `article_id`, so overlapping re-runs are safe.
+  * Once caught up, the cursor rewinds to the last `--tail-days` (default today +
+    yesterday) instead of moving past `--to-date`, so a scheduled job keeps picking
+    up articles published later the same day.
 
 Guardian developer key limits (measured 2026-09-10): **500 requests / day**
 (`X-RateLimit-Limit-Day`), 60 / minute, resetting at midnight UTC. A ~7-call window
@@ -219,7 +222,10 @@ def save_state(path: Path, state: dict) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--from-date", default=HF_ARCHIVE_END, help="YYYY-MM-DD (inclusive)")
-    ap.add_argument("--to-date", default=date.today().isoformat(), help="YYYY-MM-DD (inclusive)")
+    ap.add_argument("--to-date", default=datetime.now(timezone.utc).date().isoformat(),
+                    help="YYYY-MM-DD (inclusive), default today in UTC")
+    ap.add_argument("--tail-days", type=int, default=2,
+                    help="once caught up, re-poll this many trailing days each run")
     ap.add_argument("--window-days", type=int, default=7)
     ap.add_argument("--page-size", type=int, default=200)
     ap.add_argument("--max-pages", type=int, default=60, help="safety cap per window")
@@ -251,6 +257,12 @@ def main() -> int:
 
     state = {} if args.reset else load_state(args.state_file)
     cursor = date.fromisoformat(state["cursor_date"]) if state.get("cursor_date") else start
+    tail_start = max(end - timedelta(days=args.tail_days - 1), start)
+    if cursor > tail_start:
+        # State written before the tail re-poll existed parked the cursor past `end`.
+        logger.info("Saved cursor %s is inside/after the tail; re-polling from %s",
+                    cursor, tail_start)
+        cursor = tail_start
     if cursor > start:
         logger.info("Resuming from saved cursor %s (--from-date was %s)", cursor, start)
 
@@ -268,6 +280,7 @@ def main() -> int:
     calls_this_run = 0
     windows_this_run = 0
     stop_reason = ""
+    caught_up = False
     try:
         while cursor <= end:
             win_to = min(cursor + timedelta(days=args.window_days - 1), end)
@@ -293,7 +306,14 @@ def main() -> int:
                 cursor, win_to, n, calls, calls_this_run, args.max_calls,
             )
 
-            cursor = win_to + timedelta(days=1)
+            caught_up = win_to >= end
+            if caught_up:
+                # Never park the cursor past `end`: the cursor is day-granular, and
+                # `end` (today) is still filling up. Rewinding to the tail keeps the
+                # last --tail-days re-polled on every run; MERGE de-dupes on article_id.
+                cursor = tail_start
+            else:
+                cursor = win_to + timedelta(days=1)
             state.update(
                 cursor_date=cursor.isoformat(),
                 windows_done=windows,
@@ -303,6 +323,8 @@ def main() -> int:
             )
             save_state(args.state_file, state)
 
+            if caught_up:
+                break
             if calls_this_run >= args.max_calls:
                 stop_reason = f"hit --max-calls ({args.max_calls})"
                 logger.warning("%s - state saved at cursor %s", stop_reason, cursor)
@@ -323,7 +345,7 @@ def main() -> int:
     finally:
         lock.unlink(missing_ok=True)
 
-    done = cursor > end
+    done = caught_up
     logger.info("=" * 64)
     logger.info("Backfill %s | cursor now %s", "COMPLETE" if done else "PAUSED", cursor)
     if not done:
