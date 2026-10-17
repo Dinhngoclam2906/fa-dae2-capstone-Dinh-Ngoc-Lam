@@ -539,14 +539,15 @@ def fetch_sitemap(
     *,
     sleep: float,
     listed: bool = True,
-    tries: int = 4,
+    tries: int = 8,
 ) -> list[tuple[str, datetime | None]]:
     """Entries of one sitemap, retrying truncated bodies and flaky errors.
 
     Only a 404 on a URL we guessed ourselves (listed=False, e.g. a day-chunk that
     may not exist) means "no such sitemap" and returns []. A 404 on a sitemap the
     index lists is retried like any other failure (news.tuoitre.vn flips the same
-    URL between 200 and 404). Raises SitemapError when every attempt fails."""
+    URL between 200 and 404, roughly every other request - 4 tries still failed about
+    one chunk per month, hence 8). Raises SitemapError when every attempt fails."""
     last: Exception | None = None
     for attempt in range(tries):
         try:
@@ -558,7 +559,7 @@ def fetch_sitemap(
         except SitemapError as e:
             last = e
         logger.warning("sitemap %s: %s - retry %d/%d", url, last, attempt + 1, tries)
-        time.sleep(min(30, 3 * 2**attempt))
+        time.sleep(min(30, 2 * 2**attempt))
     raise SitemapError(f"{url}: {last}")
 
 
