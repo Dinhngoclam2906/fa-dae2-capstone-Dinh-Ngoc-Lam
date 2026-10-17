@@ -198,6 +198,26 @@ def _jsonld_article(soup) -> dict:
     return {}
 
 
+def _jsonld_breadcrumb_section(html: str) -> str:
+    """Second item (the top-level section, after the home crumb) of the first JSON-LD
+    BreadcrumbList, or ''."""
+    soup = BeautifulSoup(html, "lxml" if _has_lxml() else "html.parser")
+    for s in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        try:
+            data = json.loads(s.string or s.get_text() or "")
+        except (ValueError, TypeError):
+            continue
+        for node in data if isinstance(data, list) else [data]:
+            if isinstance(node, dict) and node.get("@type") == "BreadcrumbList":
+                items = sorted(node.get("itemListElement") or [],
+                               key=lambda i: i.get("position", 0) if isinstance(i, dict) else 0)
+                names = [i.get("name") or (i["item"].get("name") if isinstance(i.get("item"), dict) else "") or ""
+                         for i in items if isinstance(i, dict)]
+                if len(names) >= 2:
+                    return _clean(names[1])
+    return ""
+
+
 _STRIP_IN_BODY = (
     "script, style, figure, figcaption, table, .article-actions, .box-advertisement, "
     "[class*='advertisement'], [class*='__related'], [class*='related-news'], "
@@ -396,6 +416,15 @@ class VietnamNet(HtmlNewsSource):
     def article_id(self, url):
         m = self._ID_RE.search(url)
         return f"{self.name}-{m.group(1)}" if m else super().article_id(url)
+
+    def parse_article(self, html, url, lastmod):
+        # ~5% of pages have no NewsArticle JSON-LD (so no articleSection), only a
+        # BreadcrumbList ('Trang chủ' > 'Thời sự' > 'Pháp luật'); its second crumb is
+        # the same top-level section. An empty one would drop the row from fct_articles.
+        art = super().parse_article(html, url, lastmod)
+        if art is not None and not art.section_name:
+            art.section_name = _jsonld_breadcrumb_section(html)
+        return art
 
     def month_sitemap_urls(self, index_children, year, month):
         pat = re.compile(rf"/sitemap-article-{month:02d}-{year}-\d+\.xml$")
