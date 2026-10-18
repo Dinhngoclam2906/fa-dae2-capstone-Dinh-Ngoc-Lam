@@ -45,6 +45,8 @@ import polars as pl
 import requests
 from dotenv import load_dotenv
 
+import raw_archive
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -152,14 +154,16 @@ def crawl_window(
     page_size: int,
     sleep_s: float,
     max_pages: int,
-) -> tuple[list[dict], int, bool]:
-    """Return (rows, calls_made, ok) for one date window (inclusive both ends).
-    ok is False if a page could not be fetched or max_pages was hit - the caller
-    must NOT advance the cursor past a not-ok window. DailyQuotaExhausted
-    propagates (stop the whole crawl)."""
+) -> tuple[list[dict], list[dict], int, bool]:
+    """Return (rows, raw_records, calls_made, ok) for one date window (inclusive both
+    ends). raw_records are the API result objects as received, one per parsed row
+    (Bronze; see raw_archive.py). ok is False if a page could not be fetched or
+    max_pages was hit - the caller must NOT advance the cursor past a not-ok window.
+    DailyQuotaExhausted propagates (stop the whole crawl)."""
     crawl_ts = datetime.now(timezone.utc).replace(tzinfo=None)
     f, t = win_from.isoformat(), win_to.isoformat()
     rows: list[dict] = []
+    raws: list[dict] = []
     calls = 0
     page = 1
     while page <= max_pages:
@@ -177,16 +181,28 @@ def crawl_window(
                 time.sleep(2 ** attempt)
         else:
             logger.error("window %s..%s page %d failed after retries", f, t, page)
-            return rows, calls, False
+            return rows, raws, calls, False
 
-        rows.extend(parse_results(resp.get("results", []), crawl_ts))
+        fetched_at = datetime.now(timezone.utc)
+        results = resp.get("results", [])
+        parsed = parse_results(results, crawl_ts)
+        rows.extend(parsed)
+        kept = {r["article_id"] for r in parsed}
+        raws.extend(
+            raw_archive.record(
+                "guardian", it["id"], it.get("webUrl") or "",
+                json.dumps(it, ensure_ascii=False), "json", fetched_at,
+                api_window=f"{f}..{t}", api_page=page,
+            )
+            for it in results if it.get("id") in kept
+        )
         pages = resp.get("pages", 1)
         if page >= pages:
-            return rows, calls, True
+            return rows, raws, calls, True
         page += 1
         time.sleep(sleep_s)
     logger.warning("window %s..%s hit max_pages=%d - narrow --window-days", f, t, max_pages)
-    return rows, calls, False
+    return rows, raws, calls, False
 
 
 def write_window(rows: list[dict], output_dir: Path, run_tag: str) -> int:
@@ -232,6 +248,9 @@ def main() -> int:
     ap.add_argument("--max-calls", type=int, default=450, help="stop before the 500/day dev cap")
     ap.add_argument("--sleep", type=float, default=0.2, help="seconds between page calls")
     ap.add_argument("--output-dir", type=Path, default=Path("data/batch/guardian_api_parquet"))
+    ap.add_argument("--raw-archive-dir", default=str(raw_archive.DEFAULT_DIR),
+                    help="Bronze: raw API results per window as .jsonl.gz ('' disables); "
+                         "upload with raw_archive.py upload")
     ap.add_argument("--state-file", type=Path, default=Path("data/batch/guardian_api_state.json"))
     ap.add_argument("--reset", action="store_true", help="ignore saved state, start at --from-date")
     args = ap.parse_args()
@@ -284,7 +303,7 @@ def main() -> int:
     try:
         while cursor <= end:
             win_to = min(cursor + timedelta(days=args.window_days - 1), end)
-            rows, calls, ok = crawl_window(
+            rows, raws, calls, ok = crawl_window(
                 session, cursor, win_to, args.page_size, args.sleep, args.max_pages
             )
             calls_this_run += calls
@@ -298,6 +317,10 @@ def main() -> int:
                 break
 
             n = write_window(rows, args.output_dir, f"{run_tag}-{windows:04d}")
+            raw_archive.write_records(
+                raws, "guardian", f"{run_tag}-{windows:04d}",
+                Path(args.raw_archive_dir) if args.raw_archive_dir else None,
+            )
             total_rows += n
             windows += 1
             windows_this_run += 1

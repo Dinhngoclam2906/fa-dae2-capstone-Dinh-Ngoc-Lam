@@ -75,6 +75,8 @@ from pathlib import Path
 import polars as pl
 import requests
 
+import raw_archive
+
 try:
     from bs4 import BeautifulSoup
 except ModuleNotFoundError:  # --dry-run (sitemap walk only) still works without it
@@ -805,6 +807,7 @@ def crawl_month(
     output_dir: Path,
     seen_path: Path,
     run_tag: str,
+    raw_dir: Path | None = raw_archive.DEFAULT_DIR,
     flush_every: int = 100,
 ) -> tuple[int, bool, int]:
     """Return (n_written, ok, n_new_urls). ok is False on a sitemap failure or when the
@@ -818,7 +821,9 @@ def crawl_month(
     articles, not just once at month-end - a month can be thousands of articles and
     take a long time at this crawler's real throughput, so incremental flushing is
     what makes data show up in the output directory while a month is still in
-    progress, and it also means a kill mid-month loses at most one partial batch."""
+    progress, and it also means a kill mid-month loses at most one partial batch.
+    Each flush also writes the batch's raw HTML to `raw_dir` (Bronze; see
+    raw_archive.py), unless it is None."""
     crawl_ts = datetime.now(timezone.utc).replace(tzinfo=None)
 
     frontier: dict[str, tuple[str, datetime | None]] = {}
@@ -855,7 +860,8 @@ def crawl_month(
         _aid, (loc, lastmod) = item
         try:
             html = fetch(session, loc, sleep=sleep).decode("utf-8", "replace")
-            return source.parse_article(html, loc, lastmod)
+            fetched_at = datetime.now(timezone.utc)
+            return source.parse_article(html, loc, lastmod), html, fetched_at, lastmod
         except FetchError as e:
             logger.warning("article %s: %s", loc, e)
             return None
@@ -868,28 +874,38 @@ def crawl_month(
     failed = 0
     part = 0
     buffer: list[dict] = []
+    raw_buffer: list[dict] = []
 
     def _flush():
-        nonlocal written, part, buffer
+        nonlocal written, part, buffer, raw_buffer
         if not buffer:
             return
         part += 1
-        n = write_month(buffer, output_dir, f"{run_tag}-{year}{month:02d}-p{part}")
+        tag = f"{run_tag}-{year}{month:02d}-p{part}"
+        n = write_month(buffer, output_dir, tag)
+        raw_archive.write_records(raw_buffer, source.name, tag, raw_dir)
         written += n
         ids = [r["article_id"] for r in buffer]
         append_seen(seen_path, ids)
         seen.update(ids)
         buffer = []
+        raw_buffer = []
 
     if items:
         with ThreadPoolExecutor(max_workers=max(1, concurrency)) as ex:
             futures = [ex.submit(_one, item) for item in items]
             for fut in as_completed(futures):
-                art = fut.result()
+                res = fut.result()
+                art = res[0] if res else None
                 if art is None:
                     failed += 1
                     continue
                 parsed += 1
+                _, html, fetched_at, lastmod = res
+                raw_buffer.append(raw_archive.record(
+                    source.name, art.article_id, art.web_url, html, "html", fetched_at,
+                    sitemap_lastmod=lastmod.isoformat() if lastmod else None,
+                ))
                 buffer.append(
                     {
                         "article_id": art.article_id,
@@ -958,6 +974,9 @@ def main() -> int:
         help="per-worker delay between requests; aggregate rate ~= concurrency/sleep",
     )
     ap.add_argument("--output-dir", type=Path, default=Path("data/batch/vn_news_parquet"))
+    ap.add_argument("--raw-archive-dir", default=str(raw_archive.DEFAULT_DIR),
+                    help="Bronze: raw HTML per flush as .jsonl.gz ('' disables); "
+                         "upload with raw_archive.py upload")
     ap.add_argument(
         "--state-file",
         type=Path,
@@ -1048,6 +1067,7 @@ def main() -> int:
                 realtime_floor=realtime_floor, budget=budget,
                 output_dir=args.output_dir / args.source,
                 seen_path=seen_path, run_tag=run_tag,
+                raw_dir=Path(args.raw_archive_dir) if args.raw_archive_dir else None,
             )
             run_new += n
             totals += n

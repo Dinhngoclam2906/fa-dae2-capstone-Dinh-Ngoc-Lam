@@ -30,6 +30,8 @@ for p in $pids; do
 done
 
 python scripts/batch_data/load_raw_to_bigquery.py --source vn --max-bytes-billed 6000000000 || rc=1
+# Bronze: raw HTML -> gs://$GCS_RAWHTML_BUCKET/raw/ (see raw_archive.py).
+python scripts/batch_data/raw_archive.py upload || rc=1
 
 python scripts/batch_data/sync_job_state.py push vn-ingestion
 

@@ -82,6 +82,7 @@ Key Features:
   - `vn-ingestion` (`15 */4 * * *` UTC, offset so the two `MERGE`s into `raw.raw_data` never overlap) - the three VN crawlers in parallel, then one load.
 - Both crawlers keep their cursor on the still-filling tail (today + yesterday for Guardian, the current month for VN) instead of moving past it, so every run picks up articles published since the last one; the downstream `MERGE` dedupes on `article_id`.
 - Cloud Run Jobs start from a clean container every invocation (no local disk persists between runs), so `sync_job_state.py` round-trips the crawler's cursor file and the loader's pending-merge state through a GCS prefix (pull before the run, push after - always, even on a partial failure, so an advanced cursor is never lost).
+- **Bronze raw archive** (`raw_archive.py`): every article the crawlers store is also kept exactly as received (VN page HTML, Guardian API JSON) as gzipped JSON Lines, uploaded each run to the Coldline bucket at `gs://<rawhtml bucket>/raw/source=<s>/fetch_date=<d>/`. Append-only (never overwritten), so a parser fix is an offline re-parse instead of a re-crawl, and Guardian's repeat fetches are kept as version history.
 - Verified end-to-end: a forced trigger produces a real Cloud Run execution run by the `dbt-runner` service account (confirmed via `gcloud run jobs executions list`), not a manual one.
 
 **5.1.2.5. Automated dbt + monitoring** (`capstone_dbt_project/Dockerfile`):
@@ -369,6 +370,7 @@ fa-dae2-capstone-Dinh-Ngoc-Lam/
 │   │   ├── vn_news_backfill.py / run_vn_backfill_all.sh         # Tuổi Trẻ / Thanh Niên / VnEconomy crawler
 │   │   ├── load_raw_to_bigquery.py                              # Parquet → GCS → BigQuery raw.raw_data
 │   │   ├── sync_job_state.py                                    # Cloud Run Job: pull/push cursor + pending-merge state to GCS
+│   │   ├── raw_archive.py                                       # Bronze: raw HTML / API JSON as .jsonl.gz -> Coldline bucket
 │   │   ├── run_ingestion_job.sh                                 # guardian-ingestion entrypoint (sync state → crawl → load → sync state)
 │   │   ├── run_vn_ingestion_job.sh                              # vn-ingestion entrypoint (3 VN crawlers in parallel → load)
 │   │   └── requirements-ingestion.txt                           # Minimal deps for the ingestion container image

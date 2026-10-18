@@ -15,6 +15,8 @@ python scripts/batch_data/sync_job_state.py pull
 rc=0
 python scripts/batch_data/guardian_api_backfill.py --max-calls 60 || rc=1
 python scripts/batch_data/load_raw_to_bigquery.py --source api --max-bytes-billed 6000000000 || rc=1
+# Bronze: raw API payloads -> gs://$GCS_RAWHTML_BUCKET/raw/ (see raw_archive.py).
+python scripts/batch_data/raw_archive.py upload || rc=1
 
 python scripts/batch_data/sync_job_state.py push
 
