@@ -1,0 +1,9 @@
+# Minimal deps for the embed-sync Cloud Run Job (Dockerfile.embed): just what
+# embed_articles.py, sync_vector_index.py and core/{config,bq}.py import.
+google-cloud-bigquery==3.45.0
+google-genai==1.75.0
+pinecone==7.3.0
+polars==1.33.1
+pyarrow==21.0.0
+numpy==2.3.3
+python-dotenv==1.1.1

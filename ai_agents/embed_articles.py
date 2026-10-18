@@ -264,7 +264,7 @@ def cmd_embed(args):
 def cmd_status(_):
     ensure_table()
     sql = f"""
-    SELECT model, COUNT(*) AS rows, COUNT(DISTINCT article_id) AS articles,
+    SELECT model, COUNT(*) AS n_rows, COUNT(DISTINCT article_id) AS articles,
            SUM(input_tokens) AS tokens, MIN(embedded_at) AS first, MAX(embedded_at) AS last
     FROM `{table_ref()}` GROUP BY model
     """
