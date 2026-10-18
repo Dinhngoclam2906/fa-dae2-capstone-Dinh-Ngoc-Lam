@@ -178,6 +178,11 @@ def embed_one(text: str) -> tuple[list[float], int]:
 def load_rows(rows: list[dict]):
     if not rows:
         return
+    # Stamp at save time, not embed time: the sync's watermark is "embedded_at <= cutoff", so a
+    # row stamped minutes before it reached BigQuery could fall behind a sync that ran in
+    # between and never be copied (302 rows on 2026-10-18). Don't run a sync during an embed.
+    now = datetime.now(timezone.utc)
+    rows = [{**r, "embedded_at": now} for r in rows]
     df = pl.DataFrame(rows, schema={
         "article_id": pl.Utf8, "content_hash": pl.Utf8, "source_name": pl.Utf8, "language": pl.Utf8,
         "section_group": pl.Utf8, "web_publication_date": pl.Datetime("us", "UTC"), "web_title": pl.Utf8,
