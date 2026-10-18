@@ -218,10 +218,14 @@ def cmd_embed(args):
     for month, n in months:
         rows = pending_rows(month, args.limit)
         logger.info("%s: %d pending", month.strftime("%Y-%m"), len(rows))
-        with ThreadPoolExecutor(args.workers) as ex:
-            futs = {ex.submit(embed_one, doc_text(r)): r for r in rows}
-            for fut in as_completed(futs):
-                r = futs[fut]
+        ex = ThreadPoolExecutor(args.workers)
+        futs = {ex.submit(embed_one, doc_text(r)): r for r in rows}
+        try:
+            # Stall watchdog: on 2026-10-18 a flaky network left all 16 requests hung (no CPU,
+            # no progress for 26 min) despite the per-request timeout. If nothing completes
+            # for --stall-seconds, save what we have and exit non-zero; a rerun resumes.
+            for fut in as_completed(futs, timeout=args.stall_seconds):
+                r = futs.pop(fut)  # pop: don't keep every finished vector of the month in memory
                 try:
                     vec, ntok = fut.result()
                 except Exception as e:  # noqa: BLE001 - left pending; the next run retries it
@@ -252,7 +256,15 @@ def cmd_embed(args):
                     load_rows(batch)
                     done += len(batch)
                     logger.error("token budget %.0fM reached - stopping (rerun to continue)", args.max_tokens / 1e6)
+                    ex.shutdown(wait=False, cancel_futures=True)
                     return 2
+        except TimeoutError:
+            load_rows(batch)
+            logger.error("STALLED: nothing completed for %ds; saved %d rows, exiting (rerun to resume)",
+                         args.stall_seconds, done + len(batch))
+            logging.shutdown()
+            os._exit(3)  # hung worker threads would block a normal exit
+        ex.shutdown(wait=True)
     load_rows(batch)
     done += len(batch)
     logger.info("DONE: %d embedded, %d failed (left pending), %.1fM tokens ≈ $%.2f, BigQuery %.2f GB billed, %.0f min",
@@ -283,6 +295,7 @@ def main() -> int:
     e.add_argument("--limit", type=int, default=None, help="smoke test: at most N articles from the newest month")
     e.add_argument("--workers", type=int, default=16)
     e.add_argument("--flush", type=int, default=2000)
+    e.add_argument("--stall-seconds", type=int, default=300, help="exit (resumably) if nothing completes this long")
     e.add_argument("--max-tokens", type=float, default=200e6, help="stop once this many tokens are used (cost guard)")
     e.add_argument("--price-per-m", type=float, default=0.20, help="USD per 1M tokens, for progress estimates")
     sub.add_parser("status")
