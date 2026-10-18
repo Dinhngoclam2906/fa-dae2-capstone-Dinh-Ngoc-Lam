@@ -73,6 +73,29 @@ def _q(sql: str, params: list | None = None, max_bytes: int = 1_000_000_000):
     return rows
 
 
+def _q_stream(sql: str, params: list, page_size: int = 1000, max_bytes: int = 1_000_000_000):
+    """Yield rows page by page: a whole month of 768-float rows as Python objects can
+    exceed the Cloud Run job's 2 GiB (it OOM-killed the first full sync)."""
+    from google.cloud import bigquery
+    cfg = bigquery.QueryJobConfig(query_parameters=params, maximum_bytes_billed=max_bytes,
+                                  labels={"app": "sync-vector-index"})
+    job = bq.client().query(sql, job_config=cfg)
+    yield from job.result(page_size=page_size)
+    bq.usage["bytes_billed"] += job.total_bytes_billed or 0
+
+
+def _upsert(index, chunk: list[dict]) -> None:
+    for attempt in range(5):
+        try:
+            index.upsert(vectors=chunk, namespace=settings.articles_namespace_v2)
+            return
+        except Exception as e:  # noqa: BLE001
+            if attempt == 4:
+                raise
+            logger.warning("upsert retry %d: %s", attempt + 1, str(e)[:150])
+            time.sleep(2 ** attempt)
+
+
 def _state_table() -> str:
     return f"{_p()}.vectors.sync_state"
 
@@ -130,29 +153,28 @@ def cmd_sync(args):
     done, kb = 0, 0.0
     for m, n in todo:
         m_next = datetime(m.year + (m.month // 12), m.month % 12 + 1, 1, tzinfo=timezone.utc)
-        rows = _q(f"""SELECT article_id, source_name, language, section_group, web_publication_date,
+        rows = _q_stream(f"""SELECT article_id, source_name, language, section_group, web_publication_date,
                              web_title, web_url, snippet, embedding
                       FROM `{_p()}.vectors.article_embeddings`
                       WHERE {where} AND web_publication_date >= @m AND web_publication_date < @m_next
                       ORDER BY embedded_at""",
                   params + [bq.p("m", m, "TIMESTAMP"), bq.p("m_next", m_next, "TIMESTAMP")])
-        vecs = [to_vector(r) for r in rows]
-        for i in range(0, len(vecs), args.batch):
-            chunk = vecs[i:i + args.batch]
-            for attempt in range(5):
-                try:
-                    index.upsert(vectors=chunk, namespace=settings.articles_namespace_v2)
-                    break
-                except Exception as e:  # noqa: BLE001
-                    if attempt == 4:
-                        raise
-                    logger.warning("upsert retry %d: %s", attempt + 1, str(e)[:150])
-                    time.sleep(2 ** attempt)
+        chunk, n_month = [], 0
+        for r in rows:
+            chunk.append(to_vector(r))
+            if len(chunk) == args.batch:
+                _upsert(index, chunk)
+                kb += sum(_record_kb(v) for v in chunk)
+                n_month += len(chunk)
+                chunk = []
+        if chunk:
+            _upsert(index, chunk)
             kb += sum(_record_kb(v) for v in chunk)
-        done += len(vecs)
+            n_month += len(chunk)
+        done += n_month
         cp["months"].append(m.isoformat())
         CHECKPOINT.write_text(json.dumps(cp))
-        logger.info("%s: %d upserted (%d/%d, ≈ %.2fM WU so far)", m.strftime("%Y-%m"), len(vecs), done, n_total, kb / 1e6)
+        logger.info("%s: %d upserted (%d/%d, ≈ %.2fM WU so far)", m.strftime("%Y-%m"), n_month, done, n_total, kb / 1e6)
     _q(f"INSERT INTO `{_state_table()}` VALUES (@i, @w, CURRENT_TIMESTAMP())",
        [bq.p("i", settings.pinecone_index_v2), bq.p("w", cutoff, "TIMESTAMP")])
     CHECKPOINT.unlink(missing_ok=True)
