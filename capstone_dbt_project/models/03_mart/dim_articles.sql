@@ -24,6 +24,10 @@ WITH base_articles AS (
     AND has_valid_content = TRUE
   {% if is_incremental() %}
     AND crawl_timestamp > TIMESTAMP_SUB((SELECT MAX(valid_from) FROM {{ this }}), INTERVAL 7 DAY)  -- Incremental: Recent crawls only
+    -- The crawl_timestamp filter alone doesn't prune staging (partitioned on
+    -- web_publication_date), so every run read all of staging (~2.7 GB). Staging only
+    -- refreshes these months anyway; a deep backfill widens the window via the var.
+    AND {{ recent_publication_months('web_publication_date') }}
   {% endif %}
 ),
 
