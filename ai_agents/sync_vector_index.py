@@ -142,6 +142,9 @@ def cmd_sync(args):
     months = _q(f"""SELECT TIMESTAMP_TRUNC(web_publication_date, MONTH) AS m, COUNT(*) AS n
                     FROM `{_p()}.vectors.article_embeddings` WHERE {where} GROUP BY m ORDER BY m DESC""", params)
     todo = [(r["m"], r["n"]) for r in months if r["m"].isoformat() not in cp["months"]]
+    if args.before:  # resume a run whose checkpoint was lost (newer months already upserted)
+        b = datetime.strptime(args.before, "%Y-%m").replace(tzinfo=timezone.utc)
+        todo = [(m, n) for m, n in todo if m < b]
     n_total = sum(n for _, n in todo)
     est_wu = n_total * 2.8  # ~2.7 KB per record measured; the "at least 1 WU per KB" rule
     logger.info("to sync: %d vectors in %d months (since %s), ≈ %.2fM write units", n_total, len(todo), since, est_wu / 1e6)
@@ -199,6 +202,8 @@ def main() -> int:
     s = sub.add_parser("sync")
     s.add_argument("--batch", type=int, default=100)
     s.add_argument("--max-write-units", type=float, default=1.6e6)
+    s.add_argument("--before", metavar="YYYY-MM",
+                   help="only months before this one; resumes a sync that died after upserting the newer months")
     sub.add_parser("status")
     args = ap.parse_args()
     return {"sync": cmd_sync, "status": cmd_status}[args.cmd](args)
