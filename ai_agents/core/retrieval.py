@@ -99,9 +99,70 @@ def _dense_articles(query: str, k: int) -> list[Candidate]:
     return out
 
 
+@lru_cache(maxsize=1)
+def _genai_client():
+    from google import genai
+    from google.genai import types
+    # gemini-embedding-2 is served from Vertex AI's `global` location only.
+    return genai.Client(vertexai=True, project=settings.gcp_project, location="global",
+                        http_options=types.HttpOptions(timeout=15_000))
+
+
+@lru_cache(maxsize=1)
+def _index_v2():
+    from pinecone import Pinecone
+    return Pinecone(api_key=os.environ["PINECONE_API_KEY"]).Index(settings.pinecone_index_v2)
+
+
+def embed_query(query: str, dims: int = 512) -> list[float]:
+    """The question as gemini-embedding-2 expects it (task in the text, no task_type),
+    truncated to the index's dims and re-normalised."""
+    import numpy as np
+    from google.genai import types
+    r = _genai_client().models.embed_content(
+        model=settings.query_embedding_model, contents=[f"task: search result | query: {query}"],
+        config=types.EmbedContentConfig(output_dimensionality=768))
+    v = np.asarray(r.embeddings[0].values[:dims], dtype=np.float64)
+    return (v / np.linalg.norm(v)).tolist()
+
+
+def _pinecone_filter(filters: dict) -> dict | None:
+    """Source / language / section / date filters, applied inside Pinecone (v2 metadata)."""
+    from datetime import datetime, timedelta, timezone
+    f: dict = {}
+    for key, field in (("source", "source_name"), ("language", "language"), ("section_group", "section_group")):
+        if filters.get(key):
+            f[field] = {"$eq": filters[key]}
+    if filters.get("start_date") or filters.get("end_date") or filters.get("days"):
+        start, end = articles.window(filters.get("start_date"), filters.get("end_date"), filters.get("days"))
+        lo = datetime.combine(start, datetime.min.time(), timezone.utc) - timedelta(hours=7)
+        hi = datetime.combine(end + timedelta(days=1), datetime.min.time(), timezone.utc) - timedelta(hours=7)
+        f["pub_ts"] = {"$gte": int(lo.timestamp()), "$lt": int(hi.timestamp())}
+    return f or None
+
+
+def _dense_articles_v2(query: str, k: int, filters: dict) -> list[Candidate]:
+    res = _index_v2().query(vector=embed_query(query), top_k=k, include_metadata=True,
+                            namespace=settings.articles_namespace_v2, filter=_pinecone_filter(filters))
+    out = []
+    for m in res.matches:
+        md = m.metadata or {}
+        out.append(Candidate(
+            text=f"{md.get('title', '')}. {md.get('snippet', '')}", article_id=m.id,
+            title=md.get("title", ""), section_group=md.get("section_group", ""),
+            source_name=md.get("source_name", ""), language=md.get("language", ""),
+            published_date=md.get("pub_date", ""), url=md.get("url", ""), method="dense_v2",
+        ))
+    return out
+
+
 def _dense_user_docs(query: str, k: int, session_id: str | None) -> list[Candidate]:
+    # Check the session BEFORE touching the store: initialising the v1 store is slow
+    # (and was pure waste with no session: a 100 s first retrieval, 2026-10-18).
+    if not session_id:
+        return []
     vs = vector_store()
-    if vs is None or not session_id:
+    if vs is None:
         return []
     out = []
     for doc in vs.similarity_search(query, k=k, namespace=settings.user_docs_namespace,
@@ -148,15 +209,17 @@ def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: boo
                     top_n: int = 5, include_user_docs: bool = True, **filters) -> RetrievalResult:
     """Dense + user docs + keyword search in parallel -> dedupe -> FlashRank -> top_n.
     `filters` (source, language, section_group, start_date, end_date, days) apply to
-    the keyword search; dense results are post-filtered on source/language."""
+    the keyword search, and to dense v2 inside Pinecone (v1 post-filters source/language)."""
     t0 = time.time()
     keywords = extract_keywords(query)
     k_dense, k_user, k_sql = (8, 4, 15) if demo_mode else (10, 5, 10)
-    stats: dict[str, Any] = {"query": query, "keywords": keywords, "demo_mode": demo_mode}
+    stats: dict[str, Any] = {"query": query, "keywords": keywords, "demo_mode": demo_mode,
+                             "article_vectors": settings.article_vectors}
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
         jobs = {
-            "dense": ex.submit(_dense_articles, query, k_dense),
+            "dense": (ex.submit(_dense_articles_v2, query, k_dense, filters) if settings.article_vectors == "v2"
+                      else ex.submit(_dense_articles, query, k_dense)),
             "user_docs": ex.submit(_dense_user_docs, query, k_user, session_id if include_user_docs else None),
             "keyword": ex.submit(_keyword, keywords, k_sql, filters) if keywords else None,
         }
@@ -173,8 +236,8 @@ def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: boo
     stats["retrieve_ms"] = int((time.time() - t0) * 1000)
 
     dense = found["dense"]
-    for key in ("source", "language"):
-        if filters.get(key):
+    for key in ("source", "language"):  # v2 already filtered inside Pinecone
+        if filters.get(key) and settings.article_vectors != "v2":
             attr = "source_name" if key == "source" else "language"
             dense = [c for c in dense if getattr(c, attr) == filters[key]]
     cands = _dedupe(found["user_docs"] + _interleave(dense, found["keyword"]))

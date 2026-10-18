@@ -56,6 +56,14 @@ class Settings:
     articles_namespace: str = os.getenv("PINECONE_ARTICLES_NAMESPACE", "guardian_articles")
     user_docs_namespace: str = os.getenv("PINECONE_USER_DOCS_NAMESPACE", "user_documents")
 
+    # Embeddings v2: gemini-embedding-2 article vectors (BigQuery vectors.article_embeddings,
+    # 768 dims) served from this index at 512 dims. "v1" keeps the original Guardian-only
+    # OpenAI chunk index for article search (uploads stay on the v1 index either way).
+    article_vectors: str = os.getenv("AGENT_ARTICLE_VECTORS", "v1")
+    pinecone_index_v2: str = os.getenv("PINECONE_INDEX_V2", "news-articles-v2")
+    articles_namespace_v2: str = os.getenv("PINECONE_ARTICLES_NAMESPACE_V2", "articles")
+    query_embedding_model: str = os.getenv("QUERY_EMBEDDING_MODEL", "gemini-embedding-2")
+
     # Conversation turns sent to the LLM (older turns stay in memory, not in the prompt).
     history_turns: int = _int("AGENT_HISTORY_TURNS", 6)
     # Questions per session per hour (public demo guard).
