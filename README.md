@@ -11,9 +11,10 @@ Daily News AI Assistant is an intelligent chatbot powered by a **hybrid RAG (Ret
 
 > **Migration note:** the data warehouse moved from Snowflake to **BigQuery** (the
 > Snowflake trial expired). The dbt transformation layer and raw ingestion already run
-> on BigQuery. The AI agent's SQL tool layer (`ai_agents/capstone_tool_calling_agent.py`)
-> is intentionally still frozen on the old Snowflake-based code pending a later
-> migration phase - see `PROGRESS_LOG.md` for the full roadmap and current phase status.
+> on BigQuery, and since 2026-10-18 so does the AI agent (`ai_agents/core/`): its tools
+> query `marts.obt_articles` across all 10 sources. The semantic index is still the
+> original Guardian-only Pinecone index until it is rebuilt for all sources (agent phase,
+> step 2) - see `PROGRESS_LOG.md` for the roadmap and current phase status.
 
 ## Project Structure
 ### **1. Problem & Scope**:
@@ -249,9 +250,12 @@ Ref: dim_articles.section_key > dim_sections.section_key
 
 #### **5.3. AI Agent Architecture**
 
-> As noted above, the agent's SQL tool currently still targets the old Snowflake-based
-> layer (frozen, not yet repointed at BigQuery) - the box below reflects the live code,
-> not the current data platform.
+> One implementation in `ai_agents/core/` behind both front ends (`app.py` Streamlit,
+> `cli_agent.py` terminal). Keyword search and every tool run on BigQuery with
+> parameterised queries, a date window (partition pruning) and a per-query
+> `maximum_bytes_billed` cap. The three searches run in parallel; Vietnamese queries use
+> syllable-pair keywords and the multilingual FlashRank model; uploaded PDFs are visible
+> only to the session that uploaded them.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -271,7 +275,7 @@ Ref: dim_articles.section_key > dim_sections.section_key
                    ▼                   ▼
      ┌──────────────────────┐  ┌──────────────────────┐
      │   DENSE SEARCH       │  │    SQL SEARCH        │
-     │   (Pinecone)         │  │    (Snowflake)       │
+     │   (Pinecone)         │  │    (BigQuery)        │
      │                      │  │                      │
      │ • Semantic matching  │  │ • Keyword extraction │
      │ • 2 namespaces:      │  │ • Multi-keyword OR   │
@@ -339,11 +343,12 @@ Ref: dim_articles.section_key > dim_sections.section_key
 ```
 fa-dae2-capstone-Dinh-Ngoc-Lam/
 ├── .github/workflows/
-│   └── pr_ci.yml                                  # PR CI: lint + dbt test (still Snowflake-configured)
-├── ai_agents/                                      # RAG agent (frozen on Snowflake pending migration)
-│   ├── app.py / app_demo.py / cli_agent.py         # Three entrypoints, same pipeline
-│   ├── capstone_tool_calling_agent.py              # Snowflake tool-calling layer
-│   ├── data_ingestion_to_pinecone.py               # Snowflake → Pinecone embedding pipeline
+│   └── pr_ci.yml                                  # PR CI: lint + dbt test on BigQuery (keyless WIF)
+├── ai_agents/                                      # RAG agent (BigQuery since 2026-10-18)
+│   ├── core/                                       # The agent: config, bq, articles, text, retrieval, tools, agent, memory, uploads
+│   ├── app.py / cli_agent.py                       # Streamlit and terminal front ends over core/
+│   ├── capstone_tool_calling_agent.py              # Compatibility shim for the eval scripts
+│   ├── data_ingestion_to_pinecone.py               # Old Snowflake → Pinecone pipeline (replaced in step 2)
 │   ├── document_upload_ingestion.py + services/    # User-uploaded doc ingestion
 │   ├── evaluation.py / baseline_systems.py         # Retrieval strategy comparison + eval harness
 │   └── label_ground_truth*.py / visualize_results.py
