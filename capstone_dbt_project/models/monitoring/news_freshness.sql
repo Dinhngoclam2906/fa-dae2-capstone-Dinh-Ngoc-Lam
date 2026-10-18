@@ -8,13 +8,12 @@ WITH latest_runs AS (
   SELECT
     MAX(web_publication_date) AS latest_pub_date,
     COALESCE(MAX(dbt_updated_at), CURRENT_TIMESTAMP()) AS last_dbt_run,  -- COALESCE fallback if missing
-    COUNT(DISTINCT article_id) AS recent_articles,
+    COUNTIF(web_publication_date >= TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY))) AS recent_articles,  -- Last week
     CURRENT_TIMESTAMP() AS check_timestamp,
-    -- Track row drops for quality gating
-    (SELECT COUNT(*) FROM {{ ref('stg_sf__guardian') }}) AS staging_total,
-    COUNT(DISTINCT article_id) AS fact_total  -- Reuse recent_articles as proxy; adjust if needed for full count
-  FROM {{ ref('fct_articles') }}
-  WHERE web_publication_date >= TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY))  -- Last week
+    -- Track row drops for quality gating: obt_articles keeps one row per valid article
+    (SELECT COUNT(DISTINCT article_id) FROM {{ ref('stg_sf__guardian') }}) AS staging_total,
+    COUNT(*) AS fact_total
+  FROM {{ ref('obt_articles') }}
 )
 
 SELECT

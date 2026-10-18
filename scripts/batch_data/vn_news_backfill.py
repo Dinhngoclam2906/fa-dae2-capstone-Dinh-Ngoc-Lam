@@ -420,7 +420,7 @@ class VietnamNet(HtmlNewsSource):
     def parse_article(self, html, url, lastmod):
         # ~5% of pages have no NewsArticle JSON-LD (so no articleSection), only a
         # BreadcrumbList ('Trang chủ' > 'Thời sự' > 'Pháp luật'); its second crumb is
-        # the same top-level section. An empty one would drop the row from fct_articles.
+        # the same top-level section. An empty one would land in the 'Other' group.
         art = super().parse_article(html, url, lastmod)
         if art is not None and not art.section_name:
             art.section_name = _jsonld_breadcrumb_section(html)
@@ -445,8 +445,8 @@ class VietnamNetEn(VietnamNet):
     DEFAULT_SECTION = "Vietnamnet global"
 
     def parse_article(self, html, url, lastmod):
-        # An empty section would drop the row from fct_articles (inner join on
-        # dim_sections), so fall back to the edition's own label.
+        # An empty section would land in the 'Other' group, so fall back to the
+        # edition's own label.
         art = super().parse_article(html, url, lastmod)
         if art is not None and not art.section_name:
             art.section_name = self.DEFAULT_SECTION

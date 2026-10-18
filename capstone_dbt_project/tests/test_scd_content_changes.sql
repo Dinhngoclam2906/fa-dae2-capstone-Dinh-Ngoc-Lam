@@ -1,3 +1,5 @@
+-- Disabled with the frozen star schema (dim_articles), 2026-10-18.
+{{ config(enabled=false) }}
 -- Advanced test: Validate SCD model loads without null changes (passes if no bad rows; demo-ready)
 {% if adapter.type() == 'bigquery' %}
     SELECT 1 AS validation_check

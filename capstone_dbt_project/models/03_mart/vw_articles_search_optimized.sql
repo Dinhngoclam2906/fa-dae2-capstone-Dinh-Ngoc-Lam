@@ -3,18 +3,21 @@
     schema='marts'
 ) }}
 
+-- The agent's SQL lexical search. Reads the obt_articles OBT (one row per article);
+-- section_key / is_current are kept so the existing agent queries still work.
 SELECT
-  a.article_id,
-  LOWER(a.web_title) AS web_title_lower,
-  LOWER(a.body_text) AS body_text_lower,
-  a.web_title,
-  a.web_publication_date,
-  a.web_url,
-  a.section_key,
-  s.section_name,
-  a.is_current,
-  a.data_source,
-  LEFT(a.body_text, 500) AS preview
-FROM {{ ref('fct_articles') }} a
-JOIN {{ ref('dim_sections') }} s ON a.section_key = s.section_key
-WHERE a.is_current = TRUE
+  article_id,
+  LOWER(web_title) AS web_title_lower,
+  LOWER(body_text) AS body_text_lower,
+  web_title,
+  web_publication_date,
+  web_url,
+  UPPER(section_name) AS section_key,
+  section_name,
+  section_group,
+  TRUE AS is_current,
+  data_source,
+  source_name,
+  language,  -- noqa: RF04
+  preview
+FROM {{ ref('obt_articles') }}

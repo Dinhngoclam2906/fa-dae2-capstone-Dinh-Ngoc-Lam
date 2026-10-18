@@ -90,13 +90,13 @@ Key Features:
 
 **5.1.3. dbt Transformation:**
 
-The dbt (data build tool) layer transforms raw multi-source article data into a **star schema** optimized for analytics and RAG retrieval, running on **BigQuery**:
+The dbt (data build tool) layer transforms raw multi-source article data into **`obt_articles`**, a One Big Table the RAG agent reads, running on **BigQuery**:
 - **Data Quality Validation** - Staging layer with comprehensive quality checks (source-aware: Guardian's fixed batch/realtime cutoff date vs. the VN crawler's crawl-relative rule)
-- **SCD Type 2** - Tracks article version history (title/content changes)
-- **Incremental Loading** - Efficient processing of only new/changed data, partitioned by month
-- **Bilingual sections** - `section_utils` buckets English and Vietnamese section names into the same groups; `fct_articles` carries `source_name` / `language`
+- **One Big Table** - one row per article (current version) with the section group, source, language, word count, preview and a `content_hash` (the re-embedding signal) denormalised in. Fully derivable from raw, so `--full-refresh` is always safe
+- **Incremental Loading** - each run replaces only the recent publication-month partitions, so BigQuery prunes the read
+- **Bilingual sections** - `section_utils` buckets English and Vietnamese section names (incl. VietNamNet / VnExpress sub-sections) into 12 groups; an empty section maps to `Other` instead of dropping the article
 - **Local time** - storage stays UTC; display-only `*_local` columns render `Asia/Ho_Chi_Minh` wall-clock time
-- **Star Schema** - Dimensions + Facts for fast analytical queries
+- **Star schema, frozen** - the original Kimball model (`dim_articles` with SCD Type 2, `dim_sections`, `dim_date`, `fct_articles`) was frozen on 2026-10-18 and copied to the `marts_archive` dataset. The agent only ever needed a flat article table, and the star schema's inner joins silently dropped articles with an empty section. See `docs/decision_obt_serving_layer.md`
 - **Automated Testing** - 40+ data quality tests
 
 #### **5.2. Tech Stacks:**
@@ -113,6 +113,8 @@ The dbt (data build tool) layer transforms raw multi-source article data into a 
 - **GitHub Actions:** PR CI (`dbt debug` → `deps` → SQLFluff → `dbt test`) against BigQuery, authenticated **keylessly** via Workload Identity Federation as a read-only `ci-runner` service account.
 
 #### **ERD:**
+
+The live path is `raw_data` → `stg_sf__guardian` → `obt_articles` → `vw_articles_search_optimized`. The image and the `dim_*` / `fct_articles` tables below show the **frozen** star schema (archived in `marts_archive`, no longer built).
 
 <img src="images/ERD.png" width="100%" alt="Data Architecture">
 
@@ -213,7 +215,29 @@ Table fct_articles {
   Note: 'Fact: Article events (granular per crawl), partitioned by web_publication_date (month)'
 }
 
-// Relationships (star schema)
+Table obt_articles {
+  article_id string [pk, unique]
+  web_title string
+  body_text text
+  preview string
+  word_count integer
+  web_url string
+  web_publication_date timestamp
+  section_name string
+  section_group string
+  source_name string
+  language string
+  data_source string
+  content_hash string
+  crawl_timestamp timestamp
+  loaded_at timestamp
+  dbt_updated_at timestamp
+  Note: 'LIVE serving table (OBT): one row per article, partitioned by web_publication_date (month), clustered by source_name, section_group, language'
+}
+
+Ref: stg_sf__guardian.article_id - obt_articles.article_id
+
+// Relationships (frozen star schema)
 Ref: stg_sf__guardian.article_id > dim_articles.article_id
 Ref: stg_sf__guardian.section_name > dim_sections.section_key
 Ref: fct_articles.date_id > dim_date.date_id
@@ -329,7 +353,7 @@ fa-dae2-capstone-Dinh-Ngoc-Lam/
 │   ├── models/
 │   │   ├── 01_staging/                             # stg_sf__guardian, _sources.yml
 │   │   ├── 02_intermediate/                        # int_article_metrics (ephemeral)
-│   │   ├── 03_mart/                                # dim_date, dim_sections, dim_articles, fct_articles, vw_articles_search_optimized
+│   │   ├── 03_mart/                                # obt_articles (live), vw_articles_search_optimized; dim_* / fct_articles (frozen, disabled)
 │   │   └── monitoring/                             # news_freshness
 │   ├── tests/                                      # assert_data_source_consistency, test_scd_content_changes
 │   ├── dbt_project.yml

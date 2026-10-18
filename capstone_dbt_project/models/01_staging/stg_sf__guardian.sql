@@ -2,7 +2,7 @@
 --
 -- Incremental by publication month: each run re-reads and replaces only the whole
 -- month partitions from (today - incremental_lookback_days) onwards (macro
--- recent_publication_months, shared with fct_articles). raw_data is MONTH-
+-- recent_publication_months, shared with obt_articles). raw_data is MONTH-
 -- partitioned on web_publication_date, so this filter prunes the read to 2-3 months
 -- instead of the full table (BigQuery bills scanned columns per partition; a filter
 -- on crawl_timestamp/loaded_at would not reduce the bill). Every new or re-crawled
@@ -10,9 +10,9 @@
 -- current month), and the window starts on a month boundary, so insert_overwrite
 -- never replaces a partition with only part of its rows.
 --
--- Staging is fully derivable from raw, so --full-refresh is always safe here (unlike
--- fct_articles / dim_articles). Use it after any load of OLD articles (a deep backfill
--- or load_raw_to_bigquery.py --truncate) - see the macro for the full procedure.
+-- Staging is fully derivable from raw, so --full-refresh is always safe here (as it is
+-- for obt_articles). Use `dbt build --full-refresh` after any load of OLD articles (a
+-- deep backfill or load_raw_to_bigquery.py --truncate) - see the macro.
 {{ config(
     materialized='incremental',
     incremental_strategy='insert_overwrite',

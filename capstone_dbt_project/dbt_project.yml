@@ -17,6 +17,18 @@ models:
       schema: marts
       +cluster_by: ["loaded_at"]
       +enabled: true
+      # Star schema FROZEN 2026-10-18: the agent reads obt_articles instead. The tables
+      # stay in `marts` untouched and are copied to `marts_archive` (M02 evidence; they
+      # hold crawl/version history that raw no longer has). Don't re-enable: they'd
+      # merge stale state into the archive's twins.
+      dim_articles:
+        +enabled: false
+      dim_sections:
+        +enabled: false
+      dim_date:
+        +enabled: false
+      fct_articles:
+        +enabled: false
     monitoring:
       materialized: table
       schema: monitoring
@@ -34,7 +46,8 @@ vars:
   # different value would silently re-key rows. Cloud Run: Secret Manager news-salt.
   news_salt: "{{ env_var('NEWS_SALT') }}"
   local_timezone: 'Asia/Ho_Chi_Minh'  # display-only *_local columns; storage stays UTC
-  incremental_lookback_days: 40  # stg/fct reprocess publication months from today - 40d (macro recent_publication_months)
+  incremental_lookback_days: 40  # stg/obt reprocess publication months from today - 40d (macro recent_publication_months)
+  # (dim_articles, now frozen, used it too)
   
 # Documentation configuration
 docs-paths: ["docs"]
