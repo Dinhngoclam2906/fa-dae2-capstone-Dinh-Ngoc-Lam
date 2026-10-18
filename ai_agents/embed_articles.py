@@ -33,7 +33,7 @@ import os
 import random
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import datetime, timezone
 
 import numpy as np
@@ -224,7 +224,17 @@ def cmd_embed(args):
             # Stall watchdog: on 2026-10-18 a flaky network left all 16 requests hung (no CPU,
             # no progress for 26 min) despite the per-request timeout. If nothing completes
             # for --stall-seconds, save what we have and exit non-zero; a rerun resumes.
-            for fut in as_completed(futs, timeout=args.stall_seconds):
+            # (Not as_completed(timeout=...): that bounds the WHOLE loop, so it cut every
+            # month off 300 s after it started - the first Cloud Run attempt.)
+            pending = set(futs)
+            completed: list = []
+            while pending or completed:
+                if not completed:
+                    finished, pending = wait(pending, timeout=args.stall_seconds, return_when=FIRST_COMPLETED)
+                    if not finished:
+                        raise TimeoutError
+                    completed = list(finished)
+                fut = completed.pop()
                 r = futs.pop(fut)  # pop: don't keep every finished vector of the month in memory
                 try:
                     vec, ntok = fut.result()
