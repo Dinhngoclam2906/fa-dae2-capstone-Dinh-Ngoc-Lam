@@ -130,24 +130,29 @@ def _openai(texts: list[str], kind: str) -> np.ndarray:
     return np.array(out, dtype=np.float32)
 
 
-def _gemini(texts: list[str], kind: str) -> np.ndarray:
+def _gemini(texts: list[str], kind: str, model: str = "gemini-embedding-001",
+            location: str = "asia-southeast1") -> np.ndarray:
     from google import genai
     from google.genai import types
     # A per-request timeout: the first run hung for 20+ minutes on one request that never
     # returned (all 5,064 others had succeeded), because the client waits forever by default.
-    if "gemini" not in _CLIENTS:
-        _CLIENTS["gemini"] = genai.Client(vertexai=True, project=os.environ["GCP_PROJECT"], location="asia-southeast1",
-                                          http_options=types.HttpOptions(timeout=30_000))
-    c = _CLIENTS["gemini"]
-    task = "RETRIEVAL_DOCUMENT" if kind == "doc" else "RETRIEVAL_QUERY"
-    partial = CACHE / f"partial_gemini_{kind}.json"
+    key = f"gemini@{location}"
+    if key not in _CLIENTS:
+        _CLIENTS[key] = genai.Client(vertexai=True, project=os.environ["GCP_PROJECT"], location=location,
+                                     http_options=types.HttpOptions(timeout=30_000))
+    c = _CLIENTS[key]
+    tag = model.replace("gemini-embedding-", "gemini")
+    # gemini-embedding-001 takes task_type; gemini-embedding-2 rejects it ("You cannot use the
+    # task_type field") and expects the task written into the text instead (see _gemini2).
+    task = None if model == "gemini-embedding-2" else ("RETRIEVAL_DOCUMENT" if kind == "doc" else "RETRIEVAL_QUERY")
+    partial = CACHE / f"partial_{tag}_{kind}.json"
     done: dict[str, list[float]] = json.loads(partial.read_text()) if kind == "doc" and partial.exists() else {}
 
     def one(i_t):
         i, t = i_t
         for attempt in range(6):
             try:
-                r = c.models.embed_content(model="gemini-embedding-001", contents=[t],
+                r = c.models.embed_content(model=model, contents=[t],
                                            config=types.EmbedContentConfig(task_type=task, output_dimensionality=1536))
                 return i, r.embeddings[0].values
             except Exception as e:  # noqa: BLE001 - timeouts / 429s; back off and retry
@@ -182,13 +187,27 @@ def _e5(texts: list[str], kind: str) -> np.ndarray:
                       show_progress_bar=kind == "doc").astype(np.float32)
 
 
-MODELS = {"openai": _openai, "gemini": _gemini, "e5": _e5}
+def _gemini2(texts: list[str], kind: str) -> np.ndarray:
+    # gemini-embedding-2 (GA 2026-04-22, the listed replacement for 001) is served from
+    # the `global` location on Vertex, not asia-southeast1 (probed 2026-10-18). Its documented
+    # retrieval formats: documents "title: {title} | text: {content}", queries
+    # "task: search result | query: {content}" (asymmetric, the task inside the text).
+    if kind == "doc":
+        texts = [f"title: {t.partition(chr(10) * 2)[0]} | text: {t.partition(chr(10) * 2)[2]}" for t in texts]
+    else:
+        texts = [f"task: search result | query: {t}" for t in texts]
+    return _gemini(texts, kind, model="gemini-embedding-2", location="global")
+
+
+MODELS = {"openai": _openai, "gemini": _gemini, "gemini2": _gemini2, "e5": _e5}
 # Scored variants: (label, model, dims) - dims=None keeps the full vector.
 VARIANTS = [
     ("openai-3-small@1536", "openai", None), ("openai-3-small@512", "openai", 512),
     ("openai-3-small@256", "openai", 256),
     ("gemini-001@1536", "gemini", None), ("gemini-001@768", "gemini", 768),
     ("gemini-001@512", "gemini", 512), ("gemini-001@256", "gemini", 256),
+    ("gemini-2@1536", "gemini2", None), ("gemini-2@768", "gemini2", 768),
+    ("gemini-2@512", "gemini2", 512), ("gemini-2@256", "gemini2", 256),
     ("multilingual-e5-base@768", "e5", None),
 ]
 

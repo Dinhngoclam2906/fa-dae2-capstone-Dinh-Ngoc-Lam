@@ -1,9 +1,10 @@
 # Embedding-model bake-off (2026-10-18)
 
 **Question:** which embedding model to use for article-level vectors (agent phase, step 2).
-**Answer:** `gemini-embedding-001` (Vertex AI). Store it at 768 dimensions in BigQuery and
-serve 512 (or 256) dimensions from Pinecone. Final go-ahead pending the user's choice of
-backfill scope and a check of the official price.
+**Answer:** Gemini. **Recommended: `gemini-embedding-2`** (GA 2026-04-22, Google's listed
+replacement for `gemini-embedding-001`), which ties 001 on quality once given its documented
+input format (see *Addendum*). Store 768 dimensions in BigQuery and serve 512 (or 256) from
+Pinecone. Scope: the full corpus, covered by the GCP free-trial credit.
 
 ## Setup
 
@@ -31,6 +32,10 @@ backfill scope and a check of the official price.
 | gemini-embedding-001 @768 | 1.00 | 1.00 | 1.00 | 1.00 | 0.98 | 0.97 | 0.17 s |
 | gemini-embedding-001 @512 | 1.00 | 1.00 | 1.00 | 1.00 | 0.97 | 0.96 | 0.17 s |
 | gemini-embedding-001 @256 | 1.00 | 1.00 | 1.00 | 1.00 | 0.96 | 0.95 | 0.17 s |
+| gemini-embedding-2 @1536 | 1.00 | 1.00 | 1.00 | 1.00 | 0.96 | 0.93 | 0.38 s |
+| gemini-embedding-2 @768 | 1.00 | 1.00 | 1.00 | 1.00 | 0.97 | 0.95 | 0.38 s |
+| gemini-embedding-2 @512 | 1.00 | 1.00 | 1.00 | 1.00 | 0.96 | 0.93 | 0.38 s |
+| gemini-embedding-2 @256 | 1.00 | 1.00 | 1.00 | 1.00 | 0.96 | 0.95 | 0.38 s |
 | text-embedding-3-small @1536 | 0.97 | 1.00 | 0.96 | 0.96 | 0.86 | 0.79 | 0.98 s |
 | text-embedding-3-small @512 | 0.95 | 1.00 | 0.88 | 0.96 | 0.80 | 0.73 | 0.98 s |
 | text-embedding-3-small @256 | 0.92 | 1.00 | 0.80 | 0.96 | 0.80 | 0.75 | 0.98 s |
@@ -84,3 +89,31 @@ last 12 months ≈ $17.
    Pinecone to 256 **without re-embedding** (truncation of the stored vector).
 3. **Fallback:** OpenAI `text-embedding-3-small` if cost matters more than cross-lingual
    quality ($5 vs $26 one-off).
+
+## Addendum (same day): `gemini-embedding-2`
+
+Found while checking the official price before the backfill: Google's Gemini API pricing page
+lists **Gemini Embedding 2** ($0.20 per 1M tokens standard, $0.10 batch) and no longer lists
+001. Google's deprecation page names `gemini-embedding-2` as the replacement for 001 (its
+snapshots disagree on 001's shutdown date: July 2026 vs May 2028). On our Vertex project it is
+served from the `global` location only (404 in asia-southeast1 and us-central1).
+
+- **First run (unfair):** with 001's `task_type` parameter and plain text, R@10 was 0.95 and
+  hit@1 0.77-0.84. The docs say `task_type` cannot be used with this model (it was silently
+  ignored) and that the task goes into the text.
+- **Rerun with the documented formats:** documents `title: {title} | text: {lead}`, queries
+  `task: search result | query: {question}`. R@10 1.00 in every type, hit@1 0.93-0.95, MRR
+  0.96-0.97: a tie with 001 within noise (1-2 of 75 questions).
+- **Other differences:**
+  - several texts passed directly in `contents` are merged into ONE vector, so wrap each input
+    separately (or use the Batch API);
+  - input limit 8,192 tokens (001: 2,048);
+  - truncated outputs come back normalised;
+  - embedding spaces are incompatible with 001, so moving later means re-embedding everything.
+- **Tokens:** identical to 001 (EN 323, VI 418 per article), so the full backfill is
+  ≈ 177M × $0.20/1M ≈ **$35** (Gemini API list price; the Vertex page could not be read).
+  Ongoing ≈ $2.50/month.
+
+**Recommendation: `gemini-embedding-2`.** Same quality, longer input, and no forced
+re-embedding when 001 retires. Costs: ~2x the query latency (0.38 s vs 0.17 s, small next to the
+LLM) and ~$9 more for the backfill (covered by the trial credit).
