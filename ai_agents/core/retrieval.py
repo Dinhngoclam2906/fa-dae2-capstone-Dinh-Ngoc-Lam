@@ -206,45 +206,56 @@ def _dedupe(cands: list[Candidate]) -> list[Candidate]:
 
 
 def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: bool = False,
-                    top_n: int = 5, include_user_docs: bool = True, **filters) -> RetrievalResult:
+                    top_n: int = 5, include_user_docs: bool = True, article_vectors: str | None = None,
+                    rerank: bool = True, **filters) -> RetrievalResult:
     """Dense + user docs + keyword search in parallel -> dedupe -> FlashRank -> top_n.
     `filters` (source, language, section_group, start_date, end_date, days) apply to
-    the keyword search, and to dense v2 inside Pinecone (v1 post-filters source/language)."""
+    the keyword search, and to dense v2 inside Pinecone (v1 post-filters source/language).
+    `article_vectors` ("v1" / "v2", default from settings) and `rerank=False` are for the
+    eval (ai_agents/eval/retrieval_eval.py)."""
     t0 = time.time()
+    vectors = article_vectors or settings.article_vectors
     keywords = extract_keywords(query)
     k_dense, k_user, k_sql = (8, 4, 15) if demo_mode else (10, 5, 10)
     stats: dict[str, Any] = {"query": query, "keywords": keywords, "demo_mode": demo_mode,
-                             "article_vectors": settings.article_vectors}
+                             "article_vectors": vectors}
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+    # Not a `with` block: its exit waits for every thread, so one hung leg (a network call
+    # that never returns, seen on v1 Pinecone 2026-10-19) would hang the whole question
+    # despite the 20 s timeout. shutdown(wait=False) abandons a hung leg instead.
+    ex = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+    try:
         jobs = {
-            "dense": (ex.submit(_dense_articles_v2, query, k_dense, filters) if settings.article_vectors == "v2"
+            "dense": (ex.submit(_dense_articles_v2, query, k_dense, filters) if vectors == "v2"
                       else ex.submit(_dense_articles, query, k_dense)),
             "user_docs": ex.submit(_dense_user_docs, query, k_user, session_id if include_user_docs else None),
             "keyword": ex.submit(_keyword, keywords, k_sql, filters) if keywords else None,
         }
         found: dict[str, list[Candidate]] = {}
+        deadline = time.time() + 20
         for name, fut in jobs.items():
             try:
-                found[name] = fut.result(timeout=20) if fut else []
+                found[name] = fut.result(timeout=max(0.1, deadline - time.time())) if fut else []
             except Exception as e:  # noqa: BLE001 - one failed leg must not kill retrieval
-                logger.warning("retrieval leg %s failed: %s", name, e)
-                stats[f"{name}_error"] = str(e)[:200]
+                logger.warning("retrieval leg %s failed: %r", name, e)
+                stats[f"{name}_error"] = repr(e)[:200]
                 found[name] = []
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
     for name, cands in found.items():
         stats[name] = len(cands)
     stats["retrieve_ms"] = int((time.time() - t0) * 1000)
 
     dense = found["dense"]
     for key in ("source", "language"):  # v2 already filtered inside Pinecone
-        if filters.get(key) and settings.article_vectors != "v2":
+        if filters.get(key) and vectors != "v2":
             attr = "source_name" if key == "source" else "language"
             dense = [c for c in dense if getattr(c, attr) == filters[key]]
     cands = _dedupe(found["user_docs"] + _interleave(dense, found["keyword"]))
     stats["unique"] = len(cands)
 
     t1 = time.time()
-    if len(cands) >= MIN_RERANK:
+    if rerank and len(cands) >= MIN_RERANK:
         from flashrank import RerankRequest
         multilingual = is_vietnamese(query) or any(c.language == "vi" for c in cands)
         model = RERANK_MULTILINGUAL if multilingual else RERANK_EN
