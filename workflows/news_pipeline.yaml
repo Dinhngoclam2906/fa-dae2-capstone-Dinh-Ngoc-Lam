@@ -3,8 +3,8 @@
 #   guardian-ingestion -> vn-ingestion [-> dbt-build -> embed-sync]
 #
 # Each step starts a job and waits for its execution to finish before the next one.
-# Argument {"transform": true} adds dbt-build + embed-sync (the daily run); otherwise only
-# ingestion runs (the 4-hourly runs). Deployed and scheduled by workflows/deploy.sh.
+# Argument {"transform": true} adds dbt-build + embed-sync (the scheduled runs pass it);
+# without it only ingestion runs. Deployed and scheduled by workflows/deploy.sh.
 #
 # Failure rules:
 #   - an ingestion failure doesn't block the next step: sources are independent and the

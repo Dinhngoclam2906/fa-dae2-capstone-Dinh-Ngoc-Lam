@@ -32,5 +32,7 @@ upsert_schedule() {
     --oauth-service-account-email="$SA"
 }
 
-upsert_schedule news-pipeline-daily  "0 0 * * *"      true   # ingestion + dbt + embed
-upsert_schedule news-pipeline-ingest "0 4-20/4 * * *" false  # ingestion only
+# Full chain every 4h, so the agent sees new articles within ~4h (avg ~2h). Every 3h
+# (~590 GB/month billed vs ~450) cuts the avg wait to ~1.6h; timing the runs to each
+# source's peak hours gains only ~10 min (PROGRESS_LOG full history, 2026-10-19).
+upsert_schedule news-pipeline-trigger "0 */4 * * *" true
