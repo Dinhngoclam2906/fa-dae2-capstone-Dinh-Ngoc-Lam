@@ -73,7 +73,14 @@ models:
         tests:
           - not_null:
               severity: warn
+          # Only the months each incremental run rewrites; older partitions keep the
+          # processed_at of the run that last touched them. Same predicate as macro
+          # recent_publication_months (custom macros can't be called from YAML config).
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "{{ column_name }} > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)"
+              config:
+                where: >-
+                  web_publication_date >= TIMESTAMP(DATE_TRUNC(DATE_SUB(CURRENT_DATE(),
+                  INTERVAL {{ var('incremental_lookback_days', 40) }} DAY), MONTH))
               severity: warn
