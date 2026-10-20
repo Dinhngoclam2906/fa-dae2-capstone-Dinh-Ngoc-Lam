@@ -6,8 +6,8 @@ and is the hybrid recipe (dense + keyword + FlashRank rerank) still the right on
 
 **Answer:** move to v2, and **drop the reranker and the keyword interleaving from the
 automatic retrieval**: v2 dense alone wins every question group, at ~0.7 s and 0 BigQuery
-bytes. BigQuery `VECTOR_SEARCH` is ruled out on cost. **Status: recommendation made, not yet
-applied** (the user paused here to return later; see "Proposed change").
+bytes. BigQuery `VECTOR_SEARCH` is ruled out on cost. **Status: applied 2026-10-20**, with a
+soft recency rule added; uploads are still on v1. See "Cut-over".
 
 ## Setup
 
@@ -89,14 +89,47 @@ Latency and cost per question:
 retrieval on known-item; topical grades are an LLM's, from snippets. Direction is clear,
 magnitudes approximate.
 
-## Proposed change (step 1b, not applied yet)
+## Cut-over (step 1b, applied 2026-10-20)
 
-1. `AGENT_ARTICLE_VECTORS=v2` as the default.
-2. Automatic retrieval = **v2 dense top 5**, no FlashRank, no keyword interleave.
-3. Keep keyword search as an LLM tool (exact names/ids; articles not yet embedded, now ≤ 4 h).
-4. Then: move user uploads off the v1 index `guardian-capstone`, delete v1.
-5. Verify by re-running `retrieval_eval.py run --systems v2_dense` against the new default
-   (and a quick multi-turn agent check), then update this doc.
+What changed (`ai_agents/core/`):
+1. `AGENT_ARTICLE_VECTORS` now defaults to `v2`.
+2. New setting `AGENT_RETRIEVAL_MODE`, default `dense`: automatic retrieval is **v2 dense
+   top 5**, with no FlashRank and no keyword interleave. `hybrid` is the old pipeline; demo
+   mode runs it, for comparison.
+3. Keyword search stays an LLM tool (`search_articles_by_keywords`). `search_news` now runs
+   the dense search with the filters applied inside Pinecone.
+4. **Soft recency (new, not in the original proposal).** Dense search has no sense of
+   time: "Tin mới nhất về giá vàng" ranked January articles first. The old hybrid hid this,
+   because the keyword leg's 90-day default window supplied recency.
+   - When a question has a time phrase (`core.text.recency_days`: latest / today / this
+     week / mới nhất / hôm nay / tuần này … → 3, 7, 30 or 31 days) and no explicit dates,
+     the top 3 hits from that window come first, then the best hits of all dates.
+   - A *hard* window was tried first. It lost 8 of 100 known-item questions, whose "recent"
+     or "last week" referred to the article's own time, not today's.
+5. **Warm-up.** The Vertex and Pinecone clients load in the background when the app or CLI
+   starts. The first question used to spend ~14 s initialising, close to the 20 s retrieval
+   deadline. Client creation is now locked: two cold threads each built a client, and the
+   garbage-collected one closed its HTTP connection mid-request.
+6. **Not done:** user uploads stay on the v1 index `guardian-capstone`, because the user
+   plans to remove the upload feature. Delete v1 only after that.
+
+Verification. Both systems were re-run on the same day's index (+1,426 articles since
+2026-10-19, which moved a few `v2_dense` numbers):
+
+| Setup | Known recall@5 / hit@1 | EN recent | VI recent | EN→VI | EN old | VI old | Topical P@5 / NDCG@5 | p50 |
+|---|---|---|---|---|---|---|---|---|
+| v2_dense (re-run) | 0.95 / 0.75 | 1.00 / 0.95 | 0.95 / 0.65 | 0.90 / 0.55 | 0.95 / 0.85 | 0.95 / 0.75 | 0.83 / 0.81 | 0.77 s |
+| **agent_default** (new production path) | **0.96 / 0.71** | 1.00 / 0.90 | 1.00 / 0.70 | 0.90 / 0.55 | 0.95 / 0.70 | 0.95 / 0.70 | **0.83 / 0.80** | 0.83 s |
+
+The two are equal within noise (~20 questions per group), against 0.22 / 0.31 for the old
+production path. The eval can't measure the recency gain itself: its questions take their
+time words from the article. A 5-turn agent conversation (`ask()`: VI → VI follow-up →
+"summarize the first article" → EN with a year → thanks) behaved correctly: follow-up,
+back-reference to the previous sources, small-talk skip, cited recent sources.
+
+Observed, not caused by the cut-over: Vietnamese questions get English answers in both
+modes (gpt-4o-mini ignores prompt rule 3). Turn 1 also calls `browse_articles` twice even
+when the context already answers it (~18 s for that turn).
 
 ## Incident during the run
 

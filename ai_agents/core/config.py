@@ -57,11 +57,15 @@ class Settings:
     user_docs_namespace: str = os.getenv("PINECONE_USER_DOCS_NAMESPACE", "user_documents")
 
     # Embeddings v2: gemini-embedding-2 article vectors (BigQuery vectors.article_embeddings,
-    # 768 dims) served from this index at 512 dims. "v1" keeps the original Guardian-only
-    # OpenAI chunk index for article search (uploads stay on the v1 index either way).
-    article_vectors: str = os.getenv("AGENT_ARTICLE_VECTORS", "v1")
+    # 768 dims) served from this index at 512 dims. "v1" is the original Guardian-only
+    # OpenAI chunk index: the eval's v1 systems, and user uploads still live there.
+    article_vectors: str = os.getenv("AGENT_ARTICLE_VECTORS", "v2")
     pinecone_index_v2: str = os.getenv("PINECONE_INDEX_V2", "news-articles-v2")
     articles_namespace_v2: str = os.getenv("PINECONE_ARTICLES_NAMESPACE_V2", "articles")
+    # Automatic retrieval. "dense": v2 dense only, ranked by similarity (the 2026-10-19 eval
+    # winner, docs/eval_refresh.md). "hybrid": dense + keyword interleave + FlashRank, the
+    # pre-eval pipeline (demo mode runs it, for comparison).
+    retrieval_mode: str = os.getenv("AGENT_RETRIEVAL_MODE", "dense")
     query_embedding_model: str = os.getenv("QUERY_EMBEDDING_MODEL", "gemini-embedding-2")
 
     # Conversation turns sent to the LLM (older turns stay in memory, not in the prompt).

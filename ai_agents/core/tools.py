@@ -50,9 +50,10 @@ def _safe(fn):
 def search_news(query: str, start_date: Optional[str] = None, end_date: Optional[str] = None,
                 source: Optional[str] = None, language: Optional[str] = None,
                 section_group: Optional[str] = None, limit: int = 5) -> dict[str, Any]:
-    """Hybrid search (semantic + keyword, reranked) for articles about a topic. Use for a
-    follow-up that needs different or filtered results than the context already given,
-    e.g. a date range, a source or a language. Filters: """
+    """Semantic search for articles about a topic, in any language (an English query
+    finds Vietnamese articles too). Use for a follow-up that needs different or filtered
+    results than the context already given, e.g. a date range, a source or a language.
+    For exact names, numbers or quotes use search_articles_by_keywords. Filters: """
     from core.retrieval import hybrid_retrieve
     res = hybrid_retrieve(query, top_n=max(1, min(limit, 10)), include_user_docs=False,
                           start_date=start_date, end_date=end_date, source=source,

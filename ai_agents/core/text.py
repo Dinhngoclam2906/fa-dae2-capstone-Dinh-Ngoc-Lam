@@ -122,6 +122,27 @@ _REACTIONS = [
 ]
 
 
+# (pattern, days): the first match sets the window. Dense search has no sense of time,
+# so "latest gold price" ranked January articles first (2026-10-20); the old hybrid got
+# recency for free from the keyword search's 90-day default window.
+_RECENCY = [
+    (r"\b(today|tonight|yesterday|this morning|breaking)\b|hôm nay|hôm qua|sáng nay|tối nay|chiều nay", 3),
+    (r"\b(this|past|last) week\b|\bthis weekend\b|tuần này|tuần qua|cuối tuần", 7),
+    (r"\b(this|past|last) month\b|tháng này|tháng qua", 31),
+    (r"\b(latest|recent|recently|newest|right now|nowadays)\b"
+     r"|mới nhất|gần đây|hiện nay|hiện tại|cập nhật|vừa qua|mới đây", 30),
+]
+
+
+def recency_days(query: str) -> int | None:
+    """Days of recent news the question asks for (\"latest ...\", \"tuần này\"), else None."""
+    q = query.lower()
+    for pattern, days in _RECENCY:
+        if re.search(pattern, q):
+            return days
+    return None
+
+
 def should_retrieve(query: str) -> bool:
     """False for greetings, thanks and small talk; True for anything that needs articles."""
     q = query.lower().strip()

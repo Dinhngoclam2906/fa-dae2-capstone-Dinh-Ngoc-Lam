@@ -14,6 +14,8 @@ Systems (the real code in core/retrieval.py, not a replay):
   v2_hybrid           cut-over candidate: v2 dense (gemini-embedding-2, all sources) + keyword + FlashRank
   v2_hybrid_norerank  v2 hybrid, interleaved, no rerank
   v2_dense / v1_dense / keyword   the single legs
+  agent_default       hybrid_retrieve with the agent's defaults (v2 dense since the 2026-10-20
+                      cut-over): checks the production path matches v2_dense
 BigQuery VECTOR_SEARCH is costed by dry run only (`vsearch_cost`): it reads the same
 vectors as v2 at 768 dims, so its quality is v2_dense's (bake-off: 768 vs 512 within 0.01).
 
@@ -63,7 +65,7 @@ KNOWN_ITEM = [("en_en", "en", "English", "recent", 20), ("vi_vi", "vi", "Vietnam
               ("vi_vi", "vi", "Vietnamese", "old", 20)]
 TOPICAL = [("en_en", "en", "English", "recent", 10), ("vi_vi", "vi", "Vietnamese", "recent", 10),
            ("en_vi", "vi", "English", "recent", 10)]
-SYSTEMS = ["v1_hybrid", "v2_hybrid", "v2_hybrid_norerank", "v2_dense", "v1_dense", "keyword"]
+SYSTEMS = ["v1_hybrid", "v2_hybrid", "v2_hybrid_norerank", "v2_dense", "v1_dense", "keyword", "agent_default"]
 
 
 # ---------------------------------------------------------------------------- sample
@@ -166,12 +168,16 @@ def _system(name: str, question: str) -> list:
     from core import retrieval as R
     from core.text import extract_keywords
     if name == "v1_hybrid":
-        return R.hybrid_retrieve(question, top_n=TOP_N, include_user_docs=False, article_vectors="v1").candidates
+        return R.hybrid_retrieve(question, top_n=TOP_N, include_user_docs=False, article_vectors="v1",
+                                 keyword=True, rerank=True).candidates
     if name == "v2_hybrid":
-        return R.hybrid_retrieve(question, top_n=TOP_N, include_user_docs=False, article_vectors="v2").candidates
+        return R.hybrid_retrieve(question, top_n=TOP_N, include_user_docs=False, article_vectors="v2",
+                                 keyword=True, rerank=True).candidates
     if name == "v2_hybrid_norerank":
         return R.hybrid_retrieve(question, top_n=TOP_N, include_user_docs=False, article_vectors="v2",
-                                 rerank=False).candidates
+                                 keyword=True, rerank=False).candidates
+    if name == "agent_default":
+        return R.hybrid_retrieve(question, top_n=TOP_N, include_user_docs=False).candidates
     if name == "v2_dense":
         return R._dense_articles_v2(question, LEG_K, {})
     if name == "v1_dense":

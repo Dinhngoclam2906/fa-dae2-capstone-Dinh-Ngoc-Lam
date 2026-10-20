@@ -7,6 +7,7 @@
 import argparse
 import logging
 import sys
+import threading
 import time
 import uuid
 
@@ -18,12 +19,14 @@ from core.memory import create_checkpointer
 def main() -> int:
     ap = argparse.ArgumentParser(description="Daily News AI Assistant (terminal)")
     ap.add_argument("--stats", action="store_true", help="print retrieval stats after each answer")
-    ap.add_argument("--demo", action="store_true", help="demo mode (fewer semantic, more keyword results)")
+    ap.add_argument("--demo", action="store_true", help="demo mode (the old hybrid pipeline, for comparison)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")  # Vietnamese output on Windows consoles
 
+    from core.retrieval import warm_up
+    threading.Thread(target=warm_up, daemon=True).start()
     checkpointer, kind = create_checkpointer()
     agent = build_agent(checkpointer)
     session_id, thread_id = str(uuid.uuid4()), str(uuid.uuid4())
@@ -57,7 +60,7 @@ def main() -> int:
             continue
         print(f"\nAssistant: {text}")
         if show_stats:
-            keep = ("skipped", "keywords", "dense", "user_docs", "keyword", "unique", "returned",
+            keep = ("skipped", "mode", "keywords", "dense", "user_docs", "keyword", "unique", "returned",
                     "rerank_model", "retrieve_ms", "rerank_ms", "tools_used")
             print(f"\n  [stats] { {k: stats[k] for k in keep if k in stats} }")
             print(f"  [cost]  {time.time() - t0:.1f}s, BigQuery {(bq.usage['bytes_billed'] - b0) / 1e6:.0f} MB")

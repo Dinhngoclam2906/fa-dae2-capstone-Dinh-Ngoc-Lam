@@ -10,6 +10,7 @@
 #   * a per-session question limit (AGENT_RATE_LIMIT_PER_HOUR) and per-query BigQuery
 #     byte caps (core/bq.py).
 import re
+import threading
 import time
 import uuid
 
@@ -35,6 +36,8 @@ st.markdown("""
 @st.cache_resource
 def get_agent():
     """One compiled graph per server process; conversations are separated by thread_id."""
+    from core.retrieval import warm_up
+    threading.Thread(target=warm_up, daemon=True).start()
     checkpointer, kind = create_checkpointer()
     return build_agent(checkpointer), kind
 
@@ -94,7 +97,7 @@ def answer(question: str) -> str:
 def run_question(question: str):
     msgs = current()["messages"]
     msgs.append({"role": "user", "content": question})
-    with st.spinner("🔍 Searching (semantic + keyword) → re-ranking → writing..."):
+    with st.spinner("🔍 Searching → writing..."):
         msgs.append({"role": "assistant", "content": answer(question)})
     st.rerun()
 
@@ -103,11 +106,12 @@ init_session()
 
 # ==================== HEADER ====================
 st.markdown("<h1>Daily News AI Assistant</h1>", unsafe_allow_html=True)
-st.markdown("**📰 The Guardian + 9 Vietnamese news sources • Hybrid RAG (semantic + keyword) • FlashRank re-ranking**")
+st.markdown("**📰 The Guardian + 9 Vietnamese news sources • Multilingual semantic search • "
+            "keyword search as a tool**")
 cols = st.columns(4)
-cols[0].caption("🟢 Semantic: Pinecone")
-cols[1].caption("🟢 Keyword: BigQuery")
-cols[2].caption("🟢 Re-rank: FlashRank")
+cols[0].caption("🟢 Semantic: Pinecone + Gemini embeddings")
+cols[1].caption("🟢 Keyword: BigQuery (tool)")
+cols[2].caption(f"🟢 Retrieval: {settings.retrieval_mode}")
 cols[3].caption(f"🟢 Model: {settings.llm_model}")
 
 # ==================== SIDEBAR ====================
@@ -135,9 +139,10 @@ with st.sidebar:
     st.markdown("### 🎓 Demo mode")
     st.session_state.demo_mode = st.checkbox(
         "Enable demo mode", value=st.session_state.demo_mode,
-        help="Fewer semantic results and more keyword results, to show both halves of hybrid search")
+        help="Runs the old hybrid pipeline (semantic + keyword + FlashRank re-rank) to compare "
+             "with the default semantic search, which beat it in the 2026-10-19 eval")
     if st.session_state.demo_mode:
-        st.caption("_Click a query to run it through the full hybrid pipeline_")
+        st.caption("_Click a query to run it through the old hybrid pipeline_")
         for q, emoji in [("Latest news on fuel prices in Vietnam", "⛽"), ("Tin mới nhất về giá vàng", "🪙"),
                          ("Climate policy in the UK", "🌍"), ("AI regulation", "🤖"),
                          ("Tình hình bóng đá Việt Nam tuần này", "⚽")]:
@@ -145,21 +150,26 @@ with st.sidebar:
                 run_question(q)
 
     st.divider()
-    st.markdown("### 🔍 Hybrid search stats")
+    st.markdown("### 🔍 Search stats")
     stats_list = current()["stats"]
     if stats_list:
         s = stats_list[-1]
         if s.get("skipped"):
             st.info(f"No search for the last message ({s['skipped'].replace('_', ' ')}).")
         else:
+            hybrid = s.get("mode") == "hybrid"
             c1, c2 = st.columns(2)
             c1.metric("🧠 Semantic", s.get("dense", 0))
-            c2.metric("🔤 Keyword", s.get("keyword", 0))
+            if hybrid:
+                c2.metric("🔤 Keyword", s.get("keyword", 0))
             if s.get("user_docs"):
                 st.metric("📄 Your documents", s["user_docs"])
-            st.caption(f"🔍 _Keywords: {', '.join(s.get('keywords') or []) or 'none extracted'}_")
+            if hybrid:
+                st.caption(f"🔍 _Keywords: {', '.join(s.get('keywords') or []) or 'none extracted'}_")
             st.metric("Unique after dedupe", s.get("unique", 0))
-            if s.get("rerank_skipped"):
+            if s.get("rerank_skipped") == "off":
+                st.caption(f"🎯 Top {s.get('returned', 0)} by semantic similarity (no re-ranker)")
+            elif s.get("rerank_skipped"):
                 st.warning("Re-ranking skipped (fewer than 3 results)")
             else:
                 st.caption(f"🎯 Top {s.get('returned', 0)} re-ranked by `{s.get('rerank_model', '?')}`")
@@ -170,7 +180,7 @@ with st.sidebar:
         if s.get("tools_used"):
             st.caption(f"🛠️ Tools called: {', '.join(s['tools_used'])}")
     else:
-        st.info("👋 Ask a question to see how the hybrid search works.")
+        st.info("👋 Ask a question to see how the search works.")
     st.caption(f"BigQuery this server: {bq.usage['queries']} queries, "
                f"{bq.usage['bytes_billed'] / 1e9:.2f} GB billed")
 
@@ -203,6 +213,6 @@ if prompt:
 st.divider()
 st.markdown(
     "<p style='text-align: center; color: #666;'>Built by Dinh Ngoc Lam • Foundry AI Academy Capstone<br>"
-    "Hybrid RAG: Pinecone (semantic) + BigQuery (keyword) + FlashRank (re-rank)</p>",
+    "RAG: Pinecone (multilingual semantic search) + BigQuery (keyword tool)</p>",
     unsafe_allow_html=True,
 )
