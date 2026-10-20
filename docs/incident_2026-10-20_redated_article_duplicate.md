@@ -87,25 +87,40 @@ Recovery steps:
   replaced the old vector. No stale vector there.
 - **Ingestion:** both crawlers succeeded on every run, and raw stayed unique.
 
-## Open follow-ups (revisit later)
+## Follow-ups
 
-1. **The reverse move is not handled.** If a source re-dates an article *into an older*
-   month (outside the window), the next run drops the recent copy and never writes the old
-   month, so the article silently disappears from staging/OBT. No test catches that. Fix
-   only if it's ever seen, either with `dbt build --full-refresh` or a periodic
-   reconciliation (`COUNT(DISTINCT article_id)` raw vs OBT, with the OBT filters).
-   Consider adding that count to `news_freshness`.
-2. **Stale embeddings in BigQuery.** `vectors.article_embeddings` keeps one row per
-   `(article_id, content_hash)`, so old versions are never deleted: 104 rows on
-   2026-10-20, this article's July version included. They're harmless today (Pinecone is
-   the serving index, and `VECTOR_SEARCH` was ruled out), but they'd surface if BigQuery
-   vectors were ever queried directly. Optional cleanup: delete embeddings with no matching
-   OBT `(article_id, content_hash)`.
-3. **Staging has no `unique(article_id)` test.** The OBT test was the only guard. With the
-   hook in place, a unique test on staging would catch a regression one layer earlier.
-4. **Alert noise.** One root cause gave 2 emails per run, every 4 h, until fixed. That's
-   acceptable for now. If it gets noisy, consider a notification rate limit / auto-close
-   on the alert policies.
+Handled on 2026-10-20, same day:
+
+1. **Reverse move (re-dated *into an older* month): now detected, not auto-fixed.** The
+   next run would drop the recent copy and never write the old month, so the article would
+   silently disappear. The new singular test `tests/assert_raw_articles_in_staging.sql`
+   (raw `article_id`s missing from staging, ~55 MB/run, severity error) fails the build and
+   so sends the alert email. The fix when it fires is `dbt build --full-refresh`. 0 such
+   articles on 2026-10-20. Not auto-healed: a full refresh is ~20 GB, too heavy to run
+   unattended for a rare case.
+2. **Stale embeddings: the real risk was a full Pinecone re-sync, now fixed.**
+   `vectors.article_embeddings` keeps one row per `(article_id, content_hash)` (104 old
+   versions on 2026-10-20). `sync_vector_index.py sync` with no watermark walks months
+   newest first, and the Pinecone id is the `article_id`. So for a re-dated article it
+   upserted the current (October) vector, then the stale (July) one *over* it. The sync now
+   skips any row that has a newer `embedded_at` for the same article and model
+   (`NOT EXISTS`, +45 MB scan). Checked: the filtered set is exactly 488,410 rows, the
+   OBT's count. The incremental sync in the job was never affected (old versions are
+   older than the watermark). The 104 rows stay: deleting them would rewrite whole
+   partitions of a 3.3 GB table, for no benefit now that every reader skips them
+   (`retrieval_eval.py` already takes the latest version per article).
+   Only manual full syncs use the new code; the `embed-sync` image was not rebuilt.
+3. **Staging `unique(article_id)` test added** (severity error). It replaces the
+   `unique_combination_of_columns(article_id, crawl_timestamp)` warn test, which it
+   implies, so a regression now fails one layer earlier.
+
+Still open (decide later):
+
+4. **Alert noise.** Both policies are metric thresholds over 5-min windows, so every
+   failed run opens (and closes) a new incident on *each* policy: 2 emails per run, plus
+   any "resolved" mails, every 4 h until fixed. Options: widen the alignment window (one
+   incident per persistent failure, but a second failure inside the window is silent), or
+   accept it. It was not changed.
 
 ## How to diagnose this class of failure next time
 

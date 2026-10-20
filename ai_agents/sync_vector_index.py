@@ -136,11 +136,16 @@ def cmd_sync(args):
         cp = {"index": settings.pinecone_index_v2, "since": since.isoformat() if since else None,
               "cutoff": cutoff.isoformat(), "months": []}
     where = "model = @model AND embedded_at <= @cutoff" + (" AND embedded_at > @since" if since else "")
+    # A re-embedded article keeps its older versions in the table, possibly in another month
+    # (re-dated, incident 2026-10-20). Skip them: months go newest first and the Pinecone id is
+    # the article_id, so a full sync would otherwise upsert the stale vector over the current one.
+    where += (f" AND NOT EXISTS (SELECT 1 FROM `{_p()}.vectors.article_embeddings` n"
+              " WHERE n.article_id = v.article_id AND n.model = v.model AND n.embedded_at > v.embedded_at)")
     params = [bq.p("model", MODEL), bq.p("cutoff", cutoff, "TIMESTAMP")]
     if since:
         params.append(bq.p("since", since, "TIMESTAMP"))
     months = _q(f"""SELECT TIMESTAMP_TRUNC(web_publication_date, MONTH) AS m, COUNT(*) AS n
-                    FROM `{_p()}.vectors.article_embeddings` WHERE {where} GROUP BY m ORDER BY m DESC""", params)
+                    FROM `{_p()}.vectors.article_embeddings` v WHERE {where} GROUP BY m ORDER BY m DESC""", params)
     todo = [(r["m"], r["n"]) for r in months if r["m"].isoformat() not in cp["months"]]
     if args.before:  # resume a run whose checkpoint was lost (newer months already upserted)
         b = datetime.strptime(args.before, "%Y-%m").replace(tzinfo=timezone.utc)
@@ -158,7 +163,7 @@ def cmd_sync(args):
         m_next = datetime(m.year + (m.month // 12), m.month % 12 + 1, 1, tzinfo=timezone.utc)
         rows = _q_stream(f"""SELECT article_id, source_name, language, section_group, web_publication_date,
                              web_title, web_url, snippet, embedding
-                      FROM `{_p()}.vectors.article_embeddings`
+                      FROM `{_p()}.vectors.article_embeddings` v
                       WHERE {where} AND web_publication_date >= @m AND web_publication_date < @m_next
                       ORDER BY embedded_at""",
                   params + [bq.p("m", m, "TIMESTAMP"), bq.p("m_next", m_next, "TIMESTAMP")])

@@ -2,18 +2,15 @@ version: 2
 models:
   - name: stg_sf__guardian
     description: Cleaned and standardized Guardian articles data from raw Parquet ingestion
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - article_id
-            - crawl_timestamp
-          severity: warn
     columns:
       - name: article_id
         description: Original unique article identifier
         tests:
           - not_null:
               severity: warn
+          # raw is unique on article_id (the MERGE upserts), so staging must be too.
+          # Catches a stale copy left by a re-dated article (incident 2026-10-20).
+          - unique
       - name: web_title
         description: Article title
         tests:
