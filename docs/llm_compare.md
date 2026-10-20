@@ -4,7 +4,8 @@
 **Answer:** `gpt-5.4-mini` gives the best answers (grounded, every fact linked to its
 article, fewer wasted tool calls, faster median) at ~3.5× the cost per turn. `gpt-4o-mini`
 is acceptable now that the language fix works. The other three each have a disqualifying
-flaw. **Status: results only; the model choice is the user's.**
+flaw. **Status: the user chose `gpt-5.4-mini`; it is the default since 2026-10-20** (see
+"Switch" at the end).
 
 ## Setup
 
@@ -85,3 +86,22 @@ clear signals: missing URLs (4.1-mini), mangled URLs (flash-lite) and latency
 
 Reproduce: `uv run --with langchain-google-genai --env-file .env python ai_agents/eval/llm_compare.py run`,
 then `... llm_compare.py report --prices '{"gpt-4o-mini":[0.15,0.6], ...}'`.
+
+## Switch (applied 2026-10-20)
+
+- `core/llm.py` `chat_model()` builds the model for both the agent and the
+  `summarize_article` tool. Reasoning models (gpt-5.x, o-series) get the Responses API,
+  `reasoning={"effort": AGENT_REASONING_EFFORT}` (default `low`), no temperature, and
+  2,500 extra tokens of headroom for reasoning. Other models keep temperature + `max_tokens`.
+- `OPENAI_MODEL` now defaults to `gpt-5.4-mini` (`.env` updated too).
+- Responses API replies are content blocks, so `ask()` and the summary tool read
+  `message.text`; `str(message.content)` would have shown raw block lists.
+- **Gotcha:** `uv run --env-file .env` does not override variables already set in the
+  shell. This session's terminal had inherited `OPENAI_MODEL=gpt-4o-mini` from its parent
+  process, so the first check still ran 4o-mini. Open a new terminal, or `unset OPENAI_MODEL`.
+- Same 5-turn conversation as the cut-over check, gpt-4o-mini → gpt-5.4-mini:
+  - turn times 19.5 / 9.7 / 15.6 / 10.6 / 1.5 s → 9.0 / 4.5 / 11.0 / 3.8 / 1.8 s
+  - tool calls 7 → 1: before, two searches in each of turns 1, 2 and 4, plus the summary
+    tool; after, only `summarize_article`, which the request needs
+  - answer languages correct; every fact links its article
+- Roll back with `OPENAI_MODEL=gpt-4o-mini`; no code change needed.

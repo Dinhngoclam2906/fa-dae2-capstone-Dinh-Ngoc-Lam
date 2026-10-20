@@ -116,7 +116,7 @@ def summarize_article(article_id: str, published_date: str, source: Optional[str
     row = articles.get_article(article_id, published_date, source)
     if not row:
         return {"error": "Article not found. Check article_id and published_date from the search result."}
-    from langchain_openai import ChatOpenAI
+    from core.llm import chat_model
     lang = "Vietnamese" if answer_language == "vi" else "English"
     prompt = (
         f"Summarise this news article in 4-6 concise bullet points, in {lang}. Focus on key "
@@ -124,8 +124,7 @@ def summarize_article(article_id: str, published_date: str, source: Optional[str
         f"Title: {row['web_title']}\nSource: {row['source_name']}\nPublished: {row['web_publication_date_local']}\n\n"
         f"{(row.get('body_text') or '')[:12000]}"
     )
-    llm = ChatOpenAI(model=settings.llm_model, temperature=0, max_tokens=500)
-    summary = str(llm.invoke(prompt).content).strip()
+    summary = chat_model(temperature=0, max_tokens=500).invoke(prompt).text.strip()
     return {k: row[k] for k in ("article_id", "web_title", "source_name", "web_publication_date_local",
                                  "web_url", "section_group")} | {"summary": summary}
 

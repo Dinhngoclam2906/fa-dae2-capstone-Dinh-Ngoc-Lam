@@ -17,7 +17,6 @@ from typing import Annotated, Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -25,6 +24,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from typing_extensions import TypedDict
 
 from core.config import settings
+from core.llm import chat_model
 from core.retrieval import format_context, hybrid_retrieve
 from core.text import (instant_response, is_conversational_followup, is_vietnamese, refers_to_previous,
                        should_retrieve)
@@ -120,7 +120,7 @@ def recent_turns(messages: list, turns: int) -> list:
 
 
 def build_agent(checkpointer=None, llm=None):
-    llm = llm or ChatOpenAI(model=settings.llm_model, temperature=0.3, max_tokens=settings.llm_max_tokens)
+    llm = llm or chat_model()
     bound = llm.bind_tools(TOOLS)
 
     def chatbot(state: AgentState, config: RunnableConfig) -> dict:
@@ -154,5 +154,5 @@ def ask(agent, question: str, *, thread_id: str, session_id: str | None = None,
     msgs = final["messages"]
     turn_start = max(i for i, m in enumerate(msgs) if isinstance(m, HumanMessage))
     tools_used = [tc["name"] for m in msgs[turn_start:] for tc in (getattr(m, "tool_calls", None) or [])]
-    answer = msgs[-1].content if isinstance(msgs[-1].content, str) else str(msgs[-1].content)
+    answer = msgs[-1].text  # content blocks (Responses API) or a plain string
     return answer, {**(final.get("retrieval_stats") or {}), "tools_used": tools_used}

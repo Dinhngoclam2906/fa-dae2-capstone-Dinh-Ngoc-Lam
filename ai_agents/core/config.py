@@ -48,7 +48,10 @@ class Settings:
     # Keyword search / browsing default to the last N days when no dates are given.
     default_window_days: int = _int("AGENT_DEFAULT_WINDOW_DAYS", 90)
 
-    llm_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    # gpt-5.4-mini since 2026-10-20 (docs/llm_compare.md): the best answers of 5 models
+    # tested, ~$7 per 1k turns vs ~$2 for gpt-4o-mini.
+    llm_model: str = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
+    llm_reasoning_effort: str = os.getenv("AGENT_REASONING_EFFORT", "low")  # reasoning models only
     llm_max_tokens: int = _int("AGENT_MAX_TOKENS", 1500)
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
