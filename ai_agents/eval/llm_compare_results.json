@@ -1,0 +1,72 @@
+{
+ "gpt-4o-mini": {
+  "turns": 16,
+  "errors": 0,
+  "language_ok": 1.0,
+  "language_misses": [],
+  "citations": 34,
+  "invalid_citations": 2,
+  "tool_calls_per_turn": 1.375,
+  "p50_s": 9.05,
+  "p90_s": 12.099,
+  "input_tokens_per_turn": 12322.6875,
+  "output_tokens_per_turn": 389.625,
+  "usd_per_1k_turns": 2.082178125
+ },
+ "gpt-4.1-mini": {
+  "turns": 16,
+  "errors": 0,
+  "language_ok": 1.0,
+  "language_misses": [],
+  "citations": 6,
+  "invalid_citations": 0,
+  "tool_calls_per_turn": 0.5,
+  "p50_s": 4.972,
+  "p90_s": 13.652,
+  "input_tokens_per_turn": 4961.625,
+  "output_tokens_per_turn": 230.25,
+  "usd_per_1k_turns": 2.35305
+ },
+ "gpt-5.4-mini": {
+  "turns": 16,
+  "errors": 0,
+  "language_ok": 1.0,
+  "language_misses": [],
+  "citations": 36,
+  "invalid_citations": 6,
+  "tool_calls_per_turn": 0.75,
+  "p50_s": 6.802,
+  "p90_s": 13.478,
+  "input_tokens_per_turn": 6778.375,
+  "output_tokens_per_turn": 489.25,
+  "usd_per_1k_turns": 7.28540625
+ },
+ "gemini-3.8-flash": {
+  "turns": 16,
+  "errors": 1,
+  "language_ok": 1.0,
+  "language_misses": [],
+  "citations": 59,
+  "invalid_citations": 13,
+  "tool_calls_per_turn": 0.9333333333333333,
+  "p50_s": 22.846,
+  "p90_s": 125.391,
+  "input_tokens_per_turn": 14067.066666666668,
+  "output_tokens_per_turn": 1482.2666666666667,
+  "usd_per_1k_turns": 16.1088
+ },
+ "gemini-3.5-flash-lite": {
+  "turns": 16,
+  "errors": 0,
+  "language_ok": 1.0,
+  "language_misses": [],
+  "citations": 23,
+  "invalid_citations": 3,
+  "tool_calls_per_turn": 0.5,
+  "p50_s": 6.568,
+  "p90_s": 10.759,
+  "input_tokens_per_turn": 6404.625,
+  "output_tokens_per_turn": 470.625,
+  "usd_per_1k_turns": 3.09795
+ }
+}

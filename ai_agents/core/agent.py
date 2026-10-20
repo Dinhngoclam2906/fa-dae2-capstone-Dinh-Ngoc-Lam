@@ -26,7 +26,8 @@ from typing_extensions import TypedDict
 
 from core.config import settings
 from core.retrieval import format_context, hybrid_retrieve
-from core.text import instant_response, is_conversational_followup, refers_to_previous, should_retrieve
+from core.text import (instant_response, is_conversational_followup, is_vietnamese, refers_to_previous,
+                       should_retrieve)
 from core.tools import TOOLS
 
 
@@ -102,6 +103,16 @@ def _route(state: AgentState) -> str:
     return END if state.get("instant") else "chatbot"
 
 
+def _language_note(query: str) -> str:
+    """The answer language, stated last so it outranks the sources' language. Rule 3 alone
+    ("the user's language", in an English prompt ahead of a Vietnamese context) lost:
+    gpt-4o-mini answered Vietnamese questions in English (2026-10-20)."""
+    lang = "Vietnamese" if is_vietnamese(query) else "English"
+    return (f"Write your reply in {lang}, the language of the user's latest message, even if the "
+            f"sources are in another language, unless the user explicitly asks for a different "
+            f"language. Keep article titles as they are.")
+
+
 def recent_turns(messages: list, turns: int) -> list:
     """The last `turns` user turns (everything from the turns-th last HumanMessage on)."""
     starts = [i for i, m in enumerate(messages) if isinstance(m, HumanMessage)]
@@ -117,6 +128,7 @@ def build_agent(checkpointer=None, llm=None):
         system = (SYSTEM_PROMPT.replace("__TODAY__", today)
                   .replace("__CONTEXT__", state.get("context") or "(none)"))
         msgs = [SystemMessage(content=system)] + recent_turns(state["messages"], settings.history_turns)
+        msgs.append(SystemMessage(content=_language_note(_last_human(state["messages"]))))
         return {"messages": [bound.invoke(msgs, config=config)]}
 
     g = StateGraph(AgentState)
