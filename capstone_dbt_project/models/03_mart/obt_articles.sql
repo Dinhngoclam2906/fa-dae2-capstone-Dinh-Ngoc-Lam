@@ -17,7 +17,8 @@
     incremental_strategy='insert_overwrite',
     partition_by={'field': 'web_publication_date', 'data_type': 'timestamp', 'granularity': 'month'},
     cluster_by=['source_name', 'section_group', 'language'],
-    on_schema_change='append_new_columns'
+    on_schema_change='append_new_columns',
+    post_hook="{{ delete_moved_articles() }}"
 ) }}
 
 WITH stg AS (

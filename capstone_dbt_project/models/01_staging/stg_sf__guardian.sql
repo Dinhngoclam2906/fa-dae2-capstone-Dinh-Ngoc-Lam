@@ -8,7 +8,9 @@
 -- on crawl_timestamp/loaded_at would not reduce the bill). Every new or re-crawled
 -- row is recent by publication date (Guardian re-polls the last 2 days, VN the
 -- current month), and the window starts on a month boundary, so insert_overwrite
--- never replaces a partition with only part of its rows.
+-- never replaces a partition with only part of its rows. A source can re-date an old
+-- article into the window, though; the delete_moved_articles post-hook removes the
+-- stale copy left in its old partition.
 --
 -- Staging is fully derivable from raw, so --full-refresh is always safe here (as it is
 -- for obt_articles). Use `dbt build --full-refresh` after any load of OLD articles (a
@@ -18,7 +20,8 @@
     incremental_strategy='insert_overwrite',
     partition_by={'field': 'web_publication_date', 'data_type': 'timestamp', 'granularity': 'month'},
     cluster_by=['source_name'],
-    on_schema_change='append_new_columns'
+    on_schema_change='append_new_columns',
+    post_hook="{{ delete_moved_articles() }}"
 ) }}
 
 WITH raw_articles AS (
