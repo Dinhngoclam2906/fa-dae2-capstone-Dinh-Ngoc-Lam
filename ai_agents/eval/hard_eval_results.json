@@ -1,0 +1,226 @@
+{
+ "agent_default": {
+  "keyword_short": {
+   "n": 20,
+   "found@5": 0.9,
+   "hit@1": 0.65
+  },
+  "entity_number": {
+   "n": 20,
+   "found@5": 0.8,
+   "hit@1": 0.6
+  },
+  "deep_detail": {
+   "n": 20,
+   "found@5": 0.5,
+   "hit@1": 0.3
+  },
+  "time_relative": {
+   "n": 15,
+   "strict": 0.24000000000000002,
+   "lenient": 0.7466666666666666,
+   "constraint_ok": 0.56,
+   "results_per_q": 5.0
+  },
+  "filtered": {
+   "n": 20,
+   "strict": 0.44000000000000006,
+   "lenient": 0.6900000000000001,
+   "constraint_ok": 0.9800000000000001,
+   "results_per_q": 5.0
+  },
+  "cost": {
+   "p50_s": 0.757,
+   "p90_s": 1.227,
+   "mb_billed_per_q": 16.313635031578947,
+   "errors": 0
+  }
+ },
+ "agent_noparse": {
+  "keyword_short": {
+   "n": 20,
+   "found@5": 0.9,
+   "hit@1": 0.65
+  },
+  "entity_number": {
+   "n": 20,
+   "found@5": 0.85,
+   "hit@1": 0.65
+  },
+  "deep_detail": {
+   "n": 20,
+   "found@5": 0.5,
+   "hit@1": 0.3
+  },
+  "time_relative": {
+   "n": 15,
+   "strict": 0.24000000000000002,
+   "lenient": 0.7466666666666666,
+   "constraint_ok": 0.56,
+   "results_per_q": 5.0
+  },
+  "filtered": {
+   "n": 20,
+   "strict": 0.29000000000000004,
+   "lenient": 0.53,
+   "constraint_ok": 0.45999999999999996,
+   "results_per_q": 5.0
+  },
+  "cost": {
+   "p50_s": 0.726,
+   "p90_s": 1.082,
+   "mb_billed_per_q": 44.470660042105266,
+   "errors": 0
+  }
+ },
+ "v2_dense": {
+  "keyword_short": {
+   "n": 20,
+   "found@5": 0.9,
+   "hit@1": 0.65
+  },
+  "entity_number": {
+   "n": 20,
+   "found@5": 0.85,
+   "hit@1": 0.7
+  },
+  "deep_detail": {
+   "n": 20,
+   "found@5": 0.55,
+   "hit@1": 0.3
+  },
+  "time_relative": {
+   "n": 15,
+   "strict": 0.14666666666666667,
+   "lenient": 0.6133333333333333,
+   "constraint_ok": 0.32,
+   "results_per_q": 5.0
+  },
+  "filtered": {
+   "n": 20,
+   "strict": 0.27,
+   "lenient": 0.5599999999999999,
+   "constraint_ok": 0.45999999999999996,
+   "results_per_q": 5.0
+  },
+  "cost": {
+   "p50_s": 0.652,
+   "p90_s": 0.924,
+   "mb_billed_per_q": 33.46613086315789,
+   "errors": 0
+  }
+ },
+ "keyword": {
+  "keyword_short": {
+   "n": 20,
+   "found@5": 0.25,
+   "hit@1": 0.2
+  },
+  "entity_number": {
+   "n": 20,
+   "found@5": 0.3,
+   "hit@1": 0.15
+  },
+  "deep_detail": {
+   "n": 20,
+   "found@5": 0.05,
+   "hit@1": 0.0
+  },
+  "time_relative": {
+   "n": 15,
+   "strict": 0.16,
+   "lenient": 0.4533333333333333,
+   "constraint_ok": 0.6266666666666667,
+   "results_per_q": 5.0
+  },
+  "filtered": {
+   "n": 20,
+   "strict": 0.04,
+   "lenient": 0.2,
+   "constraint_ok": 0.32,
+   "results_per_q": 5.0
+  },
+  "cost": {
+   "p50_s": 1.535,
+   "p90_s": 2.12,
+   "mb_billed_per_q": 183.69947755789474,
+   "errors": 0
+  }
+ },
+ "agent_e2e": {
+  "keyword_short": {
+   "n": 20,
+   "found@5": 0.85,
+   "hit@1": 0.4
+  },
+  "entity_number": {
+   "n": 20,
+   "found@5": 0.65,
+   "hit@1": 0.65
+  },
+  "deep_detail": {
+   "n": 20,
+   "found@5": 0.3,
+   "hit@1": 0.2
+  },
+  "time_relative": {
+   "n": 15,
+   "strict": 0.40444444444444444,
+   "lenient": 0.9066666666666666,
+   "constraint_ok": 0.8711111111111111,
+   "results_per_q": 3.6666666666666665
+  },
+  "filtered": {
+   "n": 20,
+   "strict": 0.6683333333333333,
+   "lenient": 0.9166666666666666,
+   "constraint_ok": 0.95,
+   "results_per_q": 2.6
+  },
+  "cost": {
+   "p50_s": 6.861,
+   "p90_s": 13.967,
+   "mb_billed_per_q": 260.48835368421055,
+   "errors": 0,
+   "tool_calls_per_q": 0.8631578947368421
+  }
+ },
+ "agent_e2e_before": {
+  "keyword_short": {
+   "n": 20,
+   "found@5": 0.8,
+   "hit@1": 0.45
+  },
+  "entity_number": {
+   "n": 20,
+   "found@5": 0.65,
+   "hit@1": 0.65
+  },
+  "deep_detail": {
+   "n": 20,
+   "found@5": 0.25,
+   "hit@1": 0.15
+  },
+  "time_relative": {
+   "n": 15,
+   "strict": 0.46,
+   "lenient": 0.95,
+   "constraint_ok": 0.85,
+   "results_per_q": 3.1333333333333333
+  },
+  "filtered": {
+   "n": 20,
+   "strict": 0.6908333333333333,
+   "lenient": 0.9,
+   "constraint_ok": 0.925,
+   "results_per_q": 3.05
+  },
+  "cost": {
+   "p50_s": 5.724,
+   "p90_s": 14.742,
+   "mb_billed_per_q": 582.1693952,
+   "errors": 4,
+   "tool_calls_per_q": 0.8
+  }
+ }
+}

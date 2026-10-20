@@ -15,9 +15,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -119,17 +120,23 @@ def recent_turns(messages: list, turns: int) -> list:
     return messages[starts[-turns]:] if len(starts) > turns else messages
 
 
+def _prompt(state: AgentState, messages: list | None = None) -> list:
+    """System prompt (with today and the retrieved context) + recent turns + language note."""
+    today = (datetime.now(timezone.utc) + timedelta(hours=7)).strftime("%A %Y-%m-%d")
+    system = (SYSTEM_PROMPT.replace("__TODAY__", today)
+              .replace("__CONTEXT__", state.get("context") or "(none)"))
+    messages = state["messages"] if messages is None else messages
+    msgs = [SystemMessage(content=system)] + recent_turns(messages, settings.history_turns)
+    msgs.append(SystemMessage(content=_language_note(_last_human(messages))))
+    return msgs
+
+
 def build_agent(checkpointer=None, llm=None):
     llm = llm or chat_model()
     bound = llm.bind_tools(TOOLS)
 
     def chatbot(state: AgentState, config: RunnableConfig) -> dict:
-        today = (datetime.now(timezone.utc) + timedelta(hours=7)).strftime("%A %Y-%m-%d")
-        system = (SYSTEM_PROMPT.replace("__TODAY__", today)
-                  .replace("__CONTEXT__", state.get("context") or "(none)"))
-        msgs = [SystemMessage(content=system)] + recent_turns(state["messages"], settings.history_turns)
-        msgs.append(SystemMessage(content=_language_note(_last_human(state["messages"]))))
-        return {"messages": [bound.invoke(msgs, config=config)]}
+        return {"messages": [bound.invoke(_prompt(state), config=config)]}
 
     g = StateGraph(AgentState)
     g.add_node("retrieve", retrieve)
@@ -139,20 +146,48 @@ def build_agent(checkpointer=None, llm=None):
     g.add_conditional_edges("retrieve", _route, {"chatbot": "chatbot", END: END})
     g.add_conditional_edges("chatbot", tools_condition)
     g.add_edge("tools", "chatbot")
-    return g.compile(checkpointer=checkpointer or MemorySaver())
+    graph = g.compile(checkpointer=checkpointer or MemorySaver())
+    graph.final_llm = llm  # tool-less model for _answer_without_tools
+    return graph
+
+
+_OUT_OF_STEPS = ("You have used the maximum number of searches for this question. Answer now "
+                 "from the results above, without calling tools, and say briefly what you could "
+                 "not find.")
+
+
+def _answer_without_tools(agent, config: RunnableConfig) -> dict:
+    """The step limit stopped the tool loop (2/95 hard-eval questions, 2026-10-20, raised
+    GraphRecursionError to the user). Answer from what was found instead, and store that
+    answer so the thread stays valid: a tool call left without a result would make the next
+    turn's LLM request fail."""
+    state = agent.get_state(config).values
+    msgs, added = list(state.get("messages", [])), []
+    last = msgs[-1] if msgs else None
+    if isinstance(last, AIMessage) and last.tool_calls:
+        added = [ToolMessage(content="Not run: the search limit for this question was reached.",
+                             tool_call_id=tc["id"]) for tc in last.tool_calls]
+    resp = agent.final_llm.invoke(_prompt(state, msgs + added) + [SystemMessage(content=_OUT_OF_STEPS)])
+    agent.update_state(config, {"messages": added + [resp]}, as_node="chatbot")
+    return {**state, "messages": msgs + added + [resp]}
 
 
 def ask(agent, question: str, *, thread_id: str, session_id: str | None = None,
-        demo_mode: bool = False) -> tuple[str, dict]:
+        demo_mode: bool = False, recursion_limit: int = 12) -> tuple[str, dict]:
     """Run one turn. Returns (answer, stats) where stats has the retrieval stats and the
     tools called this turn."""
     config: RunnableConfig = {
         "configurable": {"thread_id": thread_id, "session_id": session_id, "demo_mode": demo_mode},
-        "recursion_limit": 12,  # at most ~5 tool rounds per question
+        "recursion_limit": recursion_limit,  # 12 = at most ~5 tool rounds per question
     }
-    final = agent.invoke({"messages": [HumanMessage(content=question)]}, config)
+    try:
+        final = agent.invoke({"messages": [HumanMessage(content=question)]}, config)
+        hit_limit = False
+    except GraphRecursionError:
+        final, hit_limit = _answer_without_tools(agent, config), True
     msgs = final["messages"]
     turn_start = max(i for i, m in enumerate(msgs) if isinstance(m, HumanMessage))
     tools_used = [tc["name"] for m in msgs[turn_start:] for tc in (getattr(m, "tool_calls", None) or [])]
     answer = msgs[-1].text  # content blocks (Responses API) or a plain string
-    return answer, {**(final.get("retrieval_stats") or {}), "tools_used": tools_used}
+    return answer, {**(final.get("retrieval_stats") or {}), "tools_used": tools_used,
+                    "hit_step_limit": hit_limit}

@@ -26,7 +26,7 @@ from typing import Any
 
 from core import articles
 from core.config import settings
-from core.text import extract_keywords, is_vietnamese, recency_days
+from core.text import extract_keywords, is_vietnamese, query_filters, recency_days
 
 logger = logging.getLogger(__name__)
 
@@ -153,8 +153,9 @@ def _pinecone_filter(filters: dict) -> dict | None:
     from datetime import datetime, timedelta, timezone
     f: dict = {}
     for key, field in (("source", "source_name"), ("language", "language"), ("section_group", "section_group")):
-        if filters.get(key):
-            f[field] = {"$eq": filters[key]}
+        v = filters.get(key)
+        if v:  # a list (parsed from the question, e.g. both VnExpress editions) -> $in
+            f[field] = {"$in": list(v)} if isinstance(v, (list, tuple)) else {"$eq": v}
     if filters.get("start_date") or filters.get("end_date") or filters.get("days"):
         start, end = articles.window(filters.get("start_date"), filters.get("end_date"), filters.get("days"))
         lo = datetime.combine(start, datetime.min.time(), timezone.utc) - timedelta(hours=7)
@@ -244,13 +245,17 @@ def _dedupe(cands: list[Candidate]) -> list[Candidate]:
 
 def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: bool = False,
                     top_n: int = 5, include_user_docs: bool = True, article_vectors: str | None = None,
-                    keyword: bool | None = None, rerank: bool | None = None, **filters) -> RetrievalResult:
+                    keyword: bool | None = None, rerank: bool | None = None,
+                    parse_filters: bool = True, **filters) -> RetrievalResult:
     """The retrieval for one question -> top_n candidates.
     Mode "dense" (default): this session's upload chunks (v1 index), then v2 dense articles.
     Mode "hybrid" (and demo mode): also the keyword search (interleaved) and FlashRank.
     `filters` (source, language, section_group, start_date, end_date, days) apply inside
-    Pinecone and to the keyword search (v1 post-filters source/language).
-    `article_vectors` ("v1" / "v2"), `keyword` and `rerank` override the mode (eval)."""
+    Pinecone and to the keyword search (v1 post-filters source/language). Without explicit
+    filters, a source or month / year stated in the question (`text.query_filters`) becomes
+    a hard filter on the v2 dense search, dropped again if it finds nothing.
+    `article_vectors` ("v1" / "v2"), `keyword`, `rerank` and `parse_filters` override the
+    defaults (eval)."""
     t0 = time.time()
     mode = "hybrid" if demo_mode else settings.retrieval_mode
     vectors = article_vectors or settings.article_vectors
@@ -259,11 +264,19 @@ def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: boo
     keywords = extract_keywords(query) if use_keyword else []
     k_dense, k_user, k_sql = (8, 4, 15) if demo_mode else (10, 5, 10)
     sid = session_id if include_user_docs else None
+    filters = {k: v for k, v in filters.items() if v}  # search_news passes every key, mostly None
+    parsed = query_filters(query, articles._today_local()) if parse_filters and not filters else {}
+    dense_filters = {**parsed, **filters}
+    # The keyword search takes one source; a parsed pair (both editions) is left to dense.
+    kw_filters = {**{k: v for k, v in parsed.items() if k != "source"}, **filters}
+    if len(parsed.get("source", [])) == 1 and "source" not in filters:
+        kw_filters["source"] = parsed["source"][0]
     # Explicit dates win; otherwise "latest ..." / "tuần này" asks for recent articles.
-    has_dates = any(filters.get(k) for k in ("start_date", "end_date", "days"))
+    has_dates = any(dense_filters.get(k) for k in ("start_date", "end_date", "days"))
     recent = None if has_dates else recency_days(query)
     stats: dict[str, Any] = {"query": query, "keywords": keywords, "demo_mode": demo_mode,
-                             "mode": mode, "article_vectors": vectors, "recency_days": recent}
+                             "mode": mode, "article_vectors": vectors, "recency_days": recent,
+                             "parsed_filters": parsed}
 
     # Not a `with` block: its exit waits for every thread, so one hung leg (a network call
     # that never returns, seen on v1 Pinecone 2026-10-19) would hang the whole question
@@ -271,10 +284,10 @@ def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: boo
     ex = concurrent.futures.ThreadPoolExecutor(max_workers=3)
     try:
         jobs = {
-            "dense": (ex.submit(_dense_v2_recent, query, k_dense, filters, recent) if vectors == "v2"
+            "dense": (ex.submit(_dense_v2_recent, query, k_dense, dense_filters, recent) if vectors == "v2"
                       else ex.submit(_dense_articles, query, k_dense)),
             "user_docs": ex.submit(_dense_user_docs, query, k_user, sid),
-            "keyword": ex.submit(_keyword, keywords, k_sql, filters) if keywords else None,
+            "keyword": ex.submit(_keyword, keywords, k_sql, kw_filters) if keywords else None,
         }
         found: dict[str, list[Candidate]] = {}
         deadline = time.time() + 20
@@ -287,6 +300,11 @@ def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: boo
                 found[name] = []
     finally:
         ex.shutdown(wait=False, cancel_futures=True)
+    if parsed and vectors == "v2" and not found["dense"] and "dense_error" not in stats:
+        # Nothing matches the stated source / period: search without it, so the LLM still
+        # has context and can say there is no exact match.
+        found["dense"] = _dense_v2_recent(query, k_dense, filters, recency_days(query))
+        stats["parsed_filters_dropped"] = True
     for name, cands in found.items():
         stats[name] = len(cands)
     stats["retrieve_ms"] = int((time.time() - t0) * 1000)

@@ -127,7 +127,8 @@ _REACTIONS = [
 # recency for free from the keyword search's 90-day default window.
 _RECENCY = [
     (r"\b(today|tonight|yesterday|this morning|breaking)\b|hôm nay|hôm qua|sáng nay|tối nay|chiều nay", 3),
-    (r"\b(this|past|last) week\b|\bthis weekend\b|tuần này|tuần qua|cuối tuần", 7),
+    (r"\b(this|past|last) week\b|\bthis weekend\b|\b(past|last) few days\b|tuần này|tuần qua|cuối tuần"
+     r"|mấy ngày qua|vài ngày qua|những ngày qua|mấy hôm nay", 7),
     (r"\b(this|past|last) month\b|tháng này|tháng qua", 31),
     (r"\b(latest|recent|recently|newest|right now|nowadays)\b"
      r"|mới nhất|gần đây|hiện nay|hiện tại|cập nhật|vừa qua|mới đây", 30),
@@ -141,6 +142,90 @@ def recency_days(query: str) -> int | None:
         if re.search(pattern, q):
             return days
     return None
+
+
+# Explicit sources and periods in a question ("What did VnExpress International write about
+# X in August 2026?", "báo Tuổi Trẻ tháng 8/2026"), turned into search filters. Rules, not
+# an LLM call: free, instant and predictable; the LLM's tools cover anything else.
+# Most specific first. "tuổi trẻ" also means "youth" and "thanh niên" "young people", so
+# those two need the capitalised name (case-sensitive) or "báo" (newspaper) in front.
+_SOURCE_PATTERNS = [
+    (r"(?i)tuoi tre news|tuổi trẻ news", ["tuoitre_en"]),
+    (r"(?i)vnexpress international|e\.vnexpress", ["vnexpress_en"]),
+    (r"(?i)vietnamnet global", ["vietnamnet_en"]),
+    (r"(?i)vneconomy \(?english\)?|en\.vneconomy", ["vneconomy_en"]),
+    (r"(?i)\bguardian\b", ["guardian"]),
+    (r"Tuổi Trẻ|Tuoi Tre|TUỔI TRẺ|(?i:báo tuổi trẻ|báo tuoi tre)", ["tuoitre", "tuoitre_en"]),
+    (r"Thanh Niên|Thanh Nien|THANH NIÊN|(?i:báo thanh niên|báo thanh nien)", ["thanhnien"]),
+    (r"(?i)vneconomy", ["vneconomy", "vneconomy_en"]),
+    (r"(?i)vietnamnet", ["vietnamnet", "vietnamnet_en"]),
+    (r"(?i)vnexpress", ["vnexpress", "vnexpress_en"]),
+]
+_MONTHS = {name: i for i, names in enumerate(
+    [("january", "jan"), ("february", "feb"), ("march", "mar"), ("april", "apr"), ("may",),
+     ("june", "jun"), ("july", "jul"), ("august", "aug"), ("september", "sep", "sept"),
+     ("october", "oct"), ("november", "nov"), ("december", "dec")], 1) for name in names}
+_MONTH_RE = "|".join(sorted(_MONTHS, key=len, reverse=True))
+
+
+def query_sources(query: str) -> list[str]:
+    """Source names the question asks for, in order of mention ([] = any source)."""
+    found: list[str] = []
+    rest = query
+    for pattern, sources in _SOURCE_PATTERNS:
+        if re.search(pattern, rest):
+            found += [s for s in sources if s not in found]
+            rest = re.sub(pattern, " ", rest)  # "VnExpress International" must not match "vnexpress" again
+    return found
+
+
+def _month_span(year: int, month: int):
+    from datetime import date, timedelta
+    start = date(year, month, 1)
+    return start, (start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+
+
+def query_period(query: str, today=None):
+    """(start, end) dates for an explicit month or year in the question, else None.
+    A month without a year is its latest occurrence up to today."""
+    from datetime import date
+    today = today or date.today()
+    q = query.lower()
+
+    def month_without_year(m: int):
+        return _month_span(today.year if m <= today.month else today.year - 1, m)
+
+    m = re.search(r"tháng\s*(\d{1,2})(?:\s*(?:năm|/|-|\.)\s*((?:19|20)\d{2}))?", q)
+    if m and 1 <= int(m.group(1)) <= 12:
+        return _month_span(int(m.group(2)), int(m.group(1))) if m.group(2) else month_without_year(int(m.group(1)))
+    # English month names: "August 2026", or "in / during / since August" ("may" alone is a verb).
+    m = (re.search(rf"\b({_MONTH_RE})\.?,?\s+((?:19|20)\d{{2}})\b", q)
+         or re.search(rf"\b(?:in|during|of|since|from|for)\s+({_MONTH_RE})\b(?!\s+(?:be|have|not)\b)", q))
+    if m:
+        month = _MONTHS[m.group(1)]
+        year = m.group(2) if m.lastindex and m.lastindex >= 2 else None
+        return _month_span(int(year), month) if year else month_without_year(month)
+    if re.search(r"\bthis year\b|năm nay", q):
+        return date(today.year, 1, 1), today
+    if re.search(r"\blast year\b|năm ngoái|năm trước", q):
+        return date(today.year - 1, 1, 1), date(today.year - 1, 12, 31)
+    m = re.search(r"(?:\b(?:in|during|of|since|from|for|năm)\s+|năm\s*)((?:19|20)\d{2})\b", q)
+    if m:
+        y = int(m.group(1))
+        return date(y, 1, 1), date(y, 12, 31)
+    return None
+
+
+def query_filters(query: str, today=None) -> dict:
+    """Search filters stated in the question: {"source": [...], "start_date", "end_date"}."""
+    out: dict = {}
+    sources = query_sources(query)
+    if sources:
+        out["source"] = sources
+    period = query_period(query, today)
+    if period:
+        out["start_date"], out["end_date"] = period[0].isoformat(), period[1].isoformat()
+    return out
 
 
 def should_retrieve(query: str) -> bool:
