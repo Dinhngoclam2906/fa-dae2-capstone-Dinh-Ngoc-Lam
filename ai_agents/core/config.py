@@ -70,6 +70,13 @@ class Settings:
     # pre-eval pipeline (demo mode runs it, for comparison).
     retrieval_mode: str = os.getenv("AGENT_RETRIEVAL_MODE", "dense")
     query_embedding_model: str = os.getenv("QUERY_EMBEDDING_MODEL", "gemini-embedding-2")
+    # Passage rescue (dense mode, 2026-10-21, core/passages.py, docs/hard_eval.md): the top
+    # `passage_pool` dense hits' full bodies are scored passage by passage with BM25; the
+    # dense top `passage_keep` stay, the next slots go to the best passages. Finds details
+    # beyond the ~1,500 chars the vectors see. AGENT_PASSAGE_POOL=0 turns it off.
+    passage_pool: int = _int("AGENT_PASSAGE_POOL", 30)
+    passage_keep: int = _int("AGENT_PASSAGE_KEEP", 4)
+    vectors_dataset: str = os.getenv("BQ_DATASET_VECTORS", "vectors")
 
     # Conversation turns sent to the LLM (older turns stay in memory, not in the prompt).
     history_turns: int = _int("AGENT_HISTORY_TURNS", 6)
@@ -79,6 +86,10 @@ class Settings:
     @property
     def articles_table(self) -> str:
         return f"`{self.gcp_project}.{self.marts_dataset}.obt_articles`"
+
+    @property
+    def bodies_table(self) -> str:
+        return f"`{self.gcp_project}.{self.vectors_dataset}.article_bodies`"
 
 
 settings = Settings()

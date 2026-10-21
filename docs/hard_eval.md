@@ -10,6 +10,9 @@ does pulling the source and date out of a question help?
   0.44. The full agent already got there through its tools, so its scores barely move.
 - **A step-limit crash was found and fixed:** 4/95 questions raised `GraphRecursionError`
   to the user; now 0.
+- **Update 2026-10-21, passage rescue:** the deep-detail gap is now 0.70 (from 0.50),
+  entity_number 0.95 (from 0.85), for $0, with topical questions unchanged. See
+  [Passage rescue](#passage-rescue-2026-10-21) below.
 
 ## The set (`ai_agents/eval/hard_eval.py`, 95 questions)
 
@@ -80,8 +83,8 @@ parallel, so the bytes can't be attributed to a system.
 2. **Deep details are the main gap:** 0.50 found@5, against 0.85–0.90 elsewhere. The
    article vectors embed title + ~1,500 characters, so a detail on character 4,000 is
    invisible to them. The agent's `get_article` / full-text keyword tools only partly
-   compensate (it cited the seed 0.30 of the time). The real fix is chunk vectors for a
-   recent window (backlog 1d).
+   compensate (it cited the seed 0.30 of the time). Addressed 2026-10-21 by the passage
+   rescue below (chunk vectors were costed and deferred).
 3. **Filters: a big win for automatic retrieval, little for the full agent.** With
    `query_filters`, 98% of retrieved results match the stated source and period (46%
    before). The agent already applied filters through `search_news` tool calls, so its end
@@ -114,6 +117,68 @@ parallel, so the bytes can't be attributed to a system.
 - **Caveat:** written after seeing the set's 20 filtered questions (it parses all 20
   exactly), so a fresh set will find some phrasings it misses. It was checked against
   negatives too ("Tuổi trẻ ngày nay…", "What may happen…", "Giá vàng tháng này").
+
+## Passage rescue (2026-10-21)
+
+**Question:** can the deep-detail gap be closed without paying for chunk vectors?
+**Answer:** mostly. 0.50 → 0.70 found@5 for $0 in embeddings, ~25 MB of BigQuery and
+~1 s per question.
+
+**Where the seed sits in v2 dense** (no filters), found@k:
+
+| | @5 | @10 | @20 | @30 | @50 | @100 |
+|---|---|---|---|---|---|---|
+| keyword_short | 0.90 | 0.95 | 0.95 | 0.95 | 0.95 | 1.00 |
+| entity_number | 0.85 | 0.90 | 0.95 | 0.95 | 1.00 | 1.00 |
+| deep_detail | 0.55 | 0.65 | 0.70 | **0.80** | 0.80 | 0.85 |
+
+So most deep-detail seeds are retrieved, just ranked too low: a reranker that reads the
+whole body can lift them, and 0.80 is its ceiling at a pool of 30.
+
+**Design (`core/passages.py`, `core/articles.get_bodies`):** fetch the top 30 dense hits'
+full bodies; split each into 500-char passages (step 250, title prefixed); score every
+passage with BM25 against the question (idf over the pool, syllable bigrams for Vietnamese,
+time words like "this week" / "mới nhất" dropped); keep the dense top 4, fill the remaining
+slots with the other articles in order of their best passage. Each article's best passage is
+appended to its context text, so the LLM sees the detail too. `AGENT_PASSAGE_POOL` (30, 0 =
+off) and `AGENT_PASSAGE_KEEP` (4). On any failure it keeps the dense order.
+
+**Variants** (offline replay on the production 30-deep pool; found@5 / hit@1 for known
+items, strict / lenient / constraint ok for topical):
+
+| Variant | keyword_short | entity_number | deep_detail | time_relative | filtered |
+|---|---|---|---|---|---|
+| dense (no rerank) | 0.90 / 0.65 | 0.85 / 0.65 | 0.50 / 0.30 | 0.23 / 0.76 / 0.52 | 0.44 / 0.69 / 0.98 |
+| RRF, passage weight 2 | 0.90 / 0.80 | 0.95 / 0.65 | 0.70 / 0.45 | **0.15 / 0.57 / 0.37** | 0.38 / 0.71 / 1.00 |
+| RRF, weight 0.5 | 0.95 / 0.80 | 0.90 / 0.60 | 0.55 / 0.40 | 0.17 / 0.68 / 0.49 | 0.44 / 0.73 / 1.00 |
+| keep top 3, rescue rest | 0.90 / 0.65 | 0.95 / 0.65 | 0.70 / 0.30 | 0.23 / 0.76 / 0.53 | 0.40 / 0.69 / 0.99 |
+| **keep top 4, rescue rest** (chosen) | 0.90 / 0.65 | 0.95 / 0.65 | 0.70 / 0.30 | 0.21 / 0.77 / 0.53 | 0.44 / 0.71 / 0.98 |
+| keep top 2, rescue rest | 0.90 / 0.65 | 0.95 / 0.65 | 0.70 / 0.30 | 0.19 / 0.67 / 0.45 | 0.37 / 0.68 / 0.99 |
+
+A full rerank (reciprocal rank fusion of dense and passage rank) also gives the known-item
+gains and better hit@1, but it pushes older keyword-matching articles above recent on-topic
+ones, so time-relative questions drop. One rescue slot keeps every known-item gain and leaves
+topical scores at the dense level (differences ≤ 0.02, noise at n = 15–20). The official
+re-run (`agent_default` vs same-day `agent_nopassage`) matches the replay exactly. Latency
+p50 0.9 → 1.8 s, p90 2.3 → 5.3 s.
+
+**Body storage:** `vectors.article_bodies` (bucket, article_id, content_hash, body_text,
+saved_at), integer-range partitioned on a hash bucket of article_id (3,000 buckets),
+clustered on article_id, append-only (latest `saved_at` wins). Measured per 30-id lookup:
+`obt_articles` (month partitions) ~1.3 GB, a copy clustered on article_id 2.0–2.5 GB
+(scattered ids hit every block), the hash-bucket table **25 MB**. `embed_articles.py` writes
+each new article's body just before its vector (free load job); `embed_articles.py bodies
+[--full]` fills gaps (backfill 2.52 GB once; windowed repair ~0.5 GB).
+
+**Why not chunk vectors (yet):** embedding the full text of the archive is ~300M tokens
+(≈ $60–70) and ~1M+ extra vectors, beyond Pinecone Starter's 2 GB (1.26 GB used): a paid
+tier would break the $5–10/month budget after the trial. A recent window is cheaper ($5 for
+30 days) but most hard-set seeds are older. Chunk vectors would lift the 0.80 ceiling and
+stack with this rescue; a ~$1 pilot (last 7 days + new deep-detail questions on them) would
+measure the gain before committing.
+
+**Not re-measured:** the end-to-end agent (`agent_e2e`, OpenAI cost) with passages in its
+context, and the 1c set (`retrieval_eval.py`).
 
 ## Caveats
 

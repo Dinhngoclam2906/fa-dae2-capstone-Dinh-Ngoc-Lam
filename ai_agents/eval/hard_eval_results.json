@@ -7,8 +7,45 @@
   },
   "entity_number": {
    "n": 20,
-   "found@5": 0.8,
+   "found@5": 0.95,
+   "hit@1": 0.65
+  },
+  "deep_detail": {
+   "n": 20,
+   "found@5": 0.7,
+   "hit@1": 0.3
+  },
+  "time_relative": {
+   "n": 15,
+   "strict": 0.21333333333333335,
+   "lenient": 0.7733333333333333,
+   "constraint_ok": 0.5333333333333333,
+   "results_per_q": 5.0
+  },
+  "filtered": {
+   "n": 20,
+   "strict": 0.44000000000000006,
+   "lenient": 0.71,
+   "constraint_ok": 0.9800000000000001,
+   "results_per_q": 5.0
+  },
+  "cost": {
+   "p50_s": 1.804,
+   "p90_s": 5.349,
+   "mb_billed_per_q": 0.0,
+   "errors": 0
+  }
+ },
+ "agent_nopassage": {
+  "keyword_short": {
+   "n": 20,
+   "found@5": 0.85,
    "hit@1": 0.6
+  },
+  "entity_number": {
+   "n": 20,
+   "found@5": 0.85,
+   "hit@1": 0.65
   },
   "deep_detail": {
    "n": 20,
@@ -17,9 +54,9 @@
   },
   "time_relative": {
    "n": 15,
-   "strict": 0.24000000000000002,
-   "lenient": 0.7466666666666666,
-   "constraint_ok": 0.56,
+   "strict": 0.22666666666666666,
+   "lenient": 0.76,
+   "constraint_ok": 0.52,
    "results_per_q": 5.0
   },
   "filtered": {
@@ -30,9 +67,9 @@
    "results_per_q": 5.0
   },
   "cost": {
-   "p50_s": 0.757,
-   "p90_s": 1.227,
-   "mb_billed_per_q": 16.313635031578947,
+   "p50_s": 0.915,
+   "p90_s": 2.274,
+   "mb_billed_per_q": 23.984796294736842,
    "errors": 0
   }
  },
@@ -167,7 +204,7 @@
    "n": 15,
    "strict": 0.40444444444444444,
    "lenient": 0.9066666666666666,
-   "constraint_ok": 0.8711111111111111,
+   "constraint_ok": 0.8577777777777779,
    "results_per_q": 3.6666666666666665
   },
   "filtered": {
@@ -183,6 +220,43 @@
    "mb_billed_per_q": 260.48835368421055,
    "errors": 0,
    "tool_calls_per_q": 0.8631578947368421
+  }
+ },
+ "agent_default_before": {
+  "keyword_short": {
+   "n": 20,
+   "found@5": 0.9,
+   "hit@1": 0.65
+  },
+  "entity_number": {
+   "n": 20,
+   "found@5": 0.8,
+   "hit@1": 0.6
+  },
+  "deep_detail": {
+   "n": 20,
+   "found@5": 0.5,
+   "hit@1": 0.3
+  },
+  "time_relative": {
+   "n": 15,
+   "strict": 0.24000000000000002,
+   "lenient": 0.7466666666666666,
+   "constraint_ok": 0.56,
+   "results_per_q": 5.0
+  },
+  "filtered": {
+   "n": 20,
+   "strict": 0.44000000000000006,
+   "lenient": 0.6900000000000001,
+   "constraint_ok": 0.9800000000000001,
+   "results_per_q": 5.0
+  },
+  "cost": {
+   "p50_s": 0.757,
+   "p90_s": 1.227,
+   "mb_billed_per_q": 16.313635031578947,
+   "errors": 0
   }
  },
  "agent_e2e_before": {

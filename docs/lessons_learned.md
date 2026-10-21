@@ -82,6 +82,9 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-20 | Agent | `GraphRecursionError` shown to users (4/95 hard questions) |
 | 2026-10-20 | Eval | Hard-set pitfalls: leaks, drift, rollover, shared counters |
 | 2026-10-20 | Tooling | Shell quoting, grep over `.venv`, git-ignored files |
+| 2026-10-21 | BigQuery | Fetching 30 scattered ids: month partitions 1.3 GB, clustering 2.5 GB, hash buckets 25 MB |
+| 2026-10-21 | Agent | A full passage rerank hurt "latest" questions; one rescue slot didn't |
+| 2026-10-21 | Eval | Prototype pool was 10 deep, not 30: an ablation flag changed the pool size |
 
 ---
 
@@ -200,6 +203,20 @@ Reading the SQL found none of these:
   (log said 35 MiB, real 2.4 GB). Use `INFORMATION_SCHEMA.JOBS_BY_PROJECT` by `node_id`.
 - **DML bills far more than the columns it references:** a 4-column UPDATE billed 2.43 GB.
 - Loads into a growing table need `--max-bytes-billed` headroom (the jobs use 6 GB).
+
+### Point lookups of scattered ids (2026-10-21)
+- **Symptom:** reading the bodies of the dense top 30 from `obt_articles` billed ~1.3 GB per
+  question (twice the agent's 600 MB cap): 30 ids spread over ~15 month partitions.
+- **Cause:** month partitions prune by date, not id. A copy **clustered** on `article_id` was
+  worse (2.0–2.5 GB): 30 scattered ids touch nearly every storage block, so clustering
+  prunes almost nothing.
+- **Fix:** `vectors.article_bodies`, **integer-range partitioned on a hash bucket** of the id
+  (3,000 buckets, ~0.8 MB each); the query passes `bucket IN UNNEST(@buckets)` computed in
+  Python with the same hash. 25 MB per lookup (10 MB minimum per table). Kept current by
+  free load jobs from the embed job, not by a dbt MERGE (which would scan the target).
+- **Lesson:** clustering helps range scans and a few ids, not dozens of scattered ones. For
+  key lookups, partition on a hash of the key. Measure with uncached queries (a repeated
+  identical query bills 0).
 
 ### SQLFluff dialect and the hash salt (2026-10-17)
 - **Dialect:** SQLFluff was still set to `snowflake` after the port, so parse errors hid
@@ -412,6 +429,19 @@ Reading the SQL found none of these:
   Tested with a forced `recursion_limit=4` and a follow-up in the same thread.
 - **Lesson:** every loop needs a graceful exit, and the state after it must still be usable.
 
+### A full passage rerank hurt "latest" questions (2026-10-21)
+- **Symptom:** BM25 passage scores fused into the whole top 30 (reciprocal rank fusion)
+  lifted deep_detail 0.50 → 0.70, but time_relative strict fell 0.23 → 0.15 and constraint
+  compliance 0.52 → 0.35.
+- **Cause:** lexical overlap favours older articles that share the topic's words (and words
+  like "week"); the dense order, with its recent-first slots, was already right for topical
+  questions.
+- **Fix:** keep the dense top 4, give only the later slots to the best passages, and drop
+  time words from the BM25 query (`core/passages.py`). Same known-item gains, topical
+  unchanged.
+- **Lesson:** a reranker that wins on known-item questions can lose on topical ones; always
+  check both groups, and prefer a rescue slot over reordering a good head.
+
 ### Question filter parser (2026-10-20, `e5a0c17`)
 - "tuổi trẻ" also means "youth" and "thanh niên" "young people", so those source names need
   capitals or "báo" (newspaper) in front. A bare "may" is a verb, so English months need a
@@ -442,6 +472,10 @@ Reading the SQL found none of these:
   of the same story.
 - **Shared counters lie under parallelism:** the per-process BigQuery byte counter can't
   attribute bytes to systems running side by side.
+- **Check what an ablation flag also changes.** The first variant replay collected the pool
+  with `passage_rerank=False`, which also left the dense pool at 10 instead of 30, so every
+  variant looked weak (deep_detail 0.55 instead of 0.70). Compare a replay's baseline with
+  the official run before trusting it.
 - **Before/after across a code change:** relabel the old rows (`agent_noparse`,
   `agent_e2e_before`) before re-running, or the cache resumes with stale results.
 - **Small groups (15–20) mean differences under ~0.1 are noise.** Say so in every report.

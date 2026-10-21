@@ -16,6 +16,14 @@ next run, and a crashed or interrupted run simply continues. Months are processe
 first; each month reads only its own partition. Rows are saved every --flush rows with a
 BigQuery load job (free), so a crash loses at most one batch of embedding cost.
 
+Bodies: each saved article's full body also goes to `vectors.article_bodies` (hash-bucket
+partitioned, see core/articles.py) for the agent's passage rerank, written just before its
+vector so an article is never embedded without a body. `bodies` fills in what's missing
+(a repair over the last --window-days of publication months, ~0.5 GB; --full = whole corpus,
+the first backfill, ~2.5 GB):
+
+    uv run --env-file .env python ai_agents/embed_articles.py bodies [--full]
+
 Text: "title: {title} | text: {first 1,500 chars of the body}" - gemini-embedding-2's
 documented document format (it rejects task_type; queries use
 "task: search result | query: {question}", see core/retrieval.py). Bake-off and model
@@ -42,6 +50,7 @@ from google.cloud import bigquery
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # for core.*
 from core import bq  # noqa: E402
+from core.articles import BODY_BUCKET_SQL, BODY_BUCKETS, body_bucket  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("embed_articles")
@@ -55,6 +64,7 @@ LEAD_CHARS = 1500
 SNIPPET_CHARS = 240  # stored for the vector index's metadata (context without a BigQuery lookup)
 DATASET = "vectors"
 TABLE = "article_embeddings"
+BODIES_TABLE = "article_bodies"
 
 SCHEMA = [
     bigquery.SchemaField("article_id", "STRING", mode="REQUIRED"),
@@ -71,6 +81,13 @@ SCHEMA = [
     bigquery.SchemaField("embedding", "FLOAT64", mode="REPEATED"),
     bigquery.SchemaField("input_tokens", "INT64"),
     bigquery.SchemaField("embedded_at", "TIMESTAMP", mode="REQUIRED"),
+]
+BODIES_SCHEMA = [
+    bigquery.SchemaField("bucket", "INT64", mode="REQUIRED"),
+    bigquery.SchemaField("article_id", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("content_hash", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("body_text", "STRING"),
+    bigquery.SchemaField("saved_at", "TIMESTAMP", mode="REQUIRED"),
 ]
 
 
@@ -97,6 +114,17 @@ def ensure_table():
     t.description = (f"One row per (article_id, content_hash, model). {MODEL} @{DIMS} of "
                      "'title: … | text: <first 1,500 chars>'. Latest row per article_id wins.")
     c.create_table(t, exists_ok=True)
+    b = bigquery.Table(bodies_ref(), schema=BODIES_SCHEMA)
+    b.range_partitioning = bigquery.RangePartitioning(
+        field="bucket", range_=bigquery.PartitionRange(start=0, end=BODY_BUCKETS, interval=1))
+    b.clustering_fields = ["article_id"]
+    b.description = ("Full article bodies by id for the agent's passage rerank, partitioned on "
+                     "a hash bucket of article_id (core/articles.py). Append-only: latest saved_at wins.")
+    c.create_table(b, exists_ok=True)
+
+
+def bodies_ref() -> str:
+    return f"{_project()}.{DATASET}.{BODIES_TABLE}"
 
 
 def _run(sql: str, params: list | None = None, max_bytes: int = 2_000_000_000):
@@ -128,7 +156,8 @@ def pending_months(full: bool, days: int) -> list[tuple[datetime, int]]:
 def pending_rows(month: datetime, limit: int | None) -> list[dict]:
     sql = f"""
     SELECT o.article_id, o.content_hash, o.source_name, o.language, o.section_group,
-           o.web_publication_date, o.web_title, o.web_url, LEFT(o.body_text, {LEAD_CHARS}) AS lead
+           o.web_publication_date, o.web_title, o.web_url, LEFT(o.body_text, {LEAD_CHARS}) AS lead,
+           o.body_text  -- same bytes billed: LEFT() already reads the whole column
     FROM `{_project()}.marts.obt_articles` o
     LEFT JOIN (SELECT DISTINCT article_id, content_hash FROM `{table_ref()}`
                WHERE model = @model AND web_publication_date >= @m AND web_publication_date < @m_next) e
@@ -209,6 +238,50 @@ def load_rows(rows: list[dict]):
     bq.client().load_table_from_file(buf, table_ref(), job_config=cfg).result()
 
 
+def load_bodies(rows: list[dict]):
+    if not rows:
+        return
+    now = datetime.now(timezone.utc)
+    df = pl.DataFrame([{**r, "bucket": body_bucket(r["article_id"]), "saved_at": now} for r in rows], schema={
+        "bucket": pl.Int64, "article_id": pl.Utf8, "content_hash": pl.Utf8, "body_text": pl.Utf8,
+        "saved_at": pl.Datetime("us", "UTC"),
+    })
+    buf = io.BytesIO()
+    df.write_parquet(buf)
+    buf.seek(0)
+    cfg = bigquery.LoadJobConfig(source_format=bigquery.SourceFormat.PARQUET, schema=BODIES_SCHEMA,
+                                 write_disposition=bigquery.WriteDisposition.WRITE_APPEND)
+    bq.client().load_table_from_file(buf, bodies_ref(), job_config=cfg).result()
+
+
+def save(batch: list[dict], bodies: list[dict]):
+    """Bodies first: if the vector load then fails, the article stays pending and is saved
+    again next run (a duplicate body row, harmless); the reverse order could leave an
+    embedded article with no body that nothing would ever retry."""
+    load_bodies(bodies)
+    load_rows(batch)
+
+
+def cmd_bodies(args):
+    """Insert the current body of every article that has none for its content_hash."""
+    ensure_table()
+    sql = f"""
+    INSERT INTO `{bodies_ref()}` (bucket, article_id, content_hash, body_text, saved_at)
+    SELECT {BODY_BUCKET_SQL.format(col="o.article_id")}, o.article_id, o.content_hash, o.body_text,
+           CURRENT_TIMESTAMP()
+    FROM `{_project()}.marts.obt_articles` o
+    LEFT JOIN (SELECT DISTINCT article_id, content_hash FROM `{bodies_ref()}`) b
+      USING (article_id, content_hash)
+    WHERE b.article_id IS NULL AND {_window_sql(args.full, args.window_days)}
+    """
+    cfg = bigquery.QueryJobConfig(maximum_bytes_billed=5_000_000_000, labels={"app": "embed-articles"})
+    job = bq.client().query(sql, job_config=cfg)
+    job.result()
+    logger.info("bodies: inserted %s rows, %.2f GB billed", job.num_dml_affected_rows,
+                (job.total_bytes_billed or 0) / 1e9)
+    return 0
+
+
 def cmd_embed(args):
     ensure_table()
     months = pending_months(args.full, args.window_days)
@@ -220,6 +293,7 @@ def cmd_embed(args):
     done = tokens = failed = 0
     started = time.time()
     batch: list[dict] = []
+    bodies: list[dict] = []
     for month, n in months:
         rows = pending_rows(month, args.limit)
         logger.info("%s: %d pending", month.strftime("%Y-%m"), len(rows))
@@ -258,29 +332,31 @@ def cmd_embed(args):
                     "embedding": v.tolist(), "input_tokens": ntok,
                     "embedded_at": datetime.now(timezone.utc),
                 })
+                bodies.append({"article_id": r["article_id"], "content_hash": r["content_hash"],
+                               "body_text": r["body_text"]})
                 tokens += ntok
                 if len(batch) >= args.flush:
-                    load_rows(batch)
+                    save(batch, bodies)
                     done += len(batch)
-                    batch = []
+                    batch, bodies = [], []
                     rate = done / (time.time() - started)
                     logger.info("saved %d/%d (%.0f/s, ETA %.0f min) | %.1fM tokens ≈ $%.2f | failed %d",
                                 done, total, rate, (total - done) / max(rate, 1e-9) / 60,
                                 tokens / 1e6, tokens / 1e6 * args.price_per_m, failed)
                 if tokens > args.max_tokens:
-                    load_rows(batch)
+                    save(batch, bodies)
                     done += len(batch)
                     logger.error("token budget %.0fM reached - stopping (rerun to continue)", args.max_tokens / 1e6)
                     ex.shutdown(wait=False, cancel_futures=True)
                     return 2
         except TimeoutError:
-            load_rows(batch)
+            save(batch, bodies)
             logger.error("STALLED: nothing completed for %ds; saved %d rows, exiting (rerun to resume)",
                          args.stall_seconds, done + len(batch))
             logging.shutdown()
             os._exit(3)  # hung worker threads would block a normal exit
         ex.shutdown(wait=True)
-    load_rows(batch)
+    save(batch, bodies)
     done += len(batch)
     logger.info("DONE: %d embedded, %d failed (left pending), %.1fM tokens ≈ $%.2f, BigQuery %.2f GB billed, %.0f min",
                 done, failed, tokens / 1e6, tokens / 1e6 * args.price_per_m, bq.usage["bytes_billed"] / 1e9,
@@ -314,8 +390,11 @@ def main() -> int:
     e.add_argument("--max-tokens", type=float, default=200e6, help="stop once this many tokens are used (cost guard)")
     e.add_argument("--price-per-m", type=float, default=0.20, help="USD per 1M tokens, for progress estimates")
     sub.add_parser("status")
+    b = sub.add_parser("bodies", help="insert missing bodies into vectors.article_bodies (backfill / repair)")
+    b.add_argument("--full", action="store_true", help="whole corpus (default: publication months of the last --window-days)")
+    b.add_argument("--window-days", type=int, default=40)
     args = ap.parse_args()
-    return {"embed": cmd_embed, "status": cmd_status}[args.cmd](args)
+    return {"embed": cmd_embed, "status": cmd_status, "bodies": cmd_bodies}[args.cmd](args)
 
 
 if __name__ == "__main__":

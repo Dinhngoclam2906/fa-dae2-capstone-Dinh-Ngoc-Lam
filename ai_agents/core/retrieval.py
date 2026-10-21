@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any
 
-from core import articles
+from core import articles, passages
 from core.config import settings
 from core.text import extract_keywords, is_vietnamese, query_filters, recency_days
 
@@ -243,10 +243,35 @@ def _dedupe(cands: list[Candidate]) -> list[Candidate]:
     return out
 
 
+def _passage_rerank(query: str, dense: list[Candidate], stats: dict) -> list[Candidate]:
+    """Fill the slots after the dense top `passage_keep` with the best body passages
+    (core/passages.py); on any failure keep the dense order."""
+    t = time.time()
+    try:
+        bodies = articles.get_bodies([c.article_id for c in dense])
+        ranked = passages.rescue(query, [(c.title, bodies.get(c.article_id, "")) for c in dense],
+                                 settings.passage_keep)
+    except Exception as e:  # noqa: BLE001 - the dense ranking is still a good answer
+        logger.warning("passage rerank failed: %r", e)
+        stats["passage_error"] = repr(e)[:200]
+        return dense
+    out = []
+    for i, passage in ranked:
+        c = dense[i]
+        chunk = passage[len(c.title) + 2:].strip()
+        if chunk and chunk[:200] not in c.text:  # a detail the snippet doesn't show
+            c.text = f"{c.text}\n…{chunk}…"
+        out.append(c)
+    stats["passage_bodies"] = len(bodies)
+    stats["passage_ms"] = int((time.time() - t) * 1000)
+    return out
+
+
 def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: bool = False,
                     top_n: int = 5, include_user_docs: bool = True, article_vectors: str | None = None,
                     keyword: bool | None = None, rerank: bool | None = None,
-                    parse_filters: bool = True, **filters) -> RetrievalResult:
+                    parse_filters: bool = True, passage_rerank: bool | None = None,
+                    **filters) -> RetrievalResult:
     """The retrieval for one question -> top_n candidates.
     Mode "dense" (default): this session's upload chunks (v1 index), then v2 dense articles.
     Mode "hybrid" (and demo mode): also the keyword search (interleaved) and FlashRank.
@@ -254,8 +279,11 @@ def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: boo
     Pinecone and to the keyword search (v1 post-filters source/language). Without explicit
     filters, a source or month / year stated in the question (`text.query_filters`) becomes
     a hard filter on the v2 dense search, dropped again if it finds nothing.
-    `article_vectors` ("v1" / "v2"), `keyword`, `rerank` and `parse_filters` override the
-    defaults (eval)."""
+    Mode "dense" then fills the slots after the dense top `settings.passage_keep` from the
+    top `settings.passage_pool` articles by their best body passage (core/passages.py), and
+    adds each article's best passage to its text.
+    `article_vectors` ("v1" / "v2"), `keyword`, `rerank`, `parse_filters` and
+    `passage_rerank` override the defaults (eval)."""
     t0 = time.time()
     mode = "hybrid" if demo_mode else settings.retrieval_mode
     vectors = article_vectors or settings.article_vectors
@@ -263,6 +291,10 @@ def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: boo
     use_rerank = (mode == "hybrid") if rerank is None else rerank
     keywords = extract_keywords(query) if use_keyword else []
     k_dense, k_user, k_sql = (8, 4, 15) if demo_mode else (10, 5, 10)
+    use_passages = (mode == "dense" and vectors == "v2" and settings.passage_pool > 0
+                    if passage_rerank is None else passage_rerank)
+    if use_passages:
+        k_dense = max(k_dense, settings.passage_pool)
     sid = session_id if include_user_docs else None
     filters = {k: v for k, v in filters.items() if v}  # search_news passes every key, mostly None
     parsed = query_filters(query, articles._today_local()) if parse_filters and not filters else {}
@@ -315,6 +347,8 @@ def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: boo
         if filters.get(key) and vectors != "v2":
             attr = "source_name" if key == "source" else "language"
             dense = [c for c in dense if getattr(c, attr) == filters[key]]
+    if use_passages and dense:
+        dense = _passage_rerank(query, dense, stats)
     cands = _dedupe(found["user_docs"] + _interleave(dense, found["keyword"]))
     stats["unique"] = len(cands)
 

@@ -57,10 +57,12 @@ RESULTS = HERE / "hard_eval_results.json"
 
 GEN_MODEL = "gpt-4.1-mini"  # writes and judges; not the agent's model
 TOP_N = 5
-SYSTEMS = ["agent_default", "agent_noparse", "v2_dense", "keyword", "agent_e2e", "agent_e2e_before"]
-# Run by default; agent_e2e_before holds agent_e2e rows recorded before the query parser
-# (2026-10-20) and can't be re-run.
-RUN_SYSTEMS = ["agent_default", "agent_noparse", "v2_dense", "keyword", "agent_e2e"]
+SYSTEMS = ["agent_default", "agent_nopassage", "agent_noparse", "v2_dense", "keyword", "agent_e2e",
+           "agent_default_before", "agent_e2e_before"]
+# Run by default; the *_before systems hold rows recorded before a change and can't be
+# re-run: agent_e2e_before before the query parser (2026-10-20), agent_default_before
+# before the passage rerank (2026-10-20 runs; agent_nopassage is the same-day baseline).
+RUN_SYSTEMS = ["agent_default", "agent_nopassage", "agent_noparse", "v2_dense", "keyword", "agent_e2e"]
 KNOWN = ("keyword_short", "entity_number", "deep_detail")
 TOPICAL = ("time_relative", "filtered")
 SOURCE_NAMES = {"guardian": "The Guardian", "tuoitre": "Tuổi Trẻ", "thanhnien": "Thanh Niên",
@@ -263,6 +265,9 @@ def _system(name: str, q: dict) -> dict:
     if name == "agent_default":
         return {"ids": [c.article_id for c in R.hybrid_retrieve(q["question"], top_n=TOP_N,
                                                                 include_user_docs=False).candidates]}
+    if name == "agent_nopassage":  # production retrieval without the passage rerank
+        return {"ids": [c.article_id for c in R.hybrid_retrieve(q["question"], top_n=TOP_N, include_user_docs=False,
+                                                                passage_rerank=False).candidates]}
     if name == "agent_noparse":  # production retrieval without text.query_filters
         return {"ids": [c.article_id for c in R.hybrid_retrieve(q["question"], top_n=TOP_N, include_user_docs=False,
                                                                 parse_filters=False).candidates]}

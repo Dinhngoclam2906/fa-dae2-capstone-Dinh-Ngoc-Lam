@@ -14,8 +14,11 @@ Plain functions, shared by the agent's tools and the hybrid retriever. Cost rule
 
 from __future__ import annotations
 
+import hashlib
 import unicodedata
 from datetime import date, datetime, timedelta, timezone
+
+from google.cloud import bigquery
 
 from core import bq
 from core.config import LANGUAGES, SECTION_GROUPS, SOURCES, settings
@@ -156,6 +159,34 @@ def get_article(article_id: str, published_date: str, source: str | None = None)
     rows = bq.query(sql, [bq.p("lo", lo, "TIMESTAMP"), bq.p("hi", hi, "TIMESTAMP"),
                           bq.p("article_id", article_id.strip()), bq.p("source", source)])
     return rows[0] if rows else None
+
+
+# Full bodies by id, for passage reranking. obt_articles is partitioned by month, so 30
+# scattered ids read ~1.3 GB; clustering on article_id doesn't prune scattered ids
+# (2-2.5 GB). `vectors.article_bodies` is integer-range partitioned on a hash of the id
+# instead: 30 ids touch at most 30 small partitions, ~25 MB (measured 2026-10-21).
+# The two expressions below must agree (BigQuery MD5 hashes the UTF-8 bytes).
+BODY_BUCKETS = 3000
+BODY_BUCKET_SQL = "MOD(CAST(CONCAT('0x', SUBSTR(TO_HEX(MD5({col})), 1, 8)) AS INT64), %d)" % BODY_BUCKETS
+
+
+def body_bucket(article_id: str) -> int:
+    return int(hashlib.md5(article_id.encode("utf-8")).hexdigest()[:8], 16) % BODY_BUCKETS
+
+
+def get_bodies(article_ids: list[str], timeout: float = 10) -> dict[str, str]:
+    """article_id -> full body (latest saved version). Missing ids are left out."""
+    ids = sorted({i for i in article_ids if i})
+    if not ids:
+        return {}
+    sql = f"""
+    SELECT article_id, body_text FROM {settings.bodies_table}
+    WHERE bucket IN UNNEST(@buckets) AND article_id IN UNNEST(@ids)
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY article_id ORDER BY saved_at DESC) = 1
+    """
+    buckets = bigquery.ArrayQueryParameter("buckets", "INT64", sorted({body_bucket(i) for i in ids}))
+    rows = bq.query(sql, [buckets, bq.p_array("ids", ids)], timeout=timeout)
+    return {r["article_id"]: r["body_text"] or "" for r in rows}
 
 
 def news_summary(day: str | None = None, *, language: str | None = None,
