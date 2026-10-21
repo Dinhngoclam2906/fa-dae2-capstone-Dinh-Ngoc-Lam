@@ -85,6 +85,7 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-21 | BigQuery | Fetching 30 scattered ids: month partitions 1.3 GB, clustering 2.5 GB, hash buckets 25 MB |
 | 2026-10-21 | Agent | A full passage rerank hurt "latest" questions; one rescue slot didn't |
 | 2026-10-21 | Eval | Prototype pool was 10 deep, not 30: an ablation flag changed the pool size |
+| 2026-10-22 | Eval | Time-relative sets expire, and one written after midnight can't test "today" |
 
 ---
 
@@ -476,6 +477,14 @@ Reading the SQL found none of these:
   with `passage_rerank=False`, which also left the dense pool at 10 instead of 30, so every
   variant looked weak (deep_detail 0.55 instead of 0.70). Compare a replay's baseline with
   the official run before trusting it.
+- **Time-relative questions expire, and their timing matters** (2026-10-22). Re-asked two
+  days later, the hard set's "this week" answers moved out of their windows (11 cited
+  articles newer than the window). `eval/time_eval.py` writes a fresh dated set instead.
+  Written at 00:20 Vietnam time, every "today" seed was from yesterday, so "hôm nay" scored
+  0.00: generate the set in the afternoon, Vietnam time.
+- **An eval process can hang after its last write**: a retrieval leg abandoned on timeout
+  leaves a network thread that blocks interpreter exit, and the chained `judge` never
+  starts. `time_eval.py run` now ends with `os._exit(0)`.
 - **Before/after across a code change:** relabel the old rows (`agent_noparse`,
   `agent_e2e_before`) before re-running, or the cache resumes with stale results.
 - **Small groups (15–20) mean differences under ~0.1 are noise.** Say so in every report.

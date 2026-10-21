@@ -197,6 +197,36 @@ measure the gain before committing.
 
 **Not re-measured:** the 1c set (`retrieval_eval.py`).
 
+## Time-relative questions, re-measured fresh (2026-10-22)
+
+The hard set's 15 time_relative questions expire (see the e2e note above), so they now have
+their own daily set: `ai_agents/eval/time_eval.py` writes 40 questions from articles of the
+last 2 days, 5 per phrase (4 English, 4 Vietnamese), under `data/eval/time/<asked_on>/`, and
+judges with the same prompt. Besides strict / lenient precision@5 it reports **any_strict**
+(at least one on-topic, in-window result: strict precision is capped when only one or two
+recent articles on a topic exist) and **in_window** (programmatic).
+
+First run, asked 2026-10-22 (all 40):
+
+| Recency rule | strict | lenient | any_strict | in_window | seed@5 |
+|---|---|---|---|---|---|
+| off | 0.17 | 0.69 | 0.57 | 0.31 | 0.60 |
+| recent-first 3 (rule until 10-22) | 0.25 | 0.76 | 0.72 | 0.53 | 0.75 |
+| recent-first 5 for every window | 0.30 | 0.76 | 0.72 | 0.66 | 0.78 |
+| **5 for windows ≤ 7 days, 3 for "latest"** (now production) | 0.28 | 0.78 | **0.75** | 0.64 | 0.78 |
+
+- The recency rule earns its place: without it, any_strict falls 0.72 → 0.57.
+- Giving short calendar windows ("today", "this week", "mấy ngày qua") all five slots raises
+  in-window results 0.53 → 0.64; the rest moves within noise (±0.05 at n = 40). "Latest" /
+  "this month" keep 3 slots: a hard window there lost 8/100 questions on the 1c set, whose
+  "recent" meant the article's own time.
+- Vietnamese is weaker than English (any_strict 0.60–0.65 vs 0.85): VI sources publish far
+  more per day, so more recent same-topic articles compete.
+- **"Today" was unmeasurable in this run:** the set was written at ~00:20 Vietnam time, so
+  every seed was from yesterday and the judge marks yesterday as breaking "hôm nay" (0.00
+  any_strict). Write the set in the afternoon, Vietnam time.
+- To confirm: a second set written in daytime (`current` vs `first3` vs `first5`).
+
 ## Caveats
 
 - Small groups (15–20): differences under ~0.1 are noise.

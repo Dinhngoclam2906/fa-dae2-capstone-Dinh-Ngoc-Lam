@@ -31,7 +31,11 @@ from core.text import extract_keywords, is_vietnamese, query_filters, recency_da
 logger = logging.getLogger(__name__)
 
 MIN_RECENT = 3  # fewer hits than this inside a recency window -> ignore the window
-RECENT_FIRST = 3  # recent-window hits placed ahead of the all-dates ranking
+RECENT_FIRST = 3  # recent-window hits placed ahead of the all-dates ranking ("latest", "this month")
+# Short calendar windows ("today", "this week", "mấy ngày qua") mean today's calendar, so they
+# get every top-5 slot: in-window results 0.53 -> 0.64 (eval/time_eval.py, 2026-10-22).
+RECENT_FIRST_SHORT = 5
+SHORT_WINDOW_DAYS = 7
 RERANK_EN = "ms-marco-MiniLM-L-12-v2"
 RERANK_MULTILINGUAL = "ms-marco-MultiBERT-L-12"  # used when Vietnamese is involved
 MIN_RERANK = 3
@@ -200,8 +204,9 @@ def _dense_user_docs(query: str, k: int, session_id: str | None) -> list[Candida
 
 def _dense_v2_recent(query: str, k: int, filters: dict, recent_days: int | None) -> list[Candidate]:
     """v2 articles. With `recent_days`, the best RECENT_FIRST hits from that window go
-    first, then the best of all dates. A hard window lost 8/100 eval questions whose
-    "recent" / "last week" meant the article's own time, not today's (2026-10-20)."""
+    first (RECENT_FIRST_SHORT for windows up to SHORT_WINDOW_DAYS), then the best of all
+    dates. Not a hard window: one lost 8/100 eval questions whose "recent" meant the
+    article's own time, not today's (2026-10-20)."""
     vec = embed_query(query)
     everything = _dense_articles_v2(query, k, filters, vec=vec)
     if not recent_days:
@@ -209,7 +214,8 @@ def _dense_v2_recent(query: str, k: int, filters: dict, recent_days: int | None)
     recent = _dense_articles_v2(query, k, {**filters, "days": recent_days}, vec=vec)
     if len(recent) < MIN_RECENT:
         return everything
-    return _dedupe(recent[:RECENT_FIRST] + everything)[:k]
+    first = RECENT_FIRST_SHORT if recent_days <= SHORT_WINDOW_DAYS else RECENT_FIRST
+    return _dedupe(recent[:first] + everything)[:k]
 
 
 def _keyword(keywords: list[str], limit: int, filters: dict) -> list[Candidate]:
