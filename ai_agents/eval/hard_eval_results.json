@@ -187,39 +187,39 @@
  "agent_e2e": {
   "keyword_short": {
    "n": 20,
-   "found@5": 0.85,
+   "found@5": 0.8,
    "hit@1": 0.4
   },
   "entity_number": {
    "n": 20,
-   "found@5": 0.65,
-   "hit@1": 0.65
+   "found@5": 0.6,
+   "hit@1": 0.6
   },
   "deep_detail": {
    "n": 20,
-   "found@5": 0.3,
-   "hit@1": 0.2
+   "found@5": 0.55,
+   "hit@1": 0.4
   },
   "time_relative": {
    "n": 15,
-   "strict": 0.40444444444444444,
-   "lenient": 0.9066666666666666,
-   "constraint_ok": 0.8577777777777779,
-   "results_per_q": 3.6666666666666665
+   "strict": 0.33,
+   "lenient": 0.8833333333333333,
+   "constraint_ok": 0.6533333333333334,
+   "results_per_q": 3.1333333333333333
   },
   "filtered": {
    "n": 20,
-   "strict": 0.6683333333333333,
-   "lenient": 0.9166666666666666,
-   "constraint_ok": 0.95,
-   "results_per_q": 2.6
+   "strict": 0.7375,
+   "lenient": 0.96,
+   "constraint_ok": 1.0,
+   "results_per_q": 2.85
   },
   "cost": {
-   "p50_s": 6.861,
-   "p90_s": 13.967,
-   "mb_billed_per_q": 260.48835368421055,
+   "p50_s": 5.748,
+   "p90_s": 12.334,
+   "mb_billed_per_q": 228.56749271578946,
    "errors": 0,
-   "tool_calls_per_q": 0.8631578947368421
+   "tool_calls_per_q": 0.4105263157894737
   }
  },
  "agent_default_before": {
@@ -257,6 +257,44 @@
    "p90_s": 1.227,
    "mb_billed_per_q": 16.313635031578947,
    "errors": 0
+  }
+ },
+ "agent_e2e_nopassage": {
+  "keyword_short": {
+   "n": 20,
+   "found@5": 0.85,
+   "hit@1": 0.4
+  },
+  "entity_number": {
+   "n": 20,
+   "found@5": 0.65,
+   "hit@1": 0.65
+  },
+  "deep_detail": {
+   "n": 20,
+   "found@5": 0.3,
+   "hit@1": 0.2
+  },
+  "time_relative": {
+   "n": 15,
+   "strict": 0.40444444444444444,
+   "lenient": 0.9066666666666666,
+   "constraint_ok": 0.8577777777777779,
+   "results_per_q": 3.6666666666666665
+  },
+  "filtered": {
+   "n": 20,
+   "strict": 0.6683333333333333,
+   "lenient": 0.9166666666666666,
+   "constraint_ok": 0.95,
+   "results_per_q": 2.6
+  },
+  "cost": {
+   "p50_s": 6.861,
+   "p90_s": 13.967,
+   "mb_billed_per_q": 260.48835368421055,
+   "errors": 0,
+   "tool_calls_per_q": 0.8631578947368421
   }
  },
  "agent_e2e_before": {

@@ -58,10 +58,11 @@ RESULTS = HERE / "hard_eval_results.json"
 GEN_MODEL = "gpt-4.1-mini"  # writes and judges; not the agent's model
 TOP_N = 5
 SYSTEMS = ["agent_default", "agent_nopassage", "agent_noparse", "v2_dense", "keyword", "agent_e2e",
-           "agent_default_before", "agent_e2e_before"]
-# Run by default; the *_before systems hold rows recorded before a change and can't be
-# re-run: agent_e2e_before before the query parser (2026-10-20), agent_default_before
-# before the passage rerank (2026-10-20 runs; agent_nopassage is the same-day baseline).
+           "agent_default_before", "agent_e2e_nopassage", "agent_e2e_before"]
+# Run by default; the other systems hold rows recorded before a change and can't be
+# re-run: agent_e2e_before before the query parser (2026-10-20), agent_default_before and
+# agent_e2e_nopassage before the passage rescue (2026-10-20 runs; agent_nopassage is the
+# same-day retrieval baseline).
 RUN_SYSTEMS = ["agent_default", "agent_nopassage", "agent_noparse", "v2_dense", "keyword", "agent_e2e"]
 KNOWN = ("keyword_short", "entity_number", "deep_detail")
 TOPICAL = ("time_relative", "filtered")

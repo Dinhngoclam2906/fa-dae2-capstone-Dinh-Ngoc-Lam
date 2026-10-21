@@ -177,8 +177,25 @@ tier would break the $5–10/month budget after the trial. A recent window is ch
 stack with this rescue; a ~$1 pilot (last 7 days + new deep-detail questions on them) would
 measure the gain before committing.
 
-**Not re-measured:** the end-to-end agent (`agent_e2e`, OpenAI cost) with passages in its
-context, and the 1c set (`retrieval_eval.py`).
+**End-to-end agent** (2026-10-22, `agent_e2e` with passages vs `agent_e2e_nopassage`, the
+10-20 run; gpt-5.4-mini; "cited the seed" / cited it first):
+
+| | keyword_short | entity_number | deep_detail | filtered (strict / lenient / constraint) | tool calls / q | p50 |
+|---|---|---|---|---|---|---|
+| before | 0.85 / 0.40 | 0.65 / 0.65 | 0.30 / 0.20 | 0.67 / 0.92 / 0.95 | 0.86 | 6.9 s |
+| with passages | 0.80 / 0.40 | 0.60 / 0.60 | **0.55 / 0.40** | **0.74 / 0.96 / 1.00** | **0.41** | 5.7 s |
+
+- The agent now cites the deep-detail article almost twice as often (0.30 → 0.55): the
+  matching passage is in its context, so it answers without a `get_article` call.
+- It calls tools half as often (0.86 → 0.41 per question) and answers ~1 s faster.
+- keyword_short / entity_number: one question fewer each, noise at n = 20. The agent cites
+  fewer articles than retrieval returns, so these stay below the retrieval numbers.
+- time_relative (0.40 → 0.33 strict, constraint 0.86 → 0.65) **can't be compared**: the
+  questions were written on 10-20 and re-asked on 10-22. Of the cited articles outside the
+  window, 11 were newer than it (right for "this week" asked today; 2 before) and 5 older
+  (7 before), so the drop is date drift, not a regression.
+
+**Not re-measured:** the 1c set (`retrieval_eval.py`).
 
 ## Caveats
 
