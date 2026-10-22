@@ -86,6 +86,7 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-21 | Agent | A full passage rerank hurt "latest" questions; one rescue slot didn't |
 | 2026-10-21 | Eval | Prototype pool was 10 deep, not 30: an ablation flag changed the pool size |
 | 2026-10-22 | Eval | Time-relative sets expire, and one written after midnight can't test "today" |
+| 2026-10-22 | Embeddings | Stale-version guard disabled pruning: Pinecone sync needed 3.3 GB, failed 6 runs |
 
 ---
 
@@ -353,6 +354,23 @@ Reading the SQL found none of these:
   article's stale July vector would be upserted over its October one.
 - **Fix:** the sync skips rows with a newer `embedded_at` for the same article (+45 MB scan).
 - **Lesson:** when an id can have several versions, every reader must pick the latest.
+
+### The stale-version guard broke every daily sync (2026-10-22, `ba2feee`)
+- **Symptom:** `embed-sync` failed 6 runs in a row (10-21 20:00 → 10-22 16:00 UTC): the embed
+  step was green, then `sync_vector_index.py sync` died with `bytesBilledLimitExceeded: 3310354432
+  or higher required` (cap 1 GB). Pinecone stopped at 10-21 16:04; 1,560 vectors backed up.
+- **Cause:** the `NOT EXISTS` self-join from `4166f21` sat inside the per-month row query. Any
+  self-reference there (`NOT EXISTS`, a join to `MAX(embedded_at)`, an uncorrelated `NOT IN`;
+  all dry-run 3.07 GB vs 0.16 GB without) disables partition pruning, so the whole embedding
+  column is read. The "+45 MB" in the entry above was measured on a COUNT over small columns,
+  not on the query that reads `embedding`. It stayed latent until the 10-21 passage-rescue
+  rebuild shipped it in the image.
+- **Fix:** one query over the small columns lists the stale `(article_id, embedded_at)` pairs
+  (~41 MB, 85 rows); the per-month query is back to plain partition filters and the rows are
+  skipped in Python. Local catch-up sync 0.07 GB, image rebuilt, cloud run green; Pinecone =
+  OBT = 491,403.
+- **Lesson:** dry-run the exact query that ships (same columns), not a COUNT stand-in; and a
+  fix to a job's code isn't live until its image is rebuilt, so test it then.
 
 ---
 
