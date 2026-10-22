@@ -136,21 +136,28 @@ def cmd_sync(args):
         cp = {"index": settings.pinecone_index_v2, "since": since.isoformat() if since else None,
               "cutoff": cutoff.isoformat(), "months": []}
     where = "model = @model AND embedded_at <= @cutoff" + (" AND embedded_at > @since" if since else "")
-    # A re-embedded article keeps its older versions in the table, possibly in another month
-    # (re-dated, incident 2026-10-20). Skip them: months go newest first and the Pinecone id is
-    # the article_id, so a full sync would otherwise upsert the stale vector over the current one.
-    where += (f" AND NOT EXISTS (SELECT 1 FROM `{_p()}.vectors.article_embeddings` n"
-              " WHERE n.article_id = v.article_id AND n.model = v.model AND n.embedded_at > v.embedded_at)")
     params = [bq.p("model", MODEL), bq.p("cutoff", cutoff, "TIMESTAMP")]
     if since:
         params.append(bq.p("since", since, "TIMESTAMP"))
+    # A re-embedded article keeps its older versions in the table, possibly in another month
+    # (re-dated, incident 2026-10-20). Skip them: months go newest first and the Pinecone id is
+    # the article_id, so a full sync would otherwise upsert the stale vector over the current one.
+    # Listed up front from the small columns only: any self-reference inside the per-month query
+    # disables its partition pruning and scans the whole embedding column (3.3 GB > the 1 GB cap,
+    # every run failed 2026-10-21 20:00 → 10-23).
+    stale = {(r["article_id"], r["embedded_at"]) for r in _q(
+        f"""SELECT v.article_id, v.embedded_at FROM `{_p()}.vectors.article_embeddings` v
+            JOIN `{_p()}.vectors.article_embeddings` n
+              ON n.article_id = v.article_id AND n.model = v.model AND n.embedded_at > v.embedded_at
+            WHERE v.model = @model AND v.embedded_at <= @cutoff{" AND v.embedded_at > @since" if since else ""}""",
+        params)}
     months = _q(f"""SELECT TIMESTAMP_TRUNC(web_publication_date, MONTH) AS m, COUNT(*) AS n
                     FROM `{_p()}.vectors.article_embeddings` v WHERE {where} GROUP BY m ORDER BY m DESC""", params)
     todo = [(r["m"], r["n"]) for r in months if r["m"].isoformat() not in cp["months"]]
     if args.before:  # resume a run whose checkpoint was lost (newer months already upserted)
         b = datetime.strptime(args.before, "%Y-%m").replace(tzinfo=timezone.utc)
         todo = [(m, n) for m, n in todo if m < b]
-    n_total = sum(n for _, n in todo)
+    n_total = sum(n for _, n in todo) - len(stale)  # approximate when resuming a checkpoint
     est_wu = n_total * 2.8  # ~2.7 KB per record measured; the "at least 1 WU per KB" rule
     logger.info("to sync: %d vectors in %d months (since %s), ≈ %.2fM write units", n_total, len(todo), since, est_wu / 1e6)
     if est_wu > args.max_write_units:
@@ -161,14 +168,16 @@ def cmd_sync(args):
     done, kb = 0, 0.0
     for m, n in todo:
         m_next = datetime(m.year + (m.month // 12), m.month % 12 + 1, 1, tzinfo=timezone.utc)
-        rows = _q_stream(f"""SELECT article_id, source_name, language, section_group, web_publication_date,
-                             web_title, web_url, snippet, embedding
+        rows = _q_stream(f"""SELECT article_id, embedded_at, source_name, language, section_group,
+                             web_publication_date, web_title, web_url, snippet, embedding
                       FROM `{_p()}.vectors.article_embeddings` v
                       WHERE {where} AND web_publication_date >= @m AND web_publication_date < @m_next
                       ORDER BY embedded_at""",
                   params + [bq.p("m", m, "TIMESTAMP"), bq.p("m_next", m_next, "TIMESTAMP")])
         chunk, n_month = [], 0
         for r in rows:
+            if (r["article_id"], r["embedded_at"]) in stale:
+                continue
             chunk.append(to_vector(r))
             if len(chunk) == args.batch:
                 _upsert(index, chunk)
