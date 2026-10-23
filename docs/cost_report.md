@@ -52,3 +52,23 @@ One-off setup, done by the owner (it grants IAM roles):
 4. Test: `gcloud run jobs execute cost-report --region asia-southeast1 --project project-f5433681-7b47-481f-9c7 --wait`.
 
 The report's own cost: ~0.1 GB of BigQuery and ~1 minute of Cloud Run a day (≈ $0.02/month).
+
+## Guards and history (2026-10-23)
+
+- **Budget** `news-pipeline monthly ($10)`: ₫260,000/month (the billing account is in VND;
+  ≈ $10 at the trial's ₫26,100/$), project-scoped, **credits excluded** so it reacts to real
+  usage during the trial. Emails the billing admins at 50%, 90%, 100% of actual spend and
+  100% of forecast. A budget alerts; it never stops anything.
+- **Failure alert**: `cost-report` added to the "Pipeline job failed" policy.
+- **Billing export**: dataset `billing_export` (asia-southeast1) created. Turning the export
+  on has no API: Console → Billing → Billing export → BigQuery export → *Standard usage
+  cost* → Edit settings → project `project-f5433681-7b47-481f-9c7`, dataset
+  `billing_export` → Save. It's the official record (credits included); the report stays
+  the fast, per-action view.
+- **Artifact Registry cleanup**: `scripts/monitoring/ar_cleanup_policy.json` (keep the 3
+  newest versions and `latest`, delete the rest after 7 days). Apply per repo:
+  `gcloud artifacts repositories set-cleanup-policies <repo> --location asia-southeast1 --policy scripts/monitoring/ar_cleanup_policy.json --no-dry-run`
+  for `guardian-ingestion`, `dbt-build`, `embed-sync`, `cost-report`.
+- **History backfill**: `monitoring.cost_daily` was filled for 2026-10-01 → 10-22 by running
+  the report per day. Usage-based rows are exact; storage and Pinecone rows for past days
+  use the sizes on 10-23 (pennies of error).

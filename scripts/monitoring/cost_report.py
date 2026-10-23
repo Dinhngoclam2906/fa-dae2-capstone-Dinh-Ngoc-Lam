@@ -85,7 +85,10 @@ class Report:
         return [dict(r.items()) for r in self.bq.query(sql, job_config=cfg).result()]
 
     def get(self, url: str, **params) -> dict:
-        r = self.http.get(url, params=params, timeout=30)
+        try:
+            r = self.http.get(url, params=params, timeout=30)
+        except OSError:  # a read timeout on the Run API hit 3 of 22 backfill days; retry once
+            r = self.http.get(url, params=params, timeout=60)
         r.raise_for_status()
         return r.json()
 
