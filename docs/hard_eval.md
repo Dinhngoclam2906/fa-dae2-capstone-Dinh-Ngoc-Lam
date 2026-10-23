@@ -225,7 +225,30 @@ First run, asked 2026-10-22 (all 40):
 - **"Today" was unmeasurable in this run:** the set was written at ~00:20 Vietnam time, so
   every seed was from yesterday and the judge marks yesterday as breaking "hôm nay" (0.00
   any_strict). Write the set in the afternoon, Vietnam time.
-- To confirm: a second set written in daytime (`current` vs `first3` vs `first5`).
+
+Daytime confirmation, asked 2026-10-23 (written 11:20 Vietnam time from the 04:00 UTC load:
+551 articles from that morning plus 1,498 from the day before; waiting for 13:00 would add
+nothing before the 08:00 UTC load):
+
+| Recency rule | strict | lenient | any_strict | in_window | seed@5 |
+|---|---|---|---|---|---|
+| off | 0.15 | 0.56 | 0.55 | 0.32 | 0.72 |
+| recent-first 3 (`first3`) | 0.20 | 0.67 | 0.65 | 0.53 | 0.82 |
+| recent-first 5 for every window (`first5`) | 0.23 | 0.70 | 0.72 | 0.66 | 0.88 |
+| **5 for ≤ 7 days, 3 for "latest"** (`current`, production) | 0.23 | 0.71 | **0.72** | 0.64 | 0.88 |
+
+- **Confirmed:** `current` beats `first3` on any_strict (0.72 vs 0.65) and in_window (0.64 vs
+  0.53), with the same ordering as 10-22, so `RECENT_FIRST_SHORT = 5` stays. The recency rule
+  is worth +0.17 any_strict / +0.32 in_window over no rule.
+- `first5` ≈ `current` again (they differ only on the 10 "latest" / "mới nhất" questions;
+  too few to choose), so "latest" keeps 3 slots for the reason above.
+- **"Today" is measurable now:** "hôm nay" any_strict 0.60 (0.00 in the after-midnight set),
+  "today or yesterday" 0.80.
+- Vietnamese is still weaker (any_strict 0.65 vs 0.80 English), and strict precision stays
+  low (0.23): few same-topic articles fall inside a 2–7-day window, so most of the top 5 can't
+  be strict even when ranked well.
+- Pinecone timed out 4 times that day (3 queries + a warm-up); the 3 empty rows were dropped
+  and re-run before judging.
 
 ## Caveats
 
