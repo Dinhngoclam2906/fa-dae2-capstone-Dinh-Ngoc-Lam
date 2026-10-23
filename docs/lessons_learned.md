@@ -87,6 +87,8 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-21 | Eval | Prototype pool was 10 deep, not 30: an ablation flag changed the pool size |
 | 2026-10-22 | Eval | Time-relative sets expire, and one written after midnight can't test "today" |
 | 2026-10-22 | Embeddings | Stale-version guard disabled pruning: Pinecone sync needed 3.3 GB, failed 6 runs |
+| 2026-10-23 | Agent | Hung calls cost 20 s + the context; Pinecone SDK retried 6×; 3 s timeout + 1 retry |
+| 2026-10-23 | Tooling | `uv sync` would have uninstalled pinecone (not in pyproject / uv.lock) |
 
 ---
 
@@ -375,6 +377,29 @@ Reading the SQL found none of these:
 ---
 
 ## 5. The agent
+
+### A hung call cost 20 s and the whole context; the SDK retried 6× (2026-10-23)
+- **Symptom:** ~1% of retrieval calls in the 10-23 evals (5 of ~420) timed out. Each waited
+  for the 20 s leg deadline, and in dense-only mode the question then had no context at all.
+- **Cause:** no per-request timeout on Pinecone, 15 s on the query embedding, no retry. And
+  pinecone 7.3.0's default urllib3 retry is `total=5` with backoff: a 1 ms timeout took
+  16.8 s, so a plain timeout would have been multiplied by 6.
+- **Fix:** `CALL_TIMEOUT_S = 3` (warm calls ≤ 0.65 s measured) per call; the embedding is
+  retried once in code, Pinecone once via its own retry (set on the private
+  `_openapi_config`, guarded). 3 s × 2 × 3 sequential calls < 20 s. The 1 ms test now fails
+  in 0.29 s; warm retrieval unchanged (~3 s). `warm_up()` keeps 30 s for the cold start.
+- **Lesson:** a timeout means nothing until you know the client's own retry policy; test
+  the failure path with a tiny timeout and time it.
+
+### `uv sync` would have uninstalled Pinecone (2026-10-23)
+- **Symptom:** `pinecone` and `langchain-pinecone` were installed but in neither
+  `pyproject.toml` nor `uv.lock`; `uv sync --dry-run` listed both for removal (plus 20 other
+  stray packages, e.g. matplotlib for `visualize_results.py`, dbt-snowflake).
+- **Cause:** installed outside the lock at some point; only `requirements-embed.txt` (the
+  embed-sync image) pinned pinecone. A fresh clone, or the documented `uv sync`, breaks retrieval.
+- **Fix:** `uv add pinecone==7.3.0 langchain-pinecone==0.2.13` (moved `packaging` 25.0 → 24.2;
+  dbt parse and retrieval re-checked).
+- **Lesson:** before publishing, `uv sync --dry-run` must show nothing the app imports.
 
 ### Retrieval leg timeout never fired (2026-10-19, `fe3ff4f`)
 - **Symptom:** one v1 Pinecone call hung the eval for 12 minutes.

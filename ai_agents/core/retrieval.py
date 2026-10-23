@@ -36,6 +36,10 @@ RECENT_FIRST = 3  # recent-window hits placed ahead of the all-dates ranking ("l
 # get every top-5 slot: in-window results 0.53 -> 0.64 (eval/time_eval.py, 2026-10-22).
 RECENT_FIRST_SHORT = 5
 SHORT_WINDOW_DAYS = 7
+# Per network call, then one retry. Warm calls take <= 0.65 s (embed p90 0.49, Pinecone 0.59,
+# 2026-10-23); ~1% hung until the 20 s leg deadline that day and left the question without
+# context. 3 s x 2 attempts x 3 sequential calls (embed + 2 queries) stays under 20 s.
+CALL_TIMEOUT_S = 3.0
 RERANK_EN = "ms-marco-MiniLM-L-12-v2"
 RERANK_MULTILINGUAL = "ms-marco-MultiBERT-L-12"  # used when Vietnamese is involved
 MIN_RERANK = 3
@@ -132,7 +136,17 @@ def _genai_client():
 @lru_cache(maxsize=1)
 def _index_v2_unlocked():
     from pinecone import Pinecone
-    return Pinecone(api_key=os.environ["PINECONE_API_KEY"]).Index(settings.pinecone_index_v2)
+    from pinecone.openapi_support.retry_urllib3 import JitterRetry
+    pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+    # The SDK's default urllib3 retry is total=5 with backoff, so one hung query took 6 x the
+    # timeout (a 1 ms timeout measured 16.8 s). One retry, set where Index() reads it: there is
+    # no public setting in pinecone 7.3.0 (uv.lock). If a later SDK renames it, keep its default.
+    if hasattr(pc, "_openapi_config"):
+        pc._openapi_config.retries = JitterRetry(total=1, backoff_factor=0.25,
+                                                 status_forcelist=(500, 502, 503, 504), allowed_methods=None)
+    else:
+        logger.warning("pinecone SDK changed: default retries (up to 6 attempts per query)")
+    return pc.Index(settings.pinecone_index_v2)
 
 
 def _index_v2():
@@ -140,14 +154,24 @@ def _index_v2():
         return _index_v2_unlocked()
 
 
-def embed_query(query: str, dims: int = 512) -> list[float]:
+def _retry_once(what: str, call):
+    """Run `call`; after a timeout or any other failure, run it once more."""
+    try:
+        return call()
+    except Exception as e:  # noqa: BLE001 - mostly timeouts; a real error fails again, fast
+        logger.warning("%s failed, retrying once: %r", what, e)
+        return call()
+
+
+def embed_query(query: str, dims: int = 512, timeout: float = CALL_TIMEOUT_S) -> list[float]:
     """The question as gemini-embedding-2 expects it (task in the text, no task_type),
     truncated to the index's dims and re-normalised."""
     import numpy as np
     from google.genai import types
-    r = _genai_client().models.embed_content(
-        model=settings.query_embedding_model, contents=[f"task: search result | query: {query}"],
-        config=types.EmbedContentConfig(output_dimensionality=768))
+    cfg = types.EmbedContentConfig(output_dimensionality=768,
+                                   http_options=types.HttpOptions(timeout=int(timeout * 1000)))
+    r = _retry_once("query embedding", lambda: _genai_client().models.embed_content(
+        model=settings.query_embedding_model, contents=[f"task: search result | query: {query}"], config=cfg))
     v = np.asarray(r.embeddings[0].values[:dims], dtype=np.float64)
     return (v / np.linalg.norm(v)).tolist()
 
@@ -169,8 +193,9 @@ def _pinecone_filter(filters: dict) -> dict | None:
 
 
 def _dense_articles_v2(query: str, k: int, filters: dict, vec: list[float] | None = None) -> list[Candidate]:
-    res = _index_v2().query(vector=vec or embed_query(query), top_k=k, include_metadata=True,
-                            namespace=settings.articles_namespace_v2, filter=_pinecone_filter(filters))
+    vec = vec or embed_query(query)
+    res = _index_v2().query(vector=vec, top_k=k, include_metadata=True, namespace=settings.articles_namespace_v2,
+                            filter=_pinecone_filter(filters), _request_timeout=CALL_TIMEOUT_S)  # retried once by urllib3
     out = []
     for m in res.matches:
         md = m.metadata or {}
@@ -396,7 +421,8 @@ def warm_up() -> None:
     """Open the Vertex and Pinecone clients and embed once (~14 s cold, measured
     2026-10-20), so the first question doesn't hit the 20 s retrieval deadline."""
     try:
-        _index_v2().query(vector=embed_query("warm up"), top_k=1, namespace=settings.articles_namespace_v2)
+        _index_v2().query(vector=embed_query("warm up", timeout=30), top_k=1,
+                          namespace=settings.articles_namespace_v2, _request_timeout=30)
     except Exception as e:  # noqa: BLE001 - the first question just pays the cost instead
         logger.warning("retrieval warm-up failed: %r", e)
 
