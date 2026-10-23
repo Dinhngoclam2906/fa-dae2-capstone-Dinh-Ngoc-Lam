@@ -249,6 +249,56 @@ nothing before the 08:00 UTC load):
   be strict even when ranked well.
 - Pinecone timed out 4 times that day (3 queries + a warm-up); the 3 empty rows were dropped
   and re-run before judging.
+- **The full agent on the same set** (`agent_e2e`, scored on the URLs it cites, 3.15 per
+  question): any_strict 0.72 (= retrieval), seed@5 0.88 (=), in_window **0.82** (retrieval's
+  top 5: 0.64), strict 0.37 vs 0.23. It finds a good recent article as often as retrieval and
+  leaves out most of the out-of-window ones when citing. 0 errors, 0 answers without a
+  citation, tools on 6/40 questions, p50 8.7 s.
+
+## Chunk-vector pilot (2026-10-23, `ai_agents/eval/chunk_pilot.py`)
+
+**Question:** article vectors see the first 1,500 characters, and the rescue can only re-rank
+the dense top 30, which holds 0.80 of deep-detail seeds. What would chunk vectors for the rest
+of the body add, and is it worth the price?
+
+**Setup:** the last 7 days (2026-10-17..23 local), 8,356 articles. Each body after character
+1,300 split into 1,500-char chunks (step 1,300, title-prefixed): 18,538 chunks, **6.17M tokens
+≈ $1.23**, 18 min, kept locally (nothing written to BigQuery or Pinecone). 60 new questions on
+those articles: 40 deep_detail (the hard set's prompt, a detail from characters 3,000–4,800)
+and 20 keyword_short. **Every system is limited to the same 7-day window**, or the smaller
+corpus would flatter the chunks. Chunk scoring: an article's score = max cosine over its
+article vector and its chunks.
+
+| deep_detail (n = 40; en / vi 20 each) | found@5 | hit@1 | pool@30 |
+|---|---|---|---|
+| dense (production, Pinecone 512-d) | 0.60 | 0.35 | 0.80 |
+| **dense + rescue** (production) | **0.75** (en 0.90 / vi 0.60) | 0.35 | 0.80 |
+| chunks | 0.88 | 0.57 | 1.00 |
+| **chunks + rescue** | **1.00** (en 1.00 / vi 1.00) | 0.57 | 1.00 |
+| dense ∪ chunks (RRF), then rescue | 0.95 | 0.38 | 1.00 |
+
+keyword_short (n = 20): found@5 1.00 for every system, hit@1 0.90 → 0.95 with chunks.
+
+- Chunks remove the pool ceiling (0.80 → 1.00) and the rescue then ranks the article into the
+  top 5 every time. Vietnamese gains most (0.60 → 1.00): VI articles are long and many per day.
+- **Not measured:** (1) how much comes from the setup alone. The chunk system searches exact
+  768-d locally, production searches approximate 512-d in Pinecone. A control (`local` /
+  `local_rescue`: exact 768-d over article vectors only) is in the script but its run was
+  killed for low laptop memory and not repeated. (2) topical questions: max-chunk scoring
+  could lift loosely related articles on "what's happening with X" questions.
+
+**Decision: not rolled out, on cost** (user, 2026-10-23: balance cost against accuracy).
+Scaled from the pilot (≈ 738 chunk tokens and 2.2 vectors per article, ≈ 1.2k articles/day):
+
+| Option | One-off | Monthly | Catch |
+|---|---|---|---|
+| Whole archive (491k) | ≈ $70 | ≈ $5 embeddings + **paid Pinecone** | ~1.1M extra vectors overflow Starter's 2 GB (1.26 GB used) |
+| Rolling 30 days | ≈ $5 | ≈ $5 | fits Starter, but ~doubles the $5–10/month running cost |
+| Passage rescue only (now) | $0 | $0 | deep_detail found@5 stays at 0.75 |
+
+The gain is large but narrow: one question type, which real users ask far less often than
+topical or "latest" questions. Revisit only if the budget grows or usage shows many
+deep-detail questions; run the free control and a topical check first.
 
 ## Caveats
 
