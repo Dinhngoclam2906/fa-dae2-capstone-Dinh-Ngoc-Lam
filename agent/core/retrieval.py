@@ -242,7 +242,27 @@ def _passage_rerank(query: str, dense: list[Candidate], stats: dict) -> list[Can
     return out
 
 
+def scope_filter(sources: list[str] | None) -> dict:
+    """The user's chosen sources as a default source filter ({} = all sources)."""
+    return {"source": list(sources)} if sources else {}
+
+
+def build_filters(query: str, filters: dict, sources: list[str] | None = None,
+                  parse: bool = True, today=None) -> tuple[dict, dict, dict]:
+    """(dense_filters, keyword_filters, parsed) for one question. Precedence: explicit
+    `filters` (a tool call's arguments), then a source / period stated in the question
+    (`text.query_filters`, only without explicit filters), then the user's chosen `sources`
+    as the default source scope. A source named in the question wins over the scope."""
+    filters = {k: v for k, v in filters.items() if v}  # search_news passes every key, mostly None
+    parsed = query_filters(query, today or articles._today_local()) if parse and not filters else {}
+    dense = {**parsed, **filters}
+    if "source" not in dense:
+        dense.update(scope_filter(sources))
+    return dense, dict(dense), parsed  # the keyword search takes the same filters (incl. a source list)
+
+
 def hybrid_retrieve(query: str, *, demo_mode: bool = False, top_n: int = 5,
+                    sources: list[str] | None = None,
                     keyword: bool | None = None, rerank: bool | None = None,
                     parse_filters: bool = True, passage_rerank: bool | None = None,
                     **filters) -> RetrievalResult:
@@ -256,6 +276,8 @@ def hybrid_retrieve(query: str, *, demo_mode: bool = False, top_n: int = 5,
     Mode "dense" then fills the slots after the dense top `settings.passage_keep` from the
     top `settings.passage_pool` articles by their best body passage (core/passages.py), and
     adds each article's best passage to its text.
+    `sources` (the user's chosen sources) scope every search unless the question or an
+    explicit filter names a source (`build_filters`).
     `keyword`, `rerank`, `parse_filters` and
     `passage_rerank` override the defaults (eval)."""
     t0 = time.time()
@@ -268,19 +290,15 @@ def hybrid_retrieve(query: str, *, demo_mode: bool = False, top_n: int = 5,
                     if passage_rerank is None else passage_rerank)
     if use_passages:
         k_dense = max(k_dense, settings.passage_pool)
-    filters = {k: v for k, v in filters.items() if v}  # search_news passes every key, mostly None
-    parsed = query_filters(query, articles._today_local()) if parse_filters and not filters else {}
-    dense_filters = {**parsed, **filters}
-    # The keyword search takes one source; a parsed pair (both editions) is left to dense.
-    kw_filters = {**{k: v for k, v in parsed.items() if k != "source"}, **filters}
-    if len(parsed.get("source", [])) == 1 and "source" not in filters:
-        kw_filters["source"] = parsed["source"][0]
+    filters = {k: v for k, v in filters.items() if v}
+    dense_filters, kw_filters, parsed = build_filters(query, filters, sources, parse_filters)
     # Explicit dates win; otherwise "latest ..." / "tuần này" asks for recent articles.
     has_dates = any(dense_filters.get(k) for k in ("start_date", "end_date", "days"))
     recent = None if has_dates else recency_days(query)
     stats: dict[str, Any] = {"query": query, "keywords": keywords, "demo_mode": demo_mode,
                              "mode": mode, "recency_days": recent,
-                             "parsed_filters": parsed}
+                             "parsed_filters": parsed, "scope": list(sources or []),
+                             "scope_overridden": bool(sources) and dense_filters.get("source") != list(sources)}
 
     # Not a `with` block: its exit waits for every thread, so one hung leg (a network call
     # that never returns, seen on Pinecone 2026-10-19) would hang the whole question
@@ -305,7 +323,8 @@ def hybrid_retrieve(query: str, *, demo_mode: bool = False, top_n: int = 5,
     if parsed and not found["dense"] and "dense_error" not in stats:
         # Nothing matches the stated source / period: search without it, so the LLM still
         # has context and can say there is no exact match.
-        found["dense"] = _dense_v2_recent(query, k_dense, filters, recency_days(query))
+        fallback = {**filters, **({} if "source" in filters else scope_filter(sources))}
+        found["dense"] = _dense_v2_recent(query, k_dense, fallback, recency_days(query))
         stats["parsed_filters_dropped"] = True
     for name, cands in found.items():
         stats[name] = len(cands)

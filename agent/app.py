@@ -18,7 +18,7 @@ import streamlit as st
 
 from core import bq
 from core.agent import ask, build_agent
-from core.config import settings
+from core.config import SOURCES, settings
 from core.memory import create_checkpointer
 
 st.set_page_config(page_title="Daily News AI Assistant", page_icon="📰", layout="centered",
@@ -54,6 +54,7 @@ def init_session():
         ss.thread_id = tid
     ss.setdefault("question_times", [])
     ss.setdefault("demo_mode", False)
+    ss.setdefault("sources", list(SOURCES))  # the "My sources" picker; all = no filter
     ss.setdefault("processing", False)
 
 
@@ -83,7 +84,8 @@ def answer(question: str) -> str:
     t0 = time.time()
     try:
         text, stats = ask(agent, question, thread_id=st.session_state.thread_id,
-                          demo_mode=st.session_state.demo_mode)
+                          demo_mode=st.session_state.demo_mode,
+                          sources=st.session_state.sources or None)
     except Exception as e:  # noqa: BLE001
         return f"❌ Something went wrong: {type(e).__name__}: {str(e)[:300]}"
     stats["answer_ms"] = int((time.time() - t0) * 1000)
@@ -112,7 +114,31 @@ cols[2].caption(f"🟢 Retrieval: {settings.retrieval_mode}")
 cols[3].caption(f"🟢 Model: {settings.llm_model}")
 
 # ==================== SIDEBAR ====================
+_PRESETS = {
+    "All": list(SOURCES),
+    "Tiếng Việt": [s for s, (_, lang) in SOURCES.items() if lang == "vi"],
+    "English": [s for s, (_, lang) in SOURCES.items() if lang == "en"],
+}
+
+
+def _set_sources(preset: str):
+    st.session_state.sources = _PRESETS[preset]
+
+
 with st.sidebar:
+    st.markdown("### 📰 My sources")
+    st.multiselect(
+        "Search only these sites", options=list(SOURCES), key="sources",
+        format_func=lambda s: f"{SOURCES[s][0]} ({SOURCES[s][1]})",
+        help="Every search uses only these sites. A site you name in your question "
+             "(\"what did the Guardian write…\") is still searched.")
+    for col, preset in zip(st.columns(len(_PRESETS)), _PRESETS):
+        col.button(preset, key=f"preset_{preset}", on_click=_set_sources, args=(preset,),
+                   use_container_width=True)
+    if not st.session_state.sources:
+        st.warning("No site selected: searching all of them.")
+
+    st.divider()
     st.markdown("### 🎓 Demo mode")
     st.session_state.demo_mode = st.checkbox(
         "Enable demo mode", value=st.session_state.demo_mode,
@@ -142,6 +168,10 @@ with st.sidebar:
             if hybrid:
                 st.caption(f"🔍 _Keywords: {', '.join(s.get('keywords') or []) or 'none extracted'}_")
             st.metric("Unique after dedupe", s.get("unique", 0))
+            if s.get("scope_overridden"):
+                st.caption("📰 Your question named a site, so that site was searched")
+            elif s.get("scope"):
+                st.caption(f"📰 Searched your {len(s['scope'])} chosen sites")
             if s.get("rerank_skipped") == "off":
                 st.caption(f"🎯 Top {s.get('returned', 0)} by semantic similarity (no re-ranker)")
             elif s.get("rerank_skipped"):

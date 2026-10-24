@@ -72,17 +72,26 @@ WINDOW_SQL = (
 )
 
 
-def _filters(source: str | None, language: str | None, section_group: str | None) -> tuple[str, list]:
-    if source and source not in SOURCES:
-        raise ValueError(f"unknown source {source!r}; valid: {', '.join(SOURCES)}")
+def source_list(source: str | list[str] | tuple[str, ...] | None) -> list[str]:
+    """One source, several (the user's chosen sources) or none (= all) as a validated list."""
+    sources = [source] if isinstance(source, str) else list(source or [])
+    for s in sources:
+        if s not in SOURCES:
+            raise ValueError(f"unknown source {s!r}; valid: {', '.join(SOURCES)}")
+    return sources
+
+
+def _filters(source: str | list[str] | None, language: str | None,
+             section_group: str | None) -> tuple[str, list]:
+    sources = source_list(source)
     if language and language not in LANGUAGES:
         raise ValueError(f"language must be one of {LANGUAGES}")
     if section_group and section_group not in SECTION_GROUPS:
         raise ValueError(f"unknown section_group {section_group!r}; valid: {', '.join(SECTION_GROUPS)}")
-    sql = (" AND (@source IS NULL OR source_name = @source)"
+    sql = (" AND (IFNULL(ARRAY_LENGTH(@sources), 0) = 0 OR source_name IN UNNEST(@sources))"  # an empty array param arrives as NULL
            " AND (@language IS NULL OR language = @language)"
            " AND (@section_group IS NULL OR section_group = @section_group)")
-    return sql, [bq.p("source", source), bq.p("language", language),
+    return sql, [bq.p_array("sources", sources), bq.p("language", language),
                  bq.p("section_group", section_group)]
 
 
@@ -92,7 +101,7 @@ def _limit(limit: int | None, default: int = 15) -> int:
 
 def keyword_search(keywords: list[str], *, start_date: str | None = None,
                    end_date: str | None = None, days: int | None = None,
-                   source: str | None = None, language: str | None = None,
+                   source: str | list[str] | None = None, language: str | None = None,
                    section_group: str | None = None, full_text: bool = False,
                    limit: int = 15) -> list[dict]:
     """Articles matching the keywords, ranked by coverage (title hit = 2, text hit = 1).
@@ -127,7 +136,7 @@ def keyword_search(keywords: list[str], *, start_date: str | None = None,
 
 
 def browse(*, start_date: str | None = None, end_date: str | None = None,
-           days: int | None = 7, source: str | None = None, language: str | None = None,
+           days: int | None = 7, source: str | list[str] | None = None, language: str | None = None,
            section_group: str | None = None, limit: int = 15) -> list[dict]:
     """Most recent articles in a window, optionally by source / language / section group."""
     start, end = window(start_date, end_date, days)
@@ -190,7 +199,7 @@ def get_bodies(article_ids: list[str], timeout: float = 10) -> dict[str, str]:
 
 
 def news_summary(day: str | None = None, *, language: str | None = None,
-                 source: str | None = None, per_group: int = 3) -> list[dict]:
+                 source: str | list[str] | None = None, per_group: int = 3) -> list[dict]:
     """Latest `per_group` stories per section group on one local day (default: today)."""
     d = _parse_day(day, "date") or _today_local()
     filt_sql, filt_params = _filters(source, language, None)
@@ -208,7 +217,7 @@ def news_summary(day: str | None = None, *, language: str | None = None,
 
 
 def section_counts(days: int = 7, *, language: str | None = None,
-                   source: str | None = None) -> list[dict]:
+                   source: str | list[str] | None = None) -> list[dict]:
     """Article counts per section group (and top raw sections) over the last N days."""
     start, end = window(None, None, days)
     filt_sql, filt_params = _filters(source, language, None)

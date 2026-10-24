@@ -29,6 +29,7 @@ Daily News AI Assistant is a bilingual (English + Vietnamese) news chatbot built
 
 - **Multilingual semantic search** (Pinecone index `news-articles-v2`, `gemini-embedding-2` article vectors): an English question finds Vietnamese articles too
 - **Passage rescue** (BM25 over the top hits' full bodies): finds details deep inside an article that the vector doesn't see
+- **"My sources" picker**: each user chooses which of the 10 sites to search
 - **Question filters + recency**: a source or month stated in the question becomes a hard filter; "latest / mới nhất / this week" questions put recent articles first
 - **LangGraph agent with 10 read-only tools** on BigQuery (keyword search, browse, full article, summaries, trending, freshness, coverage)
 - **LLM `gpt-5.4-mini`** (chosen in `docs/llm_compare.md`), answering in the user's language
@@ -370,6 +371,11 @@ Ref: dim_articles.section_key > dim_sections.section_key
                     │ • EN or VI       │
                     └──────────────────┘
 ```
+
+**My sources:** the app's sidebar lets each user pick the sites they read (all 10 by
+default, with *All / Tiếng Việt / English* presets; `cli_agent.py --sources tuoitre,vnexpress`
+in the terminal). The choice scopes every search, the automatic retrieval and every tool,
+unless the question itself names a site ("what did the Guardian write…"), which still wins.
 
 Public-demo safety: a per-session question limit (30/hour), per-query BigQuery byte caps,
 3-second timeouts with one retry on the embedding and Pinecone calls (BigQuery and the LLM

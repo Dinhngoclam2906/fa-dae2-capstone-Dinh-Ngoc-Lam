@@ -15,6 +15,7 @@ from __future__ import annotations
 from functools import wraps
 from typing import Any, Optional
 
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
 from core import articles, bq
@@ -30,6 +31,12 @@ def _with_filters(fn):
     """Append the shared filter help to a tool's docstring (the LLM reads it)."""
     fn.__doc__ = (fn.__doc__ or "") + _FILTER_HELP
     return fn
+
+
+def _scope(source: Optional[str], config: RunnableConfig | None) -> str | list[str] | None:
+    """The source a tool searches: the one the LLM named (the user asked about it), else the
+    user's chosen sources from the run config (None = all)."""
+    return source or ((config or {}).get("configurable") or {}).get("sources") or None
 
 
 def _safe(fn):
@@ -49,13 +56,17 @@ def _safe(fn):
 @_safe
 def search_news(query: str, start_date: Optional[str] = None, end_date: Optional[str] = None,
                 source: Optional[str] = None, language: Optional[str] = None,
-                section_group: Optional[str] = None, limit: int = 5) -> dict[str, Any]:
+                section_group: Optional[str] = None, limit: int = 5,
+                config: RunnableConfig = None) -> dict[str, Any]:
     """Semantic search for articles about a topic, in any language (an English query
     finds Vietnamese articles too). Use for a follow-up that needs different or filtered
     results than the context already given, e.g. a date range, a source or a language.
     For exact names, numbers or quotes use search_articles_by_keywords. Filters: """
     from core.retrieval import hybrid_retrieve
-    res = hybrid_retrieve(query, top_n=max(1, min(limit, 10)), start_date=start_date, end_date=end_date, source=source,
+    scoped = _scope(source, config)
+    res = hybrid_retrieve(query, top_n=max(1, min(limit, 10)), start_date=start_date, end_date=end_date,
+                          source=scoped if isinstance(scoped, str) else None,
+                          sources=scoped if isinstance(scoped, list) else None,
                           language=language, section_group=section_group)
     return {"query": query, "count": len(res.candidates),
             "results": [c.as_dict() for c in res.candidates]}
@@ -67,15 +78,16 @@ def search_news(query: str, start_date: Optional[str] = None, end_date: Optional
 def search_articles_by_keywords(keywords: list[str], start_date: Optional[str] = None,
                                 end_date: Optional[str] = None, source: Optional[str] = None,
                                 language: Optional[str] = None, section_group: Optional[str] = None,
-                                search_full_text: bool = False, limit: int = 15) -> dict[str, Any]:
+                                search_full_text: bool = False, limit: int = 15,
+                                config: RunnableConfig = None) -> dict[str, Any]:
     """Exact keyword search (names, places, numbers, quotes). Ranked by how many keywords
     match (a title match counts double). Without dates it searches the last 90 days.
     Searches title + lead paragraph; set search_full_text=True only when the term may be
     deep in the article body (much more expensive). Use Vietnamese keywords for
     Vietnamese sources. Filters: """
     rows = articles.keyword_search(keywords, start_date=start_date, end_date=end_date,
-                                   source=source, language=language, section_group=section_group,
-                                   full_text=search_full_text, limit=limit)
+                                   source=_scope(source, config), language=language,
+                                   section_group=section_group, full_text=search_full_text, limit=limit)
     return {"keywords": keywords, "count": len(rows), "results": rows}
 
 
@@ -85,11 +97,11 @@ def search_articles_by_keywords(keywords: list[str], start_date: Optional[str] =
 def browse_articles(start_date: Optional[str] = None, end_date: Optional[str] = None,
                     days: Optional[int] = 7, source: Optional[str] = None,
                     language: Optional[str] = None, section_group: Optional[str] = None,
-                    limit: int = 15) -> dict[str, Any]:
+                    limit: int = 15, config: RunnableConfig = None) -> dict[str, Any]:
     """Most recent articles in a period (default: last 7 days), optionally from one source,
     language or section group. Use for "what's new in sports today", "VnExpress articles
     on 2026-10-15", "tech news this week". Filters: """
-    rows = articles.browse(start_date=start_date, end_date=end_date, days=days, source=source,
+    rows = articles.browse(start_date=start_date, end_date=end_date, days=days, source=_scope(source, config),
                            language=language, section_group=section_group, limit=limit)
     return {"count": len(rows), "results": rows}
 
@@ -131,10 +143,10 @@ def summarize_article(article_id: str, published_date: str, source: Optional[str
 @tool
 @_safe
 def get_news_summary(date: Optional[str] = None, language: Optional[str] = None,
-                     source: Optional[str] = None) -> dict[str, Any]:
+                     source: Optional[str] = None, config: RunnableConfig = None) -> dict[str, Any]:
     """The day's headlines: up to 3 latest stories per section group on one date
     (default: today, Vietnam time), optionally for one language or source."""
-    rows = articles.news_summary(date, language=language, source=source)
+    rows = articles.news_summary(date, language=language, source=_scope(source, config))
     grouped: dict[str, list] = {}
     for r in rows:
         grouped.setdefault(r.pop("section_group"), []).append(r)
@@ -144,10 +156,11 @@ def get_news_summary(date: Optional[str] = None, language: Optional[str] = None,
 @tool
 @_safe
 def get_trending_sections(days: int = 7, language: Optional[str] = None,
-                          source: Optional[str] = None) -> dict[str, Any]:
+                          source: Optional[str] = None, config: RunnableConfig = None) -> dict[str, Any]:
     """Which section groups have the most articles in the last N days (what's being
     covered most), with example section names."""
-    return {"days": days, "sections": articles.section_counts(days, language=language, source=source)}
+    return {"days": days, "sections": articles.section_counts(days, language=language,
+                                                               source=_scope(source, config))}
 
 
 @tool
