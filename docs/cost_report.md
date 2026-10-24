@@ -1,6 +1,6 @@
 # Daily cost report
 
-`scripts/monitoring/cost_report.py` answers "what did each service cost yesterday, and this
+`monitoring/cost_report.py` answers "what did each service cost yesterday, and this
 month?" from **measured usage × list prices**, because Google's billing data lags by hours
 and the trial credit hides it. Built 2026-10-23.
 
@@ -22,8 +22,8 @@ Scheduler, Secret Manager, Cloud Build, Logging (free tiers), Gemini query embed
 one-off eval embeddings (e.g. the $1.23 chunk pilot); the billing export will show those.
 
 ```bash
-uv run --env-file .env python scripts/monitoring/cost_report.py              # yesterday (UTC)
-uv run --env-file .env python scripts/monitoring/cost_report.py --day 2026-10-22 --save
+uv run --env-file .env python monitoring/cost_report.py              # yesterday (UTC)
+uv run --env-file .env python monitoring/cost_report.py --day 2026-10-22 --save
 ```
 
 `--save` replaces that day's partition of `monitoring.cost_daily` (idempotent; load jobs are
@@ -46,7 +46,7 @@ One-off setup, done by the owner (it grants IAM roles):
    gcloud secrets create smtp-app-password --replication-policy=automatic --data-file="C:\Users\DELL\smtp.txt" --project project-f5433681-7b47-481f-9c7
    Remove-Item "C:\Users\DELL\smtp.txt"
    ```
-3. From the repo root in Git Bash: `GCP_PROJECT=project-f5433681-7b47-481f-9c7 bash scripts/monitoring/deploy_cost_report.sh`.
+3. From the repo root in Git Bash: `GCP_PROJECT=project-f5433681-7b47-481f-9c7 bash monitoring/deploy_cost_report.sh`.
    It creates the read-only service account `cost-reporter` (roles listed at the top of the
    script), the image, the job and the 02:00 UTC schedule.
 4. Test: `gcloud run jobs execute cost-report --region asia-southeast1 --project project-f5433681-7b47-481f-9c7 --wait`.
@@ -65,9 +65,9 @@ The report's own cost: ~0.1 GB of BigQuery and ~1 minute of Cloud Run a day (≈
   cost* → Edit settings → project `project-f5433681-7b47-481f-9c7`, dataset
   `billing_export` → Save. It's the official record (credits included); the report stays
   the fast, per-action view.
-- **Artifact Registry cleanup**: `scripts/monitoring/ar_cleanup_policy.json` (keep the 3
+- **Artifact Registry cleanup**: `monitoring/ar_cleanup_policy.json` (keep the 3
   newest versions and `latest`, delete the rest after 7 days). Apply per repo:
-  `gcloud artifacts repositories set-cleanup-policies <repo> --location asia-southeast1 --policy scripts/monitoring/ar_cleanup_policy.json --no-dry-run`
+  `gcloud artifacts repositories set-cleanup-policies <repo> --location asia-southeast1 --policy monitoring/ar_cleanup_policy.json --no-dry-run`
   for `guardian-ingestion`, `dbt-build`, `embed-sync`, `cost-report`.
 - **History backfill**: `monitoring.cost_daily` was filled for 2026-10-01 → 10-22 by running
   the report per day. Usage-based rows are exact; storage and Pinecone rows for past days

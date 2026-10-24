@@ -1,6 +1,0 @@
-# Minimal deps for the cost-report Cloud Run Job (Dockerfile.cost): just what
-# scripts/monitoring/cost_report.py imports.
-google-cloud-bigquery==3.45.0
-google-auth==2.57.1
-requests==2.32.5
-pinecone==7.3.0

@@ -1,0 +1,13 @@
+# infra/docker/Dockerfile.cost - image for the cost-report Cloud Run Job (daily cost email,
+# monitoring/cost_report.py). Build from a minimal context: the repo root has
+# no .gcloudignore.
+FROM python:3.13-slim
+
+WORKDIR /app
+
+COPY monitoring/requirements-cost.txt ./
+RUN pip install --no-cache-dir -r requirements-cost.txt
+
+COPY monitoring/cost_report.py ./monitoring/
+
+CMD ["python", "monitoring/cost_report.py", "--save", "--email"]

@@ -86,7 +86,7 @@ airflow = [
 
 [tool.uv.workspace]
 members = [
-    "capstone_dbt_project",
+    "transform",
 ]
 
 [tool.uv.sources]
@@ -94,11 +94,11 @@ en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/dow
 
 [tool.pyright]
 extraPaths = [
-    "./ai_agents",
-    "./ai_agents/jobs",
-    "./scripts/batch_data"
+    "./agent",
+    "./agent/jobs",
+    "./ingestion"
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["ai_agents"]
+pythonpath = ["agent"]

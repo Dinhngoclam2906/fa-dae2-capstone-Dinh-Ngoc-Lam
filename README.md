@@ -35,7 +35,7 @@ Daily News AI Assistant is a bilingual (English + Vietnamese) news chatbot built
 - **Persistent memory** (PostgreSQL checkpointer, in-memory fallback)
 
 > **Migration note:** the warehouse moved from Snowflake to **BigQuery** (the Snowflake
-> trial expired). Ingestion, dbt, the agent (`ai_agents/core/`, since 2026-10-18) and the
+> trial expired). Ingestion, dbt, the agent (`agent/core/`, since 2026-10-18) and the
 > embeddings (since 2026-10-18) all run on GCP now. The original Guardian-only Pinecone
 > index and the PDF-upload feature were removed on 2026-10-24. `PROGRESS_LOG.md` has the
 > roadmap and phase status (local file).
@@ -83,7 +83,7 @@ All sources land in one BigQuery table (`raw.raw_data`), tagged by `source_name`
 
 **High-level Diagram:**
 
-<img src="images/data_architecture.png" width="100%" alt="Data Architecture">
+<img src="docs/images/data_architecture.png" width="100%" alt="Data Architecture">
 
 > Note: the diagram above predates the BigQuery migration and still shows Snowflake. The
 > pipeline described below is the current one.
@@ -103,7 +103,7 @@ Guardian API ─┐                                        ┌─> Bronze archiv
 
 **5.1.1. Real-time / frequent-poll Pipeline:**
 
-**5.1.1.1. Kafka Producer/Consumer** (`scripts/real_time_data/`):
+**5.1.1.1. Kafka Producer/Consumer** (`ingestion/streaming/`):
 Purpose: poll the Guardian API and stream new articles through Kafka to PostgreSQL staging.
 Key Features:
 - State Tracking: PostgreSQL table tracks processed articles (avoid duplicates)
@@ -117,33 +117,33 @@ Key Features:
 
 **5.1.2. Batch & Backfill Data Processing:**
 
-**5.1.2.1. Guardian - HF archive + API backfill** (`scripts/batch_data/hf_archive_to_parquet.py`, `guardian_api_backfill.py`):
+**5.1.2.1. Guardian - HF archive + API backfill** (`ingestion/hf_archive_to_parquet.py`, `guardian_api_backfill.py`):
 - Downloads/cleans the HuggingFace historical archive and crawls the Guardian Content API for everything since, with a resumable cursor, lock file, and daily-quota handling.
 
-**5.1.2.2. Vietnamese news crawler** (`scripts/batch_data/vn_news_backfill.py`, `run_vn_backfill_all.sh`):
+**5.1.2.2. Vietnamese news crawler** (`ingestion/vn_news_backfill.py`, `run_vn_backfill_all.sh`):
 - One crawler for all 9 Vietnamese sites and editions: sitemap-driven for Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet and their English editions; RSS-only for VnExpress (no usable archive). Per-source resumable state, incremental Parquet flushing (every 100 articles), per-site concurrency and delays tuned for stability over raw speed.
 
-**5.1.2.3. BigQuery loader** (`scripts/batch_data/load_raw_to_bigquery.py`):
+**5.1.2.3. BigQuery loader** (`ingestion/load_raw_to_bigquery.py`):
 - Parquet → GCS landing bucket → BigQuery staging table → `MERGE` into `raw.raw_data` (idempotent, dedupes on `article_id`). One command, `--source hf|api|vn`, handles all sources.
 - Only stages/merges files pending since the last successful merge (tracked in a persistent `.pending_merge.<source>.json`), not the source's entire accumulated history - keeps `MERGE` cost proportional to what's new (~70x reduction measured vs. the naive full-wildcard approach).
 
-**5.1.2.4. Automated pipeline: Cloud Workflows + Cloud Run Jobs** (`workflows/news_pipeline.yaml`, `workflows/deploy.sh`):
+**5.1.2.4. Automated pipeline: Cloud Workflows + Cloud Run Jobs** (`orchestration/workflows/news_pipeline.yaml`, `orchestration/workflows/deploy.sh`):
 - **One DAG, `news-pipeline`, every 4 hours** (Cloud Scheduler `0 */4 * * *` UTC). It runs four Cloud Run Jobs one after another, each waiting for the previous one to finish:
-  1. `guardian-ingestion` - Guardian Content API crawl + load (`Dockerfile.ingestion`, `run_ingestion_job.sh`). The Guardian `API_KEY` comes from **Secret Manager**.
+  1. `guardian-ingestion` - Guardian Content API crawl + load (`infra/docker/Dockerfile.ingestion`, `run_ingestion_job.sh`). The Guardian `API_KEY` comes from **Secret Manager**.
   2. `vn-ingestion` - the 9 Vietnamese crawlers in parallel, then one load (`run_vn_ingestion_job.sh`). Running after Guardian means the two `MERGE`s into `raw.raw_data` never overlap.
   3. `dbt-build` - `dbt source freshness`, then `dbt build` (5.1.2.5).
-  4. `embed-sync` - new article vectors to BigQuery and Pinecone (`Dockerfile.embed`, `ai_agents/jobs/run_embed_job.sh`).
+  4. `embed-sync` - new article vectors to BigQuery and Pinecone (`infra/docker/Dockerfile.embed`, `agent/jobs/run_embed_job.sh`).
 - Failure rules: a failed ingestion doesn't block the chain; a failed `dbt-build` skips `embed-sync`. The full chain takes ≈ 6 minutes; on average an article is searchable ≈ 2 hours after it is published.
 - **Why Workflows, not Cloud Composer:** Workflows is pay-per-step (≈ $0/month here); Composer is an always-on Airflow environment (≈ $300-400/month even idle). One linear 4-step pipeline with no date backfills doesn't need Composer.
-- **Article embeddings** (`ai_agents/jobs/embed_articles.py`, `sync_vector_index.py`): every article in `marts.obt_articles` is embedded with `gemini-embedding-2` on Vertex AI (title + first 1,500 characters, 768 dims) into BigQuery `vectors.article_embeddings`, the source of truth, then copied at 512 dims into Pinecone `news-articles-v2`. The job also stores each article's full body in `vectors.article_bodies` for the agent's passage rescue. Incremental by `(article_id, content_hash)`, so new articles, edits and new sources are picked up automatically; a daily token cap bounds spend. Model choice: `docs/embedding_bakeoff.md`.
+- **Article embeddings** (`agent/jobs/embed_articles.py`, `sync_vector_index.py`): every article in `marts.obt_articles` is embedded with `gemini-embedding-2` on Vertex AI (title + first 1,500 characters, 768 dims) into BigQuery `vectors.article_embeddings`, the source of truth, then copied at 512 dims into Pinecone `news-articles-v2`. The job also stores each article's full body in `vectors.article_bodies` for the agent's passage rescue. Incremental by `(article_id, content_hash)`, so new articles, edits and new sources are picked up automatically; a daily token cap bounds spend. Model choice: `docs/embedding_bakeoff.md`.
 - Cloud Run Jobs start from a clean container every run, so `sync_job_state.py` round-trips the crawlers' cursors and the loader's pending-merge state through GCS (pull before, push after, even on a partial failure).
 - Both crawlers keep their cursor on the still-filling tail (today + yesterday for Guardian, the current month for VN) instead of moving past it, so every run picks up articles published since the last one.
 - **Bronze raw archive** (`raw_archive.py`): every article the crawlers store is also kept exactly as received (VN page HTML, Guardian API JSON) as gzipped JSON Lines in a Coldline bucket (`gs://<rawhtml bucket>/raw/source=<s>/fetch_date=<d>/`). Append-only, so a parser fix is an offline re-parse instead of a re-crawl.
 
-**5.1.2.5. dbt build, monitoring and cost tracking** (`capstone_dbt_project/Dockerfile`, `scripts/monitoring/`):
+**5.1.2.5. dbt build, monitoring and cost tracking** (`transform/Dockerfile`, `monitoring/`):
 - `dbt-build` runs `dbt source freshness` (one check per source on `loaded_at`: warn 12h / error 24h for the big sources, 24h / 48h for the low-volume English editions), then `dbt build` **regardless**, so one stale source alerts without freezing the others.
 - **Alerts:** Cloud Monitoring emails on any failed job execution, and on a `news-pipeline` run that fails or doesn't happen at all for 5 hours.
-- **Daily cost report** (`scripts/monitoring/cost_report.py`, Cloud Run Job `cost-report`, 02:00 UTC): measured usage × list prices per service (BigQuery, Vertex AI, Cloud Run, GCS, Artifact Registry, Pinecone) plus OpenAI's billed cost, saved to `monitoring.cost_daily` and emailed. A GCP budget alert sits at $10/month. See `docs/cost_report.md`.
+- **Daily cost report** (`monitoring/cost_report.py`, Cloud Run Job `cost-report`, 02:00 UTC): measured usage × list prices per service (BigQuery, Vertex AI, Cloud Run, GCS, Artifact Registry, Pinecone) plus OpenAI's billed cost, saved to `monitoring.cost_daily` and emailed. A GCP budget alert sits at $10/month. See `docs/cost_report.md`.
 - Pipeline health is checked by **rows, not exit codes** (a "nothing to do" run exits 0): rows per source, articles without a vector, Pinecone vs. warehouse counts.
 
 **5.1.3. dbt Transformation:**
@@ -176,7 +176,7 @@ The dbt (data build tool) layer transforms raw multi-source article data into **
 
 The live path is `raw_data` → `stg_sf__guardian` → `obt_articles` → `vw_articles_search_optimized`. The image and the `dim_*` / `fct_articles` tables below show the **frozen** star schema (archived in `marts_archive`, no longer built).
 
-<img src="images/ERD.png" width="100%" alt="Data Architecture">
+<img src="docs/images/ERD.png" width="100%" alt="Data Architecture">
 
 ```dbml
 Table raw_data {
@@ -308,7 +308,7 @@ Ref: dim_articles.section_key > dim_sections.section_key
 
 #### **5.3. AI Agent Architecture**
 
-> One implementation in `ai_agents/core/` behind both front ends (`app.py` Streamlit,
+> One implementation in `agent/core/` behind both front ends (`app.py` Streamlit,
 > `cli_agent.py` terminal). Every BigQuery query is parameterised, date-windowed (partition
 > pruning) and capped by `maximum_bytes_billed` (600 MB). Since 2026-10-20 the automatic
 > retrieval is **dense search only**: the eval showed the old hybrid recipe (dense + keyword
@@ -387,50 +387,45 @@ Each change to retrieval was measured on real questions, through the real code, 
 | Hard set (95 questions, the regression benchmark) | question filters: constraint compliance 0.46 → 0.98; passage rescue: deep-detail found@5 0.50 → 0.70 | `docs/hard_eval.md` |
 | LLM comparison (5 models) | `gpt-5.4-mini` gave the best answers (~$7 per 1,000 turns) | `docs/llm_compare.md` |
 
-The original 2026-01 eval (`ai_agents/legacy/eval_2026_01/`, 4 strategies on the Guardian-only index) is kept, frozen, as the first baseline. Bugs, incidents and lessons are collected in `docs/lessons_learned.md`.
+The original 2026-01 eval (`agent/legacy/eval_2026_01/`, 4 strategies on the Guardian-only index) is kept, frozen, as the first baseline. Bugs, incidents and lessons are collected in `docs/lessons_learned.md`.
 
 ---
 
 **Project Structure** (abridged - omits `__pycache__`, `.venv`, `target`, `dbt_packages`, `logs`).
-Each folder is one part of the pipeline; the production images are built from the root `Dockerfile.*`.
+One folder per pipeline component, in data-flow order. Old paths (before 2026-10-24) map to
+these in `docs/repo_layout.md`.
 ```
 fa-dae2-capstone-Dinh-Ngoc-Lam/
-├── ai_agents/                          # RAG agent (BigQuery since 2026-10-18)
-│   ├── core/                           # the agent: config, bq, articles, text, retrieval, passages, tools, agent, llm, memory
-│   ├── app.py / cli_agent.py           # Streamlit and terminal front ends over core/
-│   ├── jobs/                           # embed-sync Cloud Run Job: embed_articles, sync_vector_index, run_embed_job.sh
-│   ├── eval/                           # current evals: hard_eval (benchmark), retrieval_eval, time_eval, llm_compare, bake-off
-│   └── legacy/eval_2026_01/            # FROZEN first eval (Guardian-only v1 index, deleted 2026-10-24) + its results
-├── capstone_dbt_project/               # dbt project (BigQuery)
-│   ├── .dbt/profiles.yml               # the single dbt profile (use --profiles-dir .dbt)
-│   ├── Dockerfile                      # dbt-build Cloud Run Job image
-│   ├── macros/                         # generate_news_hash, section_utils, generate_schema_name, ...
-│   ├── models/
-│   │   ├── 01_staging/                 # stg_sf__guardian, _sources.yml (freshness per source)
-│   │   ├── 02_intermediate/            # int_article_metrics (ephemeral)
-│   │   ├── 03_mart/                    # obt_articles (live), vw_articles_search_optimized; dim_* / fct_articles (frozen)
-│   │   └── monitoring/                 # news_freshness
-│   └── tests/                          # assert_data_source_consistency (test_scd_content_changes disabled)
-├── scripts/
-│   ├── batch_data/                     # crawlers, BigQuery loader, Bronze archive, Cloud Run Job entrypoints
-│   │   └── legacy/                     # Snowflake-era collector / loader
-│   ├── monitoring/                     # cost_report.py + deploy script (daily cost email, monitoring.cost_daily)
-│   └── real_time_data/                 # Kafka producer / consumer (unused in production)
-├── workflows/                          # Cloud Workflows DAG news_pipeline.yaml + deploy.sh (schedules)
-├── dags/                               # Airflow DAGs (local/manual): guardian_ingestion, capstone_dbt_orchestration
-├── deploy/local/                       # docker compose: agent-memory Postgres, Kafka, Airflow (+ Dockerfile.airflow)
-├── tests/                              # pytest unit tests (no network): question parsing, passage rescue, retrieval
-├── docs/                               # phase reports, decisions, eval reports, cost report, lessons_learned
-├── images/                             # architecture diagram + ERD
-├── sql/init.sql                        # PostgreSQL staging schema bootstrap
-├── .claude/skills/                     # runbooks: check-pipeline, deploy-job-image, log-update
-├── .github/workflows/pr_ci.yml         # CI: unit tests, SQLFluff, dbt test on BigQuery (keyless WIF)
-├── Dockerfile.ingestion / .embed / .cost   # images for the ingestion, embed-sync and cost-report jobs
-├── Makefile                            # make help: common commands
-├── pyproject.toml / uv.lock            # uv-managed dependencies
-├── requirements.txt                    # Airflow-image dependency subset
-├── .env.example                        # every setting, with defaults
-└── LICENSE                             # MIT
+├── ingestion/                  # 1. collect: crawlers, BigQuery loader, Bronze archive, Cloud Run Job entrypoints
+│   ├── legacy/                 #    Snowflake-era collector / loader
+│   └── streaming/              #    Kafka producer / consumer (unused in production)
+├── transform/                  # 2. model: the dbt project (BigQuery), its Dockerfile = dbt-build job image
+│   ├── models/                 #    01_staging -> 02_intermediate -> 03_mart (obt_articles) + monitoring
+│   ├── macros/  tests/         #    section_utils, generate_news_hash, ...; custom data tests
+│   └── .dbt/profiles.yml       #    the only dbt profile (use --profiles-dir .dbt)
+├── agent/                      # 3. serve: the RAG agent
+│   ├── core/                   #    config, bq, articles, text, retrieval, passages, tools, agent, llm, memory
+│   ├── app.py / cli_agent.py   #    Streamlit and terminal front ends over core/
+│   ├── jobs/                   #    embed-sync job: embed_articles, sync_vector_index, run_embed_job.sh
+│   ├── eval/                   #    current evals: hard_eval (benchmark), retrieval_eval, time_eval, llm_compare
+│   └── legacy/eval_2026_01/    #    FROZEN first eval (Guardian-only v1 index) + its results
+├── orchestration/
+│   ├── workflows/              # production DAG: Cloud Workflows news_pipeline.yaml + deploy.sh (schedules)
+│   └── airflow/dags/           # local/manual Airflow DAGs: guardian_ingestion, capstone_dbt_orchestration
+├── monitoring/                 # daily cost report (cost_report.py, deploy script)
+├── infra/
+│   ├── docker/                 # Dockerfile.ingestion / .embed / .cost (the Cloud Run Job images)
+│   └── local/                  # docker compose: agent-memory Postgres, Kafka, Airflow; Dockerfile.airflow; sql/init.sql
+├── tests/                      # pytest unit tests (no network): question parsing, passage rescue, retrieval
+├── docs/                       # reports, decisions, eval results, lessons_learned; images/ (diagram + ERD)
+├── data/                       # local working data (git-ignored; the crawlers' cwd-relative state lives here)
+├── .claude/skills/             # runbooks: check-pipeline, deploy-job-image, log-update
+├── .github/workflows/pr_ci.yml # CI: unit tests, SQLFluff, dbt test on BigQuery (keyless WIF)
+├── Makefile                    # make help: common commands
+├── pyproject.toml / uv.lock    # uv-managed dependencies (transform/ is a uv workspace member)
+├── requirements.txt            # Airflow-image dependency subset
+├── .env.example                # every setting, with defaults
+└── LICENSE                     # MIT
 ```
 
 **Setup Instructions:**
@@ -452,14 +447,14 @@ gcloud config set project <your GCP project id>
 gcloud auth application-default login
 ```
 
-**4. Start Local Docker Services** (in `deploy/local/`, split by concern - start only what you need; run from the repo root):
+**4. Start Local Docker Services** (in `infra/local/`, split by concern - start only what you need; run from the repo root):
 ```
 make memory-db     # agent memory (Postgres, port 5433); without it the agent keeps history in memory
 make kafka         # kafka + kafdrop + airflow metadata pg
 make airflow       # airflow
 make down          # stop them all
 ```
-The targets run `docker compose --project-directory . -f deploy/local/<file>.yml ...`, so paths,
+The targets run `docker compose --project-directory . -f infra/local/<file>.yml ...`, so paths,
 `.env` and the Compose project name (and with it the existing volumes) stay those of the repo root.
 
 **5. Run Ingestion:**
@@ -469,29 +464,29 @@ The targets run `docker compose --project-directory . -f deploy/local/<file>.yml
 
 Guardian (batch + API backfill):
 ```
-uv run python scripts/batch_data/hf_archive_to_parquet.py
-uv run python scripts/batch_data/guardian_api_backfill.py
+uv run python ingestion/hf_archive_to_parquet.py
+uv run python ingestion/guardian_api_backfill.py
 ```
 
 Vietnamese news (resumable):
 ```
-bash scripts/batch_data/run_vn_backfill_all.sh
+bash ingestion/run_vn_backfill_all.sh
 ```
 
 Load everything to BigQuery:
 ```
-uv run python scripts/batch_data/load_raw_to_bigquery.py --source hf
-uv run python scripts/batch_data/load_raw_to_bigquery.py --source api
-uv run python scripts/batch_data/load_raw_to_bigquery.py --source vn --max-bytes-billed 5000000000
+uv run python ingestion/load_raw_to_bigquery.py --source hf
+uv run python ingestion/load_raw_to_bigquery.py --source api
+uv run python ingestion/load_raw_to_bigquery.py --source vn --max-bytes-billed 5000000000
 ```
 
 Real-time (Guardian API → Kafka → PostgreSQL only, unused in production):
 ```
-uv run python scripts/real_time_data/kafka_producer.py --once --max-articles 100
-uv run python scripts/real_time_data/kafka_consumer.py --once
+uv run python ingestion/streaming/kafka_producer.py --once --max-articles 100
+uv run python ingestion/streaming/kafka_consumer.py --once
 ```
 
-**6. Build the warehouse (dbt, from `capstone_dbt_project/`):**
+**6. Build the warehouse (dbt, from `transform/`):**
 
 In production this runs every 4 hours as the `dbt-build` step of the workflow (5.1.2.5).
 Locally, always pass `--profiles-dir .dbt` (the project's only profile) and load `.env`.
@@ -504,8 +499,8 @@ uv run --env-file ../.env dbt build --profiles-dir .dbt
 
 **7. Run the Agent** (from the repo root):
 ```
-make agent         # = uv run --env-file .env streamlit run ai_agents/app.py
-make cli           # = uv run --env-file .env python ai_agents/cli_agent.py --stats
+make agent         # = uv run --env-file .env streamlit run agent/app.py
+make cli           # = uv run --env-file .env python agent/cli_agent.py --stats
 ```
 
 Tests and the regression benchmark:
