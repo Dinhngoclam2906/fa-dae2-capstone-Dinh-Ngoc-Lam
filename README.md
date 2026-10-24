@@ -1,20 +1,24 @@
 # Daily News AI Assistant
 
 ## Overview
-Daily News AI Assistant is an intelligent chatbot powered by a **hybrid RAG (Retrieval-Augmented Generation)** architecture that combines:
+Daily News AI Assistant is a bilingual (English + Vietnamese) news chatbot built on an end-to-end data platform: ingestion from 10 news sources, a BigQuery warehouse modelled with dbt, and a **RAG (Retrieval-Augmented Generation)** agent that answers from those articles with citations. It combines:
 
-- **Dense Semantic Search** (Pinecone vector database) - Understanding meaning and context
-- **Lexical SQL Search** (warehouse keyword matching) - Exact phrase and entity matching
-- **FlashRank Re-ranking** - Relevance optimization
-- **LangGraph Agent Framework** - Conversational AI with tool calling
-- **Persistent Memory** (PostgreSQL) - Conversation history across sessions
+- **Multilingual semantic search** (Pinecone index `news-articles-v2`, `gemini-embedding-2` article vectors): an English question finds Vietnamese articles too
+- **Passage rescue** (BM25 over the top hits' full bodies): finds details deep inside an article that the vector doesn't see
+- **Question filters + recency**: a source or month stated in the question becomes a hard filter; "latest / mới nhất / this week" questions put recent articles first
+- **LangGraph agent with 10 read-only tools** on BigQuery (keyword search, browse, full article, summaries, trending, freshness, coverage)
+- **LLM `gpt-5.4-mini`** (chosen in `docs/llm_compare.md`), answering in the user's language
+- **Persistent memory** (PostgreSQL checkpointer, in-memory fallback)
 
-> **Migration note:** the data warehouse moved from Snowflake to **BigQuery** (the
-> Snowflake trial expired). The dbt transformation layer and raw ingestion already run
-> on BigQuery, and since 2026-10-18 so does the AI agent (`ai_agents/core/`): its tools
-> query `marts.obt_articles` across all 10 sources. The semantic index is still the
-> original Guardian-only Pinecone index until it is rebuilt for all sources (agent phase,
-> step 2) - see `PROGRESS_LOG.md` for the roadmap and current phase status.
+> **Migration note:** the warehouse moved from Snowflake to **BigQuery** (the Snowflake
+> trial expired). Ingestion, dbt, the agent (`ai_agents/core/`, since 2026-10-18) and the
+> embeddings (since 2026-10-18) all run on GCP now. The original Guardian-only Pinecone
+> index and the PDF-upload feature were removed on 2026-10-24. `PROGRESS_LOG.md` has the
+> roadmap and phase status (local file).
+
+**Status (2026-10-24):** the whole pipeline runs hands-off on GCP every 4 hours, and
+493,470 articles from 10 sources are searchable. Measured running cost ≈ $0.29/day
+(≈ $9/month, `docs/cost_report.md`), under a $10/month budget.
 
 ## Project Structure
 ### **1. Problem & Scope**:
@@ -31,14 +35,25 @@ The rapid pace of news publication requires frequent ingestion and analysis to s
 - **Out of Scope**: True sub-minute streaming, social media integration, advanced ML model training.
 
 ### 4. Data Sources:
-A multi-source, bilingual ingestion architecture:
+A multi-source, bilingual ingestion architecture: 10 sources, all kept current every 4 hours.
 
-- **Guardian (English)** - HuggingFace historical archive (~87k articles) + Guardian Content API backfill/catch-up crawler, 1964 → present.
-- **Vietnamese news** - Tuổi Trẻ, Thanh Niên, and VnEconomy, plus the **English editions** of Tuổi Trẻ (news.tuoitre.vn) and VnEconomy (en.vneconomy.vn), crawled via a sitemap-driven resumable crawler (`scripts/batch_data/vn_news_backfill.py`), backfilled from 2026-01 and kept current every 4 hours.
-- **Incremental Loading** - Per-source cursor + dedupe sidecar to avoid re-crawling/re-processing.
-- **Automated Orchestration** - Guardian and Vietnamese ingestion run unattended every 4 hours and `dbt build` runs daily, all via **Cloud Scheduler + Cloud Run Jobs** (serverless, scale-to-zero), with source-freshness checks and an email alert on any failed run. The Airflow DAGs remain available for local/manual runs.
+| Source (`source_name`) | Language | Collected via | Since | Articles (2026-10-24) |
+|---|---|---|---|---|
+| The Guardian (`guardian`) | en | HuggingFace archive + Guardian Content API | 1964 | 265,430 |
+| Thanh Niên (`thanhnien`) | vi | sitemap crawler | 2026-01 | 74,359 |
+| Tuổi Trẻ (`tuoitre`) | vi | sitemap crawler | 2026-01 | 65,187 |
+| VietNamNet (`vietnamnet`) | vi | sitemap crawler | 2026-01 | 55,126 |
+| VnEconomy (`vneconomy`) | vi | sitemap crawler | 2026-01 | 18,779 |
+| Tuổi Trẻ English (`tuoitre_en`) | en | sitemap crawler | 2026-01 | 7,705 |
+| VnEconomy English (`vneconomy_en`) | en | sitemap crawler | 2026-01 | 3,317 |
+| VnExpress (`vnexpress`) | vi | RSS only (no archive) | ~2026-10-08 | 2,526 |
+| VnExpress International (`vnexpress_en`) | en | RSS only | ~2026-10 | 701 |
+| VietNamNet English (`vietnamnet_en`) | en | forward-only crawl | 2026-10-15 | 340 |
 
-All sources land in one BigQuery table (`raw.raw_data`), tagged by `source_name` (`guardian`/`tuoitre`/`thanhnien`/`vneconomy`/`tuoitre_en`/`vneconomy_en`) and `language` (`en`/`vi`).
+- **Incremental loading** - per-source cursor + dedupe sidecar, so nothing is re-crawled or re-processed.
+- **Automated orchestration** - one **Cloud Workflows** DAG runs ingestion → dbt → embeddings every 4 hours (5.1.2.4), with source-freshness checks and email alerts. The Airflow DAGs remain for local/manual runs.
+
+All sources land in one BigQuery table (`raw.raw_data`), tagged by `source_name` and `language` (`en`/`vi`).
 
 ### 5. Architecture Overview:
 
@@ -46,8 +61,19 @@ All sources land in one BigQuery table (`raw.raw_data`), tagged by `source_name`
 
 <img src="images/data_architecture.png" width="100%" alt="Data Architecture">
 
-> Note: the diagram above predates the BigQuery migration and still shows Snowflake -
-> refresh it to match the pipeline described below when there's time.
+> Note: the diagram above predates the BigQuery migration and still shows Snowflake. The
+> pipeline described below is the current one.
+
+```
+Guardian API ─┐                                        ┌─> Bronze archive (raw HTML / API JSON, GCS Coldline)
+9 VN sites ───┴─> Cloud Run ingestion jobs ─> GCS ─> BigQuery raw.raw_data (MERGE)
+                                                         │
+                                       dbt: stg_sf__guardian ─> obt_articles (+ freshness tests)
+                                                         │
+                     embed-sync: gemini-embedding-2 ─> vectors.article_embeddings / article_bodies ─> Pinecone news-articles-v2
+                                                         │
+                         Streamlit / CLI agent (LangGraph + gpt-5.4-mini) ─ dense search + passage rescue + BigQuery tools
+```
 
 #### **5.1. Data Pipeline:**
 
@@ -61,9 +87,9 @@ Key Features:
 - Rate Limiting: Handles Guardian API limits (sleeps on 429 errors)
 - Idempotent: Safe to re-run (won't create duplicates)
 
-> This path currently lands data in local PostgreSQL only - it has not yet been pointed
-> at BigQuery (see `PROGRESS_LOG.md`, Phase 2). The DAG's real-time tasks are disabled;
-> the actively-running ingestion today is the batch/backfill crawlers below.
+> Built and tested (milestone M03) but **unused in production**: frequent polling by the
+> Cloud Run ingestion jobs (5.1.2.4) delivers new articles every 4 hours at no fixed cost,
+> so Kafka lands data in local PostgreSQL only. Whether to remove it is still open.
 
 **5.1.2. Batch & Backfill Data Processing:**
 
@@ -71,49 +97,56 @@ Key Features:
 - Downloads/cleans the HuggingFace historical archive and crawls the Guardian Content API for everything since, with a resumable cursor, lock file, and daily-quota handling.
 
 **5.1.2.2. Vietnamese news crawler** (`scripts/batch_data/vn_news_backfill.py`, `run_vn_backfill_all.sh`):
-- Sitemap-driven crawler for Tuổi Trẻ / Thanh Niên / VnEconomy. Per-source resumable state, incremental Parquet flushing (every 100 articles, not just at month-end), concurrency tuned for stability over raw speed.
+- One crawler for all 9 Vietnamese sites and editions: sitemap-driven for Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet and their English editions; RSS-only for VnExpress (no usable archive). Per-source resumable state, incremental Parquet flushing (every 100 articles), per-site concurrency and delays tuned for stability over raw speed.
 
 **5.1.2.3. BigQuery loader** (`scripts/batch_data/load_raw_to_bigquery.py`):
 - Parquet → GCS landing bucket → BigQuery staging table → `MERGE` into `raw.raw_data` (idempotent, dedupes on `article_id`). One command, `--source hf|api|vn`, handles all sources.
 - Only stages/merges files pending since the last successful merge (tracked in a persistent `.pending_merge.<source>.json`), not the source's entire accumulated history - keeps `MERGE` cost proportional to what's new (~70x reduction measured vs. the naive full-wildcard approach).
 
-**5.1.2.4. Automated recurring ingestion** (`Dockerfile.ingestion`, `scripts/batch_data/run_ingestion_job.sh`, `run_vn_ingestion_job.sh`, `sync_job_state.py`):
-- One minimal image (just the crawlers + BigQuery loader, not the full project) backs two Cloud Run Jobs on **Cloud Scheduler** crons, authenticated via OAuth as the `dbt-runner` service account calling the Cloud Run Jobs Admin API directly - no persistent VM or Airflow scheduler process required:
-  - `guardian-ingestion` (`0 */4 * * *` UTC) - Guardian Content API crawl + load. The Guardian `API_KEY` comes from **Secret Manager** (`guardian-api-key`), not a plain env var.
-  - `vn-ingestion` (`15 */4 * * *` UTC, offset so the two `MERGE`s into `raw.raw_data` never overlap) - the three VN crawlers in parallel, then one load.
-- Both crawlers keep their cursor on the still-filling tail (today + yesterday for Guardian, the current month for VN) instead of moving past it, so every run picks up articles published since the last one; the downstream `MERGE` dedupes on `article_id`.
-- Cloud Run Jobs start from a clean container every invocation (no local disk persists between runs), so `sync_job_state.py` round-trips the crawler's cursor file and the loader's pending-merge state through a GCS prefix (pull before the run, push after - always, even on a partial failure, so an advanced cursor is never lost).
-- **Article embeddings** (`ai_agents/embed_articles.py`, `sync_vector_index.py`, Cloud Run Job `embed-sync` daily at 01:15 UTC after `dbt-build`): every article in `marts.obt_articles` is embedded with `gemini-embedding-2` (title + first 1,500 characters, 768 dims) into BigQuery `vectors.article_embeddings`, the source of truth, then copied at 512 dims into the Pinecone index `news-articles-v2` for the agent's semantic search. Incremental by `(article_id, content_hash)`, so new articles, edits and whole new sources are picked up automatically; a daily token cap bounds spend. Model choice: `docs/embedding_bakeoff.md`.
-- **Bronze raw archive** (`raw_archive.py`): every article the crawlers store is also kept exactly as received (VN page HTML, Guardian API JSON) as gzipped JSON Lines, uploaded each run to the Coldline bucket at `gs://<rawhtml bucket>/raw/source=<s>/fetch_date=<d>/`. Append-only (never overwritten), so a parser fix is an offline re-parse instead of a re-crawl, and Guardian's repeat fetches are kept as version history.
-- Verified end-to-end: a forced trigger produces a real Cloud Run execution run by the `dbt-runner` service account (confirmed via `gcloud run jobs executions list`), not a manual one.
+**5.1.2.4. Automated pipeline: Cloud Workflows + Cloud Run Jobs** (`workflows/news_pipeline.yaml`, `workflows/deploy.sh`):
+- **One DAG, `news-pipeline`, every 4 hours** (Cloud Scheduler `0 */4 * * *` UTC). It runs four Cloud Run Jobs one after another, each waiting for the previous one to finish:
+  1. `guardian-ingestion` - Guardian Content API crawl + load (`Dockerfile.ingestion`, `run_ingestion_job.sh`). The Guardian `API_KEY` comes from **Secret Manager**.
+  2. `vn-ingestion` - the 9 Vietnamese crawlers in parallel, then one load (`run_vn_ingestion_job.sh`). Running after Guardian means the two `MERGE`s into `raw.raw_data` never overlap.
+  3. `dbt-build` - `dbt source freshness`, then `dbt build` (5.1.2.5).
+  4. `embed-sync` - new article vectors to BigQuery and Pinecone (`Dockerfile.embed`, `ai_agents/run_embed_job.sh`).
+- Failure rules: a failed ingestion doesn't block the chain; a failed `dbt-build` skips `embed-sync`. The full chain takes ≈ 6 minutes; on average an article is searchable ≈ 2 hours after it is published.
+- **Why Workflows, not Cloud Composer:** Workflows is pay-per-step (≈ $0/month here); Composer is an always-on Airflow environment (≈ $300-400/month even idle). One linear 4-step pipeline with no date backfills doesn't need Composer.
+- **Article embeddings** (`ai_agents/embed_articles.py`, `sync_vector_index.py`): every article in `marts.obt_articles` is embedded with `gemini-embedding-2` on Vertex AI (title + first 1,500 characters, 768 dims) into BigQuery `vectors.article_embeddings`, the source of truth, then copied at 512 dims into Pinecone `news-articles-v2`. The job also stores each article's full body in `vectors.article_bodies` for the agent's passage rescue. Incremental by `(article_id, content_hash)`, so new articles, edits and new sources are picked up automatically; a daily token cap bounds spend. Model choice: `docs/embedding_bakeoff.md`.
+- Cloud Run Jobs start from a clean container every run, so `sync_job_state.py` round-trips the crawlers' cursors and the loader's pending-merge state through GCS (pull before, push after, even on a partial failure).
+- Both crawlers keep their cursor on the still-filling tail (today + yesterday for Guardian, the current month for VN) instead of moving past it, so every run picks up articles published since the last one.
+- **Bronze raw archive** (`raw_archive.py`): every article the crawlers store is also kept exactly as received (VN page HTML, Guardian API JSON) as gzipped JSON Lines in a Coldline bucket (`gs://<rawhtml bucket>/raw/source=<s>/fetch_date=<d>/`). Append-only, so a parser fix is an offline re-parse instead of a re-crawl.
 
-**5.1.2.5. Automated dbt + monitoring** (`capstone_dbt_project/Dockerfile`):
-- Cloud Run Job `dbt-build` runs daily at `30 0 * * *` UTC (07:30 Vietnam time): `dbt source freshness` (Guardian + one check per VN site, warn 12h / error 24h on `loaded_at`), then `dbt build`. A stale source fails the run - which is what catches an ingestion job that "succeeds" while landing nothing - but the build still runs, so one stale source doesn't freeze the others.
-- A Cloud Monitoring alert policy emails on any failed execution of `guardian-ingestion`, `vn-ingestion`, or `dbt-build`.
+**5.1.2.5. dbt build, monitoring and cost tracking** (`capstone_dbt_project/Dockerfile`, `scripts/monitoring/`):
+- `dbt-build` runs `dbt source freshness` (one check per source on `loaded_at`: warn 12h / error 24h for the big sources, 24h / 48h for the low-volume English editions), then `dbt build` **regardless**, so one stale source alerts without freezing the others.
+- **Alerts:** Cloud Monitoring emails on any failed job execution, and on a `news-pipeline` run that fails or doesn't happen at all for 5 hours.
+- **Daily cost report** (`scripts/monitoring/cost_report.py`, Cloud Run Job `cost-report`, 02:00 UTC): measured usage × list prices per service (BigQuery, Vertex AI, Cloud Run, GCS, Artifact Registry, Pinecone) plus OpenAI's billed cost, saved to `monitoring.cost_daily` and emailed. A GCP budget alert sits at $10/month. See `docs/cost_report.md`.
+- Pipeline health is checked by **rows, not exit codes** (a "nothing to do" run exits 0): rows per source, articles without a vector, Pinecone vs. warehouse counts.
 
 **5.1.3. dbt Transformation:**
 
 The dbt (data build tool) layer transforms raw multi-source article data into **`obt_articles`**, a One Big Table the RAG agent reads, running on **BigQuery**:
 - **Data Quality Validation** - Staging layer with comprehensive quality checks (source-aware: Guardian's fixed batch/realtime cutoff date vs. the VN crawler's crawl-relative rule)
 - **One Big Table** - one row per article (current version) with the section group, source, language, word count, preview and a `content_hash` (the re-embedding signal) denormalised in. Fully derivable from raw, so `--full-refresh` is always safe
-- **Incremental Loading** - each run replaces only the recent publication-month partitions, so BigQuery prunes the read
+- **Incremental Loading** - each run replaces only the recent publication-month partitions, so BigQuery prunes the read (≈ 2-3 GB billed per build); a post-hook removes the stale copy when a publisher re-dates an old article into a new month
 - **Bilingual sections** - `section_utils` buckets English and Vietnamese section names (incl. VietNamNet / VnExpress sub-sections) into 12 groups; an empty section maps to `Other` instead of dropping the article
 - **Local time** - storage stays UTC; display-only `*_local` columns render `Asia/Ho_Chi_Minh` wall-clock time
 - **Star schema, frozen** - the original Kimball model (`dim_articles` with SCD Type 2, `dim_sections`, `dim_date`, `fct_articles`) was frozen on 2026-10-18 and copied to the `marts_archive` dataset. The agent only ever needed a flat article table, and the star schema's inner joins silently dropped articles with an empty section. See `docs/decision_obt_serving_layer.md`
-- **Automated Testing** - 40+ data quality tests
+- **Automated Testing** - 40+ data quality tests, plus SQLFluff lint and `dbt test` in PR CI
 
 #### **5.2. Tech Stacks:**
 
-- **Python:** Flexible for data ingestion and processing (requests, polars, BeautifulSoup).
+- **Python:** Flexible for data ingestion and processing (requests, polars, BeautifulSoup + lxml).
 - **PostgreSQL:** Local staging for rapid development, and the agent's conversation-memory checkpointer.
-- **BigQuery:** Scalable, serverless cloud warehouse for analytics (migrated from Snowflake).
+- **BigQuery:** Scalable, serverless cloud warehouse for analytics (migrated from Snowflake), and the store for article vectors and bodies.
 - **dbt:** Industry-standard for data transformations (`dbt-bigquery` adapter).
-- **Kafka:** Real-time streaming primitive for the Guardian API path (currently lands in PostgreSQL only, not yet wired to BigQuery).
-- **Cloud Scheduler + Cloud Run Jobs:** Serverless cron for the recurring Guardian + Vietnamese ingestion and the daily dbt build in production (chosen over an always-on VM or Cloud Composer to stay under the $5-10/mo BigQuery/GCP budget cap). Secret Manager holds the Guardian API key; Cloud Monitoring alerts on failures.
-- **Airflow:** Local/manual orchestration of the ingestion + dbt steps (validated end-to-end; production uses Cloud Run).
-- **LangGraph/Pinecone:** Enables conversational AI with grounded responses.
-- **OpenAI**: LLM + embeddings API.
-- **GitHub Actions:** PR CI (`dbt debug` → `deps` → SQLFluff → `dbt test`) against BigQuery, authenticated **keylessly** via Workload Identity Federation as a read-only `ci-runner` service account.
+- **Cloud Workflows + Cloud Scheduler + Cloud Run Jobs:** the production pipeline (orchestration, trigger, compute), all pay-per-use to stay inside a $5-10/month budget. Secret Manager holds the API keys; Cloud Monitoring alerts on failures.
+- **Vertex AI (`gemini-embedding-2`):** multilingual article and query embeddings.
+- **Pinecone:** serverless vector index for the agent's semantic search.
+- **LangGraph + LangChain:** the conversational agent and its tools.
+- **OpenAI (`gpt-5.4-mini`):** the chat model.
+- **Kafka:** Real-time streaming primitive for the Guardian API path (built, unused in production).
+- **Airflow:** Local/manual orchestration of the ingestion + dbt steps (validated end-to-end; production uses Cloud Workflows).
+- **GitHub Actions:** PR CI (`dbt debug` → `deps` → SQLFluff → `dbt test`) against BigQuery, authenticated **keylessly** via Workload Identity Federation as a read-only `ci-runner` service account; a required status check on `main`.
 
 #### **ERD:**
 
@@ -131,7 +164,7 @@ Table raw_data {
   web_url string
   section_name string
   data_source string  // 'batch' | 'realtime'
-  source_name string  // 'guardian' | 'tuoitre' | 'thanhnien' | 'vneconomy'
+  source_name string  // 'guardian' | 'tuoitre' | 'thanhnien' | 'vneconomy' | 'vietnamnet' | 'vnexpress' | '<site>_en'
   language string      // 'en' | 'vi'
   loaded_at timestamp
   Note: 'Raw multi-source articles, loaded via load_raw_to_bigquery.py'
@@ -252,92 +285,85 @@ Ref: dim_articles.section_key > dim_sections.section_key
 #### **5.3. AI Agent Architecture**
 
 > One implementation in `ai_agents/core/` behind both front ends (`app.py` Streamlit,
-> `cli_agent.py` terminal). Keyword search and every tool run on BigQuery with
-> parameterised queries, a date window (partition pruning) and a per-query
-> `maximum_bytes_billed` cap. The three searches run in parallel; Vietnamese queries use
-> syllable-pair keywords and the multilingual FlashRank model. (PDF uploads and the v1
-> Guardian-only index were removed on 2026-10-24; dense search is the v2 index
-> `news-articles-v2`, all 10 sources.)
+> `cli_agent.py` terminal). Every BigQuery query is parameterised, date-windowed (partition
+> pruning) and capped by `maximum_bytes_billed` (600 MB). Since 2026-10-20 the automatic
+> retrieval is **dense search only**: the eval showed the old hybrid recipe (dense + keyword
+> + FlashRank rerank) pushed good hits out of the top 5 (5.4). Keyword search is still a
+> tool the LLM can call for exact names and numbers. Demo mode in the app runs the old
+> hybrid pipeline for comparison.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         USER QUERY                              │
-│              "What's the latest on climate change?"             │
+│       "Tin mới nhất về giá vàng" / "Latest on UK climate policy"│
 └────────────────────────────┬────────────────────────────────────┘
-                             │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    SMART QUERY ROUTING                          │
-│  • Greetings/meta questions → Direct response (no retrieval)    │
-│  • Factual queries → Hybrid retrieval pipeline                  │
+│  • Greetings / small talk → direct reply (no retrieval)         │
+│  • "those articles…" → reuse the previous turn's sources        │
+│  • News questions → retrieval                                   │
 └────────────────────────────┬────────────────────────────────────┘
-                             │
-                   ┌─────────┴─────────┐
-                   │                   │
-                   ▼                   ▼
-     ┌──────────────────────┐  ┌──────────────────────┐
-     │   DENSE SEARCH       │  │    SQL SEARCH        │
-     │   (Pinecone)         │  │    (BigQuery)        │
-     │                      │  │                      │
-     │ • Semantic matching  │  │ • Keyword extraction │
-     │ • news-articles-v2   │  │ • Multi-keyword OR   │
-     │   (all 10 sources,   │  │ • Optimized view     │
-     │   gemini-embedding-2)│  │ • Full-text search   │
-     │ • K=10 results       │  │ • Limit=10 results   │
-     └──────────┬───────────┘  └──────────┬───────────┘
-                │                         │
-                └────────┬────────────────┘
-                         ▼
-           ┌─────────────────────────┐
-           │   MERGE & DEDUPLICATE   │
-           │                         │
-           │ • Remove duplicates     │
-           │ • By article_id         │
-           │ • By text similarity    │
-           └────────────┬────────────┘
-                        ▼
-           ┌─────────────────────────┐
-           │   FLASHRANK RERANKER    │
-           │                         │
-           │ • Local model (fast)    │
-           │ • Relevance scoring     │
-           │ • Top-K selection       │
-           │ • Skip if <3 results    │
-           └────────────┬────────────┘
-                        ▼
-           ┌─────────────────────────┐
-           │   CONTEXT FORMATTING    │
-           │                         │
-           │ • Source labeling       │
-           │ • Metadata enrichment   │
-           │ • Retrieval stats       │
-           └────────────┬────────────┘
-                        ▼
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 QUERY UNDERSTANDING (rules)                     │
+│  • Source or month / year in the question → hard filter         │
+│  • "latest / mới nhất / this week" → recent articles first      │
+└────────────────────────────┬────────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│          DENSE SEARCH (Pinecone news-articles-v2)               │
+│  • gemini-embedding-2 query vector, all 10 sources, 2 languages │
+│  • top 30 articles, filters applied inside Pinecone             │
+└────────────────────────────┬────────────────────────────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│          PASSAGE RESCUE (BigQuery vectors.article_bodies)       │
+│  • BM25 over the 30 full bodies (25 MB per lookup)              │
+│  • keep the dense top 4, fill the rest by best passage          │
+│  • add each article's best passage to its context               │
+└────────────────────────────┬────────────────────────────────────┘
+                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    LANGGRAPH AGENT                              │
 │                                                                 │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │   RETRIEVE   │───▶│   CHATBOT    │───▶│    TOOLS    │       │
-│  │              │    │              │    │              │       │
-│  │ • Query      │    │ • GPT-4o     │    │ • SQL search │       │
-│  │   routing    │    │   mini       │    │ • Trending   │       │
-│  │ • Hybrid     │    │ • Context    │    │ • Summaries  │       │
-│  │   search     │    │   aware      │    │ • Metadata   │       │
-│  │ • Context    │    │ • Tool       │    │              │       │
-│  │   building   │    │   calling    │    │              │       │
-│  └──────────────┘    └──────────────┘    └──────────────┘       │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐   │
+│  │   RETRIEVE   │───▶│   CHATBOT    │◀──▶│      TOOLS       │   │
+│  │ (above; the  │    │ gpt-5.4-mini │    │ 10, read-only:   │   │
+│  │  context is  │    │ cites title, │    │ keyword search,  │   │
+│  │  per turn,   │    │ source, date │    │ semantic search, │   │
+│  │  not stored  │    │ + URL; user's│    │ browse, article, │   │
+│  │  in history) │    │ language     │    │ summaries, ...   │   │
+│  └──────────────┘    └──────────────┘    └──────────────────┘   │
 │                                                                 │
-│  Memory: PostgreSQL (conversation history, checkpoints)         │
+│  Memory: PostgreSQL checkpointer (last 6 turns sent to the LLM) │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
                     ┌──────────────────┐
                     │  FINAL RESPONSE  │
-                    │                  │
                     │ • Grounded       │
                     │ • Cited sources  │
-                    │ • Conversational │
+                    │ • EN or VI       │
                     └──────────────────┘
 ```
+
+Public-demo safety: a per-session question limit (30/hour), per-query BigQuery byte caps,
+3-second timeouts with one retry on the embedding and Pinecone calls (BigQuery and the LLM
+have their own timeouts), and a fallback answer when a
+retrieval step fails or the agent hits its tool-step limit.
+
+#### **5.4. Evaluation**
+
+Each change to retrieval was measured on real questions, through the real code, against the full corpus:
+
+| Eval | What it showed | Doc |
+|---|---|---|
+| Embedding bake-off | `gemini-embedding-2` beat OpenAI `text-embedding-3-small` and e5, incl. English → Vietnamese questions | `docs/embedding_bakeoff.md` |
+| Retrieval refresh (130 questions) | known-item recall@5: old Guardian-only hybrid **0.22** → v2 dense **0.95** (agent default 0.96); topical precision@5 0.31 → 0.86. Rerank and keyword interleave hurt | `docs/eval_refresh.md` |
+| Hard set (95 questions, the regression benchmark) | question filters: constraint compliance 0.46 → 0.98; passage rescue: deep-detail found@5 0.50 → 0.70 | `docs/hard_eval.md` |
+| LLM comparison (5 models) | `gpt-5.4-mini` gave the best answers (~$7 per 1,000 turns) | `docs/llm_compare.md` |
+
+The original 2026-01 eval (`ai_agents/evaluation.py`, 4 strategies on the Guardian-only index) is kept, frozen, as the first baseline. Bugs, incidents and lessons are collected in `docs/lessons_learned.md`.
 
 ---
 
@@ -346,23 +372,26 @@ Ref: dim_articles.section_key > dim_sections.section_key
 fa-dae2-capstone-Dinh-Ngoc-Lam/
 ├── .github/workflows/
 │   └── pr_ci.yml                                  # PR CI: lint + dbt test on BigQuery (keyless WIF)
+├── .claude/skills/                                 # check-pipeline, deploy-job-image, log-update procedures
 ├── ai_agents/                                      # RAG agent (BigQuery since 2026-10-18)
-│   ├── core/                                       # The agent: config, bq, articles, text, retrieval, passages, tools, agent, memory
+│   ├── core/                                       # The agent: config, bq, articles, text, retrieval, passages, tools, agent, llm, memory
 │   ├── app.py / cli_agent.py                       # Streamlit and terminal front ends over core/
-│   ├── eval/                                       # Current evals: retrieval_eval, hard_eval, time_eval, llm_compare
+│   ├── embed_articles.py / sync_vector_index.py    # embed-sync job: Gemini vectors → BigQuery → Pinecone
+│   ├── run_embed_job.sh / requirements-embed.txt   # embed-sync entrypoint + image deps
+│   ├── eval/                                       # Current evals: retrieval_eval, hard_eval, time_eval, llm_compare, bake-off
 │   ├── capstone_tool_calling_agent.py              # Compatibility shim for the frozen 2026-01 eval
 │   ├── evaluation.py / baseline_systems.py         # FROZEN 2026-01 eval (v1 index, deleted 2026-10-24)
 │   └── label_ground_truth*.py / visualize_results.py
 ├── capstone_dbt_project/                           # dbt project (BigQuery)
 │   ├── .dbt/profiles.yml                           # the single dbt profile (use --profiles-dir .dbt)
 │   ├── Dockerfile                                  # dbt-build Cloud Run Job image
-│   ├── macros/                                     # generate_news_hash, section_utils, generate_schema_name
+│   ├── macros/                                     # generate_news_hash, section_utils, generate_schema_name, ...
 │   ├── models/
-│   │   ├── 01_staging/                             # stg_sf__guardian, _sources.yml
+│   │   ├── 01_staging/                             # stg_sf__guardian, _sources.yml (freshness per source)
 │   │   ├── 02_intermediate/                        # int_article_metrics (ephemeral)
 │   │   ├── 03_mart/                                # obt_articles (live), vw_articles_search_optimized; dim_* / fct_articles (frozen, disabled)
 │   │   └── monitoring/                             # news_freshness
-│   ├── tests/                                      # assert_data_source_consistency, test_scd_content_changes
+│   ├── tests/                                      # assert_data_source_consistency (test_scd_content_changes disabled)
 │   ├── dbt_project.yml
 │   └── packages.yml                                # dbt_utils
 ├── dags/
@@ -373,30 +402,34 @@ fa-dae2-capstone-Dinh-Ngoc-Lam/
 │   │   ├── batch_data_collector.py / batch_data_ingestion.py   # Legacy Snowflake path
 │   │   ├── hf_archive_to_parquet.py                             # HF archive → Parquet
 │   │   ├── guardian_api_backfill.py                             # Guardian Content API crawler
-│   │   ├── vn_news_backfill.py / run_vn_backfill_all.sh         # Tuổi Trẻ / Thanh Niên / VnEconomy crawler
+│   │   ├── vn_news_backfill.py / run_vn_backfill_all.sh         # Crawler for the 9 Vietnamese sites / editions
 │   │   ├── load_raw_to_bigquery.py                              # Parquet → GCS → BigQuery raw.raw_data
 │   │   ├── sync_job_state.py                                    # Cloud Run Job: pull/push cursor + pending-merge state to GCS
 │   │   ├── raw_archive.py                                       # Bronze: raw HTML / API JSON as .jsonl.gz -> Coldline bucket
 │   │   ├── run_ingestion_job.sh                                 # guardian-ingestion entrypoint (sync state → crawl → load → sync state)
-│   │   ├── run_vn_ingestion_job.sh                              # vn-ingestion entrypoint (3 VN crawlers in parallel → load)
+│   │   ├── run_vn_ingestion_job.sh                              # vn-ingestion entrypoint (9 VN crawlers in parallel → load)
 │   │   └── requirements-ingestion.txt                           # Minimal deps for the ingestion container image
+│   ├── monitoring/                                 # cost_report.py + deploy script (daily cost email, monitoring.cost_daily)
 │   └── real_time_data/
-│       ├── kafka_producer.py / kafka_consumer.py   # Guardian API → Kafka → PostgreSQL
+│       ├── kafka_producer.py / kafka_consumer.py   # Guardian API → Kafka → PostgreSQL (unused in production)
 │       └── migrate_add_data_source.py
+├── workflows/
+│   ├── news_pipeline.yaml                          # Cloud Workflows DAG: guardian → vn → dbt-build → embed-sync
+│   └── deploy.sh                                   # deploy the workflow + its schedules (needs GCP_PROJECT)
 ├── sql/init.sql                                    # PostgreSQL staging schema bootstrap
-├── docs/                                           # phase0_baseline, phase1_load_report, phase3_5_vn_crawler
+├── docs/                                           # phase reports, decisions, eval reports, cost report, lessons_learned
 ├── images/                                         # architecture diagram + ERD
 ├── data/                                           # local Parquet/CSV working data
-├── CLAUDE.md                                       # repo guidance for AI assistants / contributors
-├── PROGRESS_LOG.md                                 # milestone status, roadmap, change log
 ├── docker-compose.yml                              # langgraph-postgres (agent memory)
 ├── docker-compose-kafka.yml                        # kafka + kafdrop + airflow metadata pg
 ├── docker-compose-airflow.yml                      # airflow
 ├── Dockerfile.airflow
-├── Dockerfile.ingestion                            # Minimal image for the guardian-/vn-ingestion Cloud Run Jobs (crawl + load only)
-├── pyproject.toml / uv.lock                        # uv-managed deps (dbt-bigquery, polars, langchain, ...)
+├── Dockerfile.ingestion                            # Image for the guardian-/vn-ingestion Cloud Run Jobs (crawl + load only)
+├── Dockerfile.embed                                # Image for the embed-sync Cloud Run Job
+├── Dockerfile.cost                                 # Image for the cost-report Cloud Run Job
+├── pyproject.toml / uv.lock                        # uv-managed deps (dbt-bigquery, polars, langgraph, ...)
 ├── requirements.txt                                # Airflow-image dependency subset
-└── .env.example                                    # Guardian / GCP / BigQuery / Pinecone / Postgres config
+└── .env.example                                    # Guardian / GCP / BigQuery / Pinecone / Postgres / agent config
 ```
 
 **Setup Instructions:**
@@ -411,7 +444,7 @@ git clone https://github.com/Dinhngoclam2906/fa-dae2-capstone-Dinh-Ngoc-Lam/
 uv sync
 ```
 
-**3. Authenticate to GCP (BigQuery/GCS use Application Default Credentials - no service-account key exists):**
+**3. Configure and authenticate** (copy `.env.example` to `.env` and fill it in; BigQuery/GCS/Vertex AI use Application Default Credentials - no service-account key exists):
 ```
 gcloud auth login
 gcloud config set project <your GCP project id>
@@ -427,9 +460,8 @@ docker compose -f docker-compose-airflow.yml up -d     # airflow
 
 **5. Run Ingestion:**
 
-> In production, Guardian and Vietnamese ingestion run unattended every 4 hours via Cloud
-> Scheduler + Cloud Run Jobs (see 5.1.2.4 above) - the commands below are for local
-> development, manual catch-up runs, or debugging.
+> In production, ingestion runs unattended every 4 hours in the `news-pipeline` workflow
+> (5.1.2.4). The commands below are for local development, manual catch-up runs, or debugging.
 
 Guardian (batch + API backfill):
 ```
@@ -437,7 +469,7 @@ uv run python scripts/batch_data/hf_archive_to_parquet.py
 uv run python scripts/batch_data/guardian_api_backfill.py
 ```
 
-Vietnamese news (Tuổi Trẻ / Thanh Niên / VnEconomy, resumable):
+Vietnamese news (resumable):
 ```
 bash scripts/batch_data/run_vn_backfill_all.sh
 ```
@@ -449,7 +481,7 @@ uv run python scripts/batch_data/load_raw_to_bigquery.py --source api
 uv run python scripts/batch_data/load_raw_to_bigquery.py --source vn --max-bytes-billed 5000000000
 ```
 
-Real-time (Guardian API → Kafka → PostgreSQL only, not yet wired to BigQuery):
+Real-time (Guardian API → Kafka → PostgreSQL only, unused in production):
 ```
 uv run python scripts/real_time_data/kafka_producer.py --once --max-articles 100
 uv run python scripts/real_time_data/kafka_consumer.py --once
@@ -457,21 +489,26 @@ uv run python scripts/real_time_data/kafka_consumer.py --once
 
 **6. Build the warehouse (dbt, from `capstone_dbt_project/`):**
 
-In production this runs daily as the `dbt-build` Cloud Run Job (5.1.2.5). Locally, always
-pass `--profiles-dir .dbt` (the project's only profile) and load `.env`. `GCP_PROJECT` and
-`NEWS_SALT` are required and have no defaults:
+In production this runs every 4 hours as the `dbt-build` step of the workflow (5.1.2.5).
+Locally, always pass `--profiles-dir .dbt` (the project's only profile) and load `.env`.
+`GCP_PROJECT` and `NEWS_SALT` are required and have no defaults:
 ```
 uv run --env-file ../.env dbt deps --profiles-dir .dbt
 uv run --env-file ../.env dbt source freshness --profiles-dir .dbt
 uv run --env-file ../.env dbt build --profiles-dir .dbt
 ```
 
-**7. Run the Agent:**
+**7. Run the Agent** (from the repo root):
 ```
-uv run streamlit run ai_agents/app.py
+uv run --env-file .env streamlit run ai_agents/app.py
 # or
-uv run python ai_agents/cli_agent.py
+uv run --env-file .env python ai_agents/cli_agent.py --stats
+```
+
+Regression benchmark (the hard question set; stages are listed in its docstring):
+```
+uv run --env-file .env python ai_agents/eval/hard_eval.py run
 ```
 
 **8. Verify Data:**
-Check `raw.raw_data` in BigQuery (multi-source row counts, per `source_name`/`language`), and the `staging`/`marts`/`monitoring` datasets after a dbt build.
+Check `raw.raw_data` in BigQuery (row counts and `MAX(loaded_at)` per `source_name`), the `staging` / `marts` / `monitoring` datasets after a dbt build, and that `vectors.article_embeddings` and the Pinecone index match `marts.obt_articles`.
