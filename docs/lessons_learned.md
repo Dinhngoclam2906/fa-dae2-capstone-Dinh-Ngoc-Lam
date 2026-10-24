@@ -89,6 +89,7 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-22 | Embeddings | Stale-version guard disabled pruning: Pinecone sync needed 3.3 GB, failed 6 runs |
 | 2026-10-23 | Agent | Hung calls cost 20 s + the context; Pinecone SDK retried 6×; 3 s timeout + 1 retry |
 | 2026-10-23 | Tooling | `uv sync` would have uninstalled pinecone (not in pyproject / uv.lock) |
+| 2026-10-24 | Cloud | Cost report lost its OpenAI section to a transient 429; retry on 429/5xx |
 
 ---
 
@@ -302,6 +303,18 @@ Reading the SQL found none of these:
   **Accepted by the user**; widening the window would hide a second failure.
 - **Concurrent MERGEs into one table conflict.** Schedules were once offset (:00 / :15); now
   the DAG runs jobs strictly in sequence.
+
+### Cost report lost its OpenAI section to a transient 429 (2026-10-24, `2ffba7d`)
+
+- **What happened:** the 10-24 cost email said `openai FAILED: HTTPError: 429 Too Many
+  Requests` on `/v1/organization/costs`. Only that section was missing (each source is
+  wrapped), but the 10-23 rows in `monitoring.cost_daily` had no OpenAI line.
+- **Cause:** one call, no retry. The same request returned 200 twice minutes later, so it was
+  a short rate limit, not the key or quota.
+- **Fix:** up to 3 retries on 429/5xx, honouring `Retry-After`, else 5 / 10 / 20 s. Image
+  rebuilt, job re-run (re-saving a day replaces its partition, so it's idempotent).
+- **Lesson:** every third-party API call in a scheduled job needs a retry on 429/5xx, not
+  just on timeouts.
 
 ---
 
