@@ -1,4 +1,4 @@
-"""Data access over marts.obt_articles (one row per article, all 10 sources).
+"""Data access over marts.obt_articles (one row per article, all sources).
 
 Plain functions, shared by the agent's tools and the hybrid retriever. Cost rules
 (BigQuery bills scanned bytes per column per partition; dry-run figures, 2026-10-18):

@@ -15,12 +15,12 @@ models:
                 to: ref('dim_articles')
                 field: article_id
       - name: source_name
-        description: "Origin site: guardian, tuoitre, thanhnien, vneconomy, tuoitre_en, vneconomy_en, vietnamnet, vietnamnet_en, vnexpress, vnexpress_en"
+        description: "Origin site: guardian, tuoitre, thanhnien, vneconomy, tuoitre_en, vneconomy_en, vietnamnet, vietnamnet_en, vnexpress, vnexpress_en, dantri, dantri_en, vir"
         tests:
           - not_null
           - accepted_values:
               arguments:
-                values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'tuoitre_en', 'vneconomy_en', 'vietnamnet', 'vietnamnet_en', 'vnexpress', 'vnexpress_en']
+                values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'tuoitre_en', 'vneconomy_en', 'vietnamnet', 'vietnamnet_en', 'vnexpress', 'vnexpress_en', 'dantri', 'dantri_en', 'vir']
       - name: language
         description: "Article language: en or vi"
         tests:
@@ -99,12 +99,12 @@ models:
               arguments:
                 values: ['Sports', 'Opinion', 'National News', 'Global & UK', 'Economy & Business', 'Politics', 'Technology', 'Science & Environment', 'Culture & Arts', 'Lifestyle & Travel', 'Society & Education', 'Other']
       - name: source_name
-        description: "Origin site: guardian, tuoitre, thanhnien, vneconomy, tuoitre_en, vneconomy_en, vietnamnet, vietnamnet_en, vnexpress, vnexpress_en"
+        description: "Origin site: guardian, tuoitre, thanhnien, vneconomy, tuoitre_en, vneconomy_en, vietnamnet, vietnamnet_en, vnexpress, vnexpress_en, dantri, dantri_en, vir"
         tests:
           - not_null
           - accepted_values:
               arguments:
-                values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'tuoitre_en', 'vneconomy_en', 'vietnamnet', 'vietnamnet_en', 'vnexpress', 'vnexpress_en']
+                values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'tuoitre_en', 'vneconomy_en', 'vietnamnet', 'vietnamnet_en', 'vnexpress', 'vnexpress_en', 'dantri', 'dantri_en', 'vir']
       - name: language
         description: "Article language: en or vi"
         tests:

@@ -190,7 +190,7 @@ def get_knowledge_base_stats() -> dict[str, Any]:
     return {"index": settings.pinecone_index_v2, "dimension": stats.dimension,
             "total_vectors": stats.total_vector_count,
             "namespaces": {k: v.vector_count for k, v in stats.namespaces.items()},
-            "note": "One vector per article (title + opening), all 10 sources; articles are "
+            "note": "One vector per article (title + opening), all sources; articles are "
                     "embedded every 4 hours, and keyword search also finds ones not yet embedded."}
 
 

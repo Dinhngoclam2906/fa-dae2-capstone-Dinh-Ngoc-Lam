@@ -16,13 +16,23 @@ python ingestion/sync_job_state.py pull vn-ingestion
 
 rc=0
 pids=""
-for s in tuoitre thanhnien vneconomy tuoitre_en vneconomy_en vietnamnet vietnamnet_en vnexpress vnexpress_en; do
-  # VnExpress (RSS-only, by policy) gets a gentler rate: 2 workers, 1.5 s apart.
+for s in tuoitre thanhnien vneconomy tuoitre_en vneconomy_en vietnamnet vietnamnet_en vnexpress vnexpress_en \
+         dantri dantri_en vir; do
+  # VnExpress (RSS-only, by policy) gets a gentler rate: 2 workers, 1.5 s apart; the
+  # sites added 2026-10-24 get 4 workers, 1 s apart.
   case "$s" in
-    vnexpress*) rate="--concurrency 2 --sleep 1.5" ;;
-    *)          rate="--concurrency 6 --sleep 0.75" ;;
+    vnexpress*)         rate="--concurrency 2 --sleep 1.5" ;;
+    dantri*|vir)        rate="--concurrency 4 --sleep 1" ;;
+    *)                  rate="--concurrency 6 --sleep 0.75" ;;
   esac
-  python ingestion/vn_news_backfill.py --source "$s" --from-date 2026-01-01 $rate &
+  # Added 2026-10-24 FORWARD-ONLY: their month floor is the month they were added
+  # (their current-month feeds hold only the last ~2-4 days anyway). A Jan-Oct 2026
+  # backfill is planned after the Pinecone 256-dim switch (PROGRESS_LOG "Resume here").
+  case "$s" in
+    dantri*|vir) from="2026-10-01" ;;
+    *)           from="2026-01-01" ;;
+  esac
+  python ingestion/vn_news_backfill.py --source "$s" --from-date "$from" $rate &
   pids="$pids $!"
 done
 for p in $pids; do

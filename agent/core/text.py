@@ -154,9 +154,13 @@ _SOURCE_PATTERNS = [
     (r"(?i)vnexpress international|e\.vnexpress", ["vnexpress_en"]),
     (r"(?i)vietnamnet global", ["vietnamnet_en"]),
     (r"(?i)vneconomy \(?english\)?|en\.vneconomy", ["vneconomy_en"]),
+    (r"(?i)dtinews|dân trí english|dan tri english", ["dantri_en"]),
+    (r"\bVIR\b|(?i:vietnam investment review|vir\.com\.vn)", ["vir"]),
     (r"(?i)\bguardian\b", ["guardian"]),
     (r"Tuổi Trẻ|Tuoi Tre|TUỔI TRẺ|(?i:báo tuổi trẻ|báo tuoi tre)", ["tuoitre", "tuoitre_en"]),
     (r"Thanh Niên|Thanh Nien|THANH NIÊN|(?i:báo thanh niên|báo thanh nien)", ["thanhnien"]),
+    # "dân trí" is also a common phrase (public awareness, "nâng cao dân trí").
+    (r"Dân Trí|Dan Tri|DÂN TRÍ|(?i:báo dân trí|báo dan tri|dantri)", ["dantri", "dantri_en"]),
     (r"(?i)vneconomy", ["vneconomy", "vneconomy_en"]),
     (r"(?i)vietnamnet", ["vietnamnet", "vietnamnet_en"]),
     (r"(?i)vnexpress", ["vnexpress", "vnexpress_en"]),
@@ -276,8 +280,9 @@ def refers_to_previous(query: str) -> bool:
 
 
 INTRO = (
-    "I'm a news assistant for The Guardian and nine Vietnamese news sites and editions "
-    "(Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet, VnExpress and their English editions), "
+    "I'm a news assistant for The Guardian and twelve Vietnamese news sites and editions "
+    "(Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet, VnExpress, Dân Trí and their English "
+    "editions, plus Vietnam Investment Review), "
     "hundreds of thousands of articles, updated every 4 hours. I can find articles by topic, date, "
     "source or section, summarise them, and show what's trending. I answer in English or "
     "Vietnamese.\n\nTry: \"What's the latest on fuel prices in Vietnam?\" or "

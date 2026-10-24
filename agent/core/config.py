@@ -21,6 +21,9 @@ SOURCES = {
     "vneconomy_en": ("VnEconomy (English)", "en"),
     "vietnamnet_en": ("VietNamNet Global (English)", "en"),
     "vnexpress_en": ("VnExpress International (English)", "en"),
+    "dantri": ("Dân Trí", "vi"),
+    "dantri_en": ("DTiNews, Dân Trí (English)", "en"),
+    "vir": ("Vietnam Investment Review (English)", "en"),
 }
 
 SECTION_GROUPS = [

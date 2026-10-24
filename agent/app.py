@@ -105,7 +105,7 @@ init_session()
 
 # ==================== HEADER ====================
 st.markdown("<h1>Daily News AI Assistant</h1>", unsafe_allow_html=True)
-st.markdown("**📰 The Guardian + 9 Vietnamese news sources • Multilingual semantic search • "
+st.markdown("**📰 The Guardian + 12 Vietnamese news sites • Multilingual semantic search • "
             "keyword search as a tool**")
 cols = st.columns(4)
 cols[0].caption("🟢 Semantic: Pinecone + Gemini embeddings")

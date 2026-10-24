@@ -133,6 +133,14 @@ class Article:
     section_name: str
 
 
+@dataclass
+class Skipped:
+    """parse_article's answer for a page rejected ON PURPOSE (e.g. a press-release wire):
+    marked seen so it is never fetched again, unlike a failed parse, which is retried."""
+    article_id: str
+    reason: str
+
+
 # ------------------------------------------------------------------------- sources
 
 
@@ -527,10 +535,115 @@ class VnExpressEn(VnExpressRss):
         return art
 
 
+def _is_current_month(year: int, month: int) -> bool:
+    today = datetime.now(timezone.utc).date()
+    return (year, month) == (today.year, today.month)
+
+
+class DanTri(HtmlNewsSource):
+    """Dân Trí (dantri.com.vn), added 2026-10-24 FORWARD-ONLY (the job passes
+    --from-date of the current month; a Jan-Oct 2026 backfill is planned). JSON-LD
+    NewsArticle carries datePublished + articleSection; body in #desktop-in-article.
+    The current month reads the Google News sitemap (~2 days, ~530 URLs) and the home
+    RSS (latest 100, ~9 h). Monthly sitemaps /sitemaps/Article-YYYY-MM-01.xml exist
+    only up to 2026-07 (checked 2026-10-24), so past months read those and a backfill
+    of 2026-08 onwards needs another route. Ids: the 17-digit number before .htm,
+    prefixed with the source name (DTiNews uses the same CMS ids)."""
+    name = "dantri"
+    base_url = "https://dantri.com.vn"
+    sitemap_index_url = "https://dantri.com.vn/sitemaps/articles.xml"
+    BODY_SELECTORS = ("#desktop-in-article", "div.singular-content", "article")
+    SECTION_SELECTORS: tuple[str, ...] = ()
+    H1_SELECTORS = ("h1",)
+    _ID_RE = re.compile(r"-(\d{14,20})\.htm(?:$|[?#])")
+
+    def article_id(self, url):
+        m = self._ID_RE.search(url)
+        return f"{self.name}-{m.group(1)}" if m else super().article_id(url)
+
+    def parse_article(self, html, url, lastmod):
+        # articleSection is "Thể thao, Bóng đá" (section, sub-section): keep the section,
+        # like the other sources.
+        art = super().parse_article(html, url, lastmod)
+        if art is not None and art.section_name:
+            art.section_name = art.section_name.split(",")[0].strip()
+        return art
+
+    def month_sitemap_urls(self, index_children, year, month):
+        if _is_current_month(year, month):
+            return [f"{self.base_url}/google-news-sitemap.xml", f"{self.base_url}/rss/home.rss"]
+        want = f"/sitemaps/Article-{year}-{month:02d}-01.xml"
+        return [u for u in index_children if u.endswith(want)]
+
+
+class DanTriEn(DanTri):
+    """DTiNews (dtinews.dantri.com.vn), Dân Trí's English edition, added 2026-10-24
+    FORWARD-ONLY: the home RSS (latest 100 items, ~4 days) for the current month. Its
+    article sitemaps (/sitemaps/article-N.xml) carry no dates, so a backfill would date
+    each page. No JSON-LD and no published-time meta: the date is the article's first
+    <time datetime="YYYY-MM-DD HH:MM"> (Vietnam time), else the RSS pubDate. No
+    breadcrumb: the section is the URL's first path segment (/lifestyle/..., /sport/...)."""
+    name = "dantri_en"
+    language = "en"
+    base_url = "https://dtinews.dantri.com.vn"
+    sitemap_index_url = ""
+    BODY_SELECTORS = ("#articleContent", "article#articleMain")
+    H1_SELECTORS = ("article#articleMain h1", "h1")
+
+    def month_sitemap_urls(self, index_children, year, month):
+        return [f"{self.base_url}/rss/home.rss"] if _is_current_month(year, month) else []
+
+    def parse_article(self, html, url, lastmod):
+        soup = BeautifulSoup(html, "lxml" if _has_lxml() else "html.parser")
+        t = soup.select_one("article#articleMain time[datetime]") or soup.select_one("time[datetime]")
+        page_dt = _parse_dt(f"{t['datetime'].strip().replace(' ', 'T')}+07:00") if t else None
+        art = super().parse_article(html, url, page_dt or lastmod)
+        if art is not None and not art.section_name:
+            parts = url.split("://", 1)[-1].split("/")[1:-1]
+            if parts:
+                art.section_name = parts[0].replace("-", " ").title()  # 'culture-and-sport' -> 'Culture And Sport'
+        return art
+
+
+class Vir(HtmlNewsSource):
+    # Paid press-release wires (~40% of the feed, 2026-10-24 sample): not journalism, and
+    # their marketing copy would crowd search results. Skipped and marked seen.
+    SKIP_SECTIONS = frozenset({"PR Newswire", "Media OutReach Newswire"})
+
+    """Vietnam Investment Review (vir.com.vn, English), added 2026-10-24 FORWARD-ONLY:
+    the news sitemap (latest 100, ~3 days) + RSS (latest 25) for the current month.
+    Yearly sitemaps (sitemap-by-year / sitemap-current-year) exist for a later backfill.
+    article:published_time / article:section meta; body in #htmlContent ('Subscribe now'
+    is an e-paper link, the article text is public). Ids: trailing digits, prefixed."""
+    name = "vir"
+    language = "en"
+    base_url = "https://vir.com.vn"
+    sitemap_index_url = ""
+    BODY_SELECTORS = ("#htmlContent", "div.__MASTERCMS_CONTENT")
+    SECTION_SELECTORS: tuple[str, ...] = ()
+    H1_SELECTORS = ("h1.title-detail", "h1")
+    _ID_RE = re.compile(r"-(\d{4,})\.html?(?:$|[?#])")
+
+    def article_id(self, url):
+        m = self._ID_RE.search(url)
+        return f"{self.name}-{m.group(1)}" if m else super().article_id(url)
+
+    def parse_article(self, html, url, lastmod):
+        art = super().parse_article(html, url, lastmod)
+        if art is not None and art.section_name in self.SKIP_SECTIONS:
+            return Skipped(art.article_id, art.section_name)
+        return art
+
+    def month_sitemap_urls(self, index_children, year, month):
+        if not _is_current_month(year, month):
+            return []
+        return [f"{self.base_url}/newssitemap-site-1.xml", f"{self.base_url}/rss_feed/"]
+
+
 SOURCES: dict[str, NewsSource] = {
     s.name: s
     for s in (TuoiTre(), ThanhNien(), VnEconomy(), TuoiTreEn(), VnEconomyEn(), VietnamNet(),
-              VietnamNetEn(), VnExpress(), VnExpressEn())
+              VietnamNetEn(), VnExpress(), VnExpressEn(), DanTri(), DanTriEn(), Vir())
 }
 
 
@@ -667,6 +780,19 @@ def fetch(
     raise FetchError(str(last))
 
 
+def _declare_unbound_prefixes(xml_bytes: bytes) -> bytes | None:
+    """Add a placeholder xmlns declaration to the root element for every element prefix
+    used but never declared, or None if there is nothing to add."""
+    used = set(re.findall(rb"</?([A-Za-z_][\w.-]*):[A-Za-z_]", xml_bytes))
+    declared = set(re.findall(rb"xmlns:([A-Za-z_][\w.-]*)=", xml_bytes))
+    missing = sorted(used - declared - {b"xml"})
+    m = re.search(rb"<(?![?!])[A-Za-z_][\w.:-]*", xml_bytes)  # the root element's start tag
+    if not missing or not m:
+        return None
+    decl = b"".join(b' xmlns:' + p + b'="urn:undeclared:' + p + b'"' for p in missing)
+    return xml_bytes[:m.end()] + decl + xml_bytes[m.end():]
+
+
 def _xml_locs(xml_bytes: bytes) -> list[tuple[str, datetime | None]]:
     """Yield (loc, lastmod) for every <url>/<sitemap> node (sitemaps) and every RSS
     <item> (link, pubDate), namespace-agnostic.
@@ -677,7 +803,16 @@ def _xml_locs(xml_bytes: bytes) -> list[tuple[str, datetime | None]]:
     try:
         root = ET.fromstring(xml_bytes)
     except ET.ParseError as e:
-        raise SitemapError(f"unparseable sitemap ({e}) - truncated response?") from e
+        # vir.com.vn's news sitemap uses `image:` without declaring it (2026-10-24). Only
+        # for that error: declare the missing prefixes and parse again. Truncation
+        # (unclosed / no element found) still raises below.
+        fixed = _declare_unbound_prefixes(xml_bytes) if "unbound prefix" in str(e) else None
+        try:
+            root = ET.fromstring(fixed) if fixed else None
+        except ET.ParseError:
+            root = None
+        if root is None:
+            raise SitemapError(f"unparseable sitemap ({e}) - truncated response?") from e
     out: list[tuple[str, datetime | None]] = []
     for node in root.iter():
         if node.tag.rsplit("}", 1)[-1] not in ("url", "sitemap", "item"):
@@ -872,6 +1007,7 @@ def crawl_month(
     written = 0
     parsed = 0
     failed = 0
+    skip_ids: list[str] = []
     part = 0
     buffer: list[dict] = []
     raw_buffer: list[dict] = []
@@ -899,6 +1035,9 @@ def crawl_month(
                 art = res[0] if res else None
                 if art is None:
                     failed += 1
+                    continue
+                if isinstance(art, Skipped):
+                    skip_ids.append(art.article_id)
                     continue
                 parsed += 1
                 _, html, fetched_at, lastmod = res
@@ -929,10 +1068,13 @@ def crawl_month(
                         source.name, year, month, parsed, len(items),
                     )
     _flush()
-    if failed:
+    if skip_ids:  # rejected on purpose: never fetch again
+        append_seen(seen_path, skip_ids)
+        seen.update(skip_ids)
+    if failed or skip_ids:
         logger.info(
-            "[%s] %04d-%02d: %d parsed, %d failed/skipped",
-            source.name, year, month, parsed, failed,
+            "[%s] %04d-%02d: %d parsed, %d failed/skipped, %d skipped on purpose",
+            source.name, year, month, parsed, failed, len(skip_ids),
         )
     return written, (sitemaps_ok and not truncated), len(frontier)
 
