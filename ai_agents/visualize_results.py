@@ -1,4 +1,8 @@
 # visualize_results_improved.py
+# FROZEN (2026-10-24): charts for the original 2026-01 retrieval eval. Still runs on the
+# saved evaluation_results.json, but needs matplotlib + seaborn, which are not declared in
+# pyproject.toml (`uv run --with matplotlib --with seaborn python ai_agents/visualize_results.py`).
+# The current evals are in ai_agents/eval/.
 
 import json
 import matplotlib.pyplot as plt

@@ -3,7 +3,8 @@ embed_articles.py - article-level embeddings v2 (agent phase, step 2b).
 
 Embeds every article in marts.obt_articles with gemini-embedding-2 (768 dims) into
 BigQuery `vectors.article_embeddings`, the source of truth for vectors. Replaces the old
-Snowflake -> Pinecone chunk pipeline (data_ingestion_to_pinecone.py).
+Snowflake -> Pinecone chunk pipeline (data_ingestion_to_pinecone.py, deleted 2026-10-24 with
+its v1 index; in git history).
 
     uv run --env-file .env python ai_agents/embed_articles.py status
     uv run --env-file .env python ai_agents/embed_articles.py embed --limit 50   # smoke test

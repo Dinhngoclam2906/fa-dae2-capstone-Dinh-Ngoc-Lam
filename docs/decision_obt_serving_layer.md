@@ -64,7 +64,9 @@ data. Don't re-enable them: they would merge new rows into stale tables.
 - **Lost:** new re-crawl events and title/body version history are no longer recorded.
   Nothing consumed them. If they're ever needed, add an append-only change log keyed on
   `content_hash`.
-- **Still to do (agent phase):** the agent's tools and `data_ingestion_to_pinecone.py`
+- **Still to do (agent phase; done: the agent moved to BigQuery 2026-10-18, v2 embeddings
+  replaced the chunk pipeline, `data_ingestion_to_pinecone.py` was deleted 2026-10-24):**
+  the agent's tools and `data_ingestion_to_pinecone.py`
   are still Snowflake code that queries `FCT_ARTICLES` / `DIM_SECTIONS`. Re-point them at
   `marts.obt_articles` (or the view) when the agent moves to BigQuery. The next serving
   table is `article_chunks` (chunk text + embedding, candidate for BigQuery `VECTOR_SEARCH`).

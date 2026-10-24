@@ -255,8 +255,9 @@ Ref: dim_articles.section_key > dim_sections.section_key
 > `cli_agent.py` terminal). Keyword search and every tool run on BigQuery with
 > parameterised queries, a date window (partition pruning) and a per-query
 > `maximum_bytes_billed` cap. The three searches run in parallel; Vietnamese queries use
-> syllable-pair keywords and the multilingual FlashRank model; uploaded PDFs are visible
-> only to the session that uploaded them.
+> syllable-pair keywords and the multilingual FlashRank model. (PDF uploads and the v1
+> Guardian-only index were removed on 2026-10-24; dense search is the v2 index
+> `news-articles-v2`, all 10 sources.)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -279,9 +280,9 @@ Ref: dim_articles.section_key > dim_sections.section_key
      │   (Pinecone)         │  │    (BigQuery)        │
      │                      │  │                      │
      │ • Semantic matching  │  │ • Keyword extraction │
-     │ • 2 namespaces:      │  │ • Multi-keyword OR   │
-     │   - guardian_articles│  │ • Optimized view     │
-     │   - user_documents   │  │ • Full-text search   │
+     │ • news-articles-v2   │  │ • Multi-keyword OR   │
+     │   (all 10 sources,   │  │ • Optimized view     │
+     │   gemini-embedding-2)│  │ • Full-text search   │
      │ • K=10 results       │  │ • Limit=10 results   │
      └──────────┬───────────┘  └──────────┬───────────┘
                 │                         │
@@ -346,12 +347,11 @@ fa-dae2-capstone-Dinh-Ngoc-Lam/
 ├── .github/workflows/
 │   └── pr_ci.yml                                  # PR CI: lint + dbt test on BigQuery (keyless WIF)
 ├── ai_agents/                                      # RAG agent (BigQuery since 2026-10-18)
-│   ├── core/                                       # The agent: config, bq, articles, text, retrieval, tools, agent, memory, uploads
+│   ├── core/                                       # The agent: config, bq, articles, text, retrieval, passages, tools, agent, memory
 │   ├── app.py / cli_agent.py                       # Streamlit and terminal front ends over core/
-│   ├── capstone_tool_calling_agent.py              # Compatibility shim for the eval scripts
-│   ├── data_ingestion_to_pinecone.py               # Old Snowflake → Pinecone pipeline (replaced in step 2)
-│   ├── document_upload_ingestion.py + services/    # User-uploaded doc ingestion
-│   ├── evaluation.py / baseline_systems.py         # Retrieval strategy comparison + eval harness
+│   ├── eval/                                       # Current evals: retrieval_eval, hard_eval, time_eval, llm_compare
+│   ├── capstone_tool_calling_agent.py              # Compatibility shim for the frozen 2026-01 eval
+│   ├── evaluation.py / baseline_systems.py         # FROZEN 2026-01 eval (v1 index, deleted 2026-10-24)
 │   └── label_ground_truth*.py / visualize_results.py
 ├── capstone_dbt_project/                           # dbt project (BigQuery)
 │   ├── .dbt/profiles.yml                           # the single dbt profile (use --profiles-dir .dbt)

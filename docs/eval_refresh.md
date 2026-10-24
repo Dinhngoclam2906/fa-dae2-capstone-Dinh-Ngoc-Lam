@@ -7,7 +7,7 @@ and is the hybrid recipe (dense + keyword + FlashRank rerank) still the right on
 **Answer:** move to v2, and **drop the reranker and the keyword interleaving from the
 automatic retrieval**: v2 dense alone wins every question group, at ~0.7 s and 0 BigQuery
 bytes. BigQuery `VECTOR_SEARCH` is ruled out on cost. **Status: applied 2026-10-20**, with a
-soft recency rule added; uploads are still on v1. See "Cut-over".
+soft recency rule added. Uploads stayed on v1 until both were removed on 2026-10-24. See "Cut-over".
 
 ## Setup
 
@@ -110,8 +110,9 @@ What changed (`ai_agents/core/`):
    starts. The first question used to spend ~14 s initialising, close to the 20 s retrieval
    deadline. Client creation is now locked: two cold threads each built a client, and the
    garbage-collected one closed its HTTP connection mid-request.
-6. **Not done:** user uploads stay on the v1 index `guardian-capstone`, because the user
-   plans to remove the upload feature. Delete v1 only after that.
+6. **Not done then:** user uploads stayed on the v1 index `guardian-capstone`, because the
+   user planned to remove the upload feature. Done 2026-10-24: uploads removed and the v1
+   index deleted, so `v1_hybrid` / `v1_dense` below can no longer be re-run.
 
 Verification. Both systems were re-run on the same day's index (+1,426 articles since
 2026-10-19, which moved a few `v2_dense` numbers):

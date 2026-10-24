@@ -1,9 +1,9 @@
 # capstone_tool_calling_agent.py - compatibility shim.
 #
 # The agent moved to ai_agents/core/ (BigQuery, 10 sources) on 2026-10-18; the original
-# Snowflake version of this file is in git history. Kept so the evaluation scripts
-# (baseline_systems.py, label_ground_truth*.py) still import their keyword search; they
-# get refreshed in the eval step of the agent phase.
+# Snowflake version of this file is in git history. Kept so the frozen 2026-01 eval scripts
+# (baseline_systems.py, label_ground_truth*.py) still read as written; they can no longer
+# run (the v1 index was deleted 2026-10-24). The current evals in eval/ use core directly.
 from typing import Any, Dict, List
 
 from langchain_core.tools import tool
