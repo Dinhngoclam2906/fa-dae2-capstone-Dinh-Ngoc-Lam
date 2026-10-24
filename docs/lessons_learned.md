@@ -92,6 +92,7 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-24 | Cloud | Cost report lost its OpenAI section to a transient 429; retry on 429/5xx |
 | 2026-10-24 | Tooling | `uv remove` of the PDF libs also dropped `lxml` (used by the VN crawler, only declared via `docx`) |
 | 2026-10-24 | Tooling | Moving compose files into `deploy/local/` would have changed the project name (new empty volumes) and lost `.env` |
+| 2026-10-24 | Agent | An empty BigQuery array parameter is NULL: `ARRAY_LENGTH(@x) = 0` dropped every unscoped row |
 | 2026-10-24 | Tooling | Repo-wide path rewrite: a folder rename blocked on Windows, a regex that missed Docker destinations, `uv.lock` pinning the old workspace path |
 
 ---
@@ -393,6 +394,16 @@ Reading the SQL found none of these:
 ---
 
 ## 5. The agent
+
+### An empty array parameter is NULL in BigQuery (2026-10-24, `0879ec1`)
+- **Symptom:** after adding the "My sources" scope, `browse_articles` with no scope returned
+  0 rows (the scoped calls were fine). Caught in the first live test, before commit.
+- **Cause:** the filter was `ARRAY_LENGTH(@sources) = 0 OR source_name IN UNNEST(@sources)`.
+  BigQuery passes an empty array query parameter as NULL, `ARRAY_LENGTH(NULL)` is NULL, so
+  the whole condition was NULL (false) for every row.
+- **Fix:** `IFNULL(ARRAY_LENGTH(@sources), 0) = 0`.
+- **Lesson:** test the "no filter" path of any new optional filter against real BigQuery,
+  not only the filtered one; unit tests can't see this.
 
 ### A hung call cost 20 s and the whole context; the SDK retried 6× (2026-10-23)
 - **Symptom:** ~1% of retrieval calls in the 10-23 evals (5 of ~420) timed out. Each waited
