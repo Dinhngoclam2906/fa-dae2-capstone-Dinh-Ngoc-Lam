@@ -16,8 +16,12 @@ python ingestion/sync_job_state.py pull vn-ingestion
 
 rc=0
 pids=""
+# dantri (dantri.com.vn) is NOT in the loop: its article pages time out from Cloud Run
+# (ConnectTimeout on every page, 2026-10-24) although its sitemap / RSS load and the same
+# pages load from a home connection - it apparently refuses datacenter addresses. The
+# crawler class stays for a run from elsewhere; dantri_en (dtinews.dantri.com.vn) works.
 for s in tuoitre thanhnien vneconomy tuoitre_en vneconomy_en vietnamnet vietnamnet_en vnexpress vnexpress_en \
-         dantri dantri_en vir; do
+         dantri_en vir; do
   # VnExpress (RSS-only, by policy) gets a gentler rate: 2 workers, 1.5 s apart; the
   # sites added 2026-10-24 get 4 workers, 1 s apart.
   case "$s" in
