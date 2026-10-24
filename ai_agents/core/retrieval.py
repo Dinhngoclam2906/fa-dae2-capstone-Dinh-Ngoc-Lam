@@ -1,15 +1,13 @@
 """Automatic retrieval: v2 dense search (Pinecone `news-articles-v2`, gemini-embedding-2).
 
 Default since 2026-10-20 (`settings.retrieval_mode == "dense"`): one query embedding,
-v2 articles ranked by similarity, after this session's uploads (still on the v1 index). The
-2026-10-19 eval (docs/eval_refresh.md) found v2 dense alone beats every hybrid on every
+v2 articles ranked by similarity. The 2026-10-19 eval (docs/eval_refresh.md) found v2 dense alone beats every hybrid on every
 question group; the FlashRank rerank and the keyword interleave both pushed good hits out
 of the top 5. The old hybrid pipeline (dense + keyword + FlashRank, the winner of the
 2026-01 English-only eval) stays as mode "hybrid": demo mode and the eval use it. Keyword
 search is still an LLM tool (exact names, numbers, articles not yet embedded).
-
-Uploaded documents live in one namespace but are filtered by `session_id`, so a user
-only ever retrieves their own uploads.
+The v1 index (Guardian-only OpenAI chunks) and the session-scoped PDF uploads it held
+were removed on 2026-10-24.
 """
 
 from __future__ import annotations
@@ -56,9 +54,7 @@ class Candidate:
     language: str = ""
     published_date: str = ""
     url: str = ""
-    source_type: str = "article"  # "article" | "uploaded_document"
     method: str = ""
-    file_name: str = ""
     score: float | None = None
 
     def as_dict(self) -> dict[str, Any]:
@@ -73,44 +69,10 @@ class RetrievalResult:
     stats: dict[str, Any] = field(default_factory=dict)
 
 
-@lru_cache(maxsize=1)
-def _embeddings():
-    from langchain_openai import OpenAIEmbeddings
-    return OpenAIEmbeddings(model=settings.embedding_model)
-
-
-@lru_cache(maxsize=1)
-def vector_store():
-    """The Pinecone store, or None if unavailable (retrieval falls back to keyword-only)."""
-    try:
-        from langchain_pinecone import PineconeVectorStore
-        return PineconeVectorStore(index_name=settings.pinecone_index, embedding=_embeddings(),
-                                   namespace=settings.articles_namespace)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("vector store unavailable: %s", e)
-        return None
-
-
 @lru_cache(maxsize=2)
 def reranker(model_name: str):
     from flashrank import Ranker
     return Ranker(model_name=model_name, cache_dir=os.path.join(tempfile.gettempdir(), "flashrank"))
-
-
-def _dense_articles(query: str, k: int) -> list[Candidate]:
-    vs = vector_store()
-    if vs is None:
-        return []
-    out = []
-    for doc in vs.similarity_search(query, k=k, namespace=settings.articles_namespace):
-        md = doc.metadata
-        out.append(Candidate(
-            text=doc.page_content, article_id=md.get("article_id"), title=md.get("title", ""),
-            section=md.get("section", ""), source_name=md.get("source_name", "guardian"),
-            language=md.get("language", "en"), published_date=str(md.get("published_date", ""))[:10],
-            url=md.get("web_url", ""), method="dense",
-        ))
-    return out
 
 
 # lru_cache alone isn't enough here: threads that miss the cache together each build a
@@ -209,24 +171,6 @@ def _dense_articles_v2(query: str, k: int, filters: dict, vec: list[float] | Non
     return out
 
 
-def _dense_user_docs(query: str, k: int, session_id: str | None) -> list[Candidate]:
-    # Check the session BEFORE touching the store: initialising the v1 store is slow
-    # (and was pure waste with no session: a 100 s first retrieval, 2026-10-18).
-    if not session_id:
-        return []
-    vs = vector_store()
-    if vs is None:
-        return []
-    out = []
-    for doc in vs.similarity_search(query, k=k, namespace=settings.user_docs_namespace,
-                                    filter={"session_id": session_id}):
-        md = doc.metadata
-        out.append(Candidate(text=doc.page_content, title=md.get("file_name", "Uploaded document"),
-                             source_type="uploaded_document", method="dense_user",
-                             file_name=md.get("file_name", "")))
-    return out
-
-
 def _dense_v2_recent(query: str, k: int, filters: dict, recent_days: int | None) -> list[Candidate]:
     """v2 articles. With `recent_days`, the best RECENT_FIRST hits from that window go
     first (RECENT_FIRST_SHORT for windows up to SHORT_WINDOW_DAYS), then the best of all
@@ -298,35 +242,32 @@ def _passage_rerank(query: str, dense: list[Candidate], stats: dict) -> list[Can
     return out
 
 
-def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: bool = False,
-                    top_n: int = 5, include_user_docs: bool = True, article_vectors: str | None = None,
+def hybrid_retrieve(query: str, *, demo_mode: bool = False, top_n: int = 5,
                     keyword: bool | None = None, rerank: bool | None = None,
                     parse_filters: bool = True, passage_rerank: bool | None = None,
                     **filters) -> RetrievalResult:
     """The retrieval for one question -> top_n candidates.
-    Mode "dense" (default): this session's upload chunks (v1 index), then v2 dense articles.
+    Mode "dense" (default): v2 dense articles.
     Mode "hybrid" (and demo mode): also the keyword search (interleaved) and FlashRank.
     `filters` (source, language, section_group, start_date, end_date, days) apply inside
-    Pinecone and to the keyword search (v1 post-filters source/language). Without explicit
+    Pinecone and to the keyword search. Without explicit
     filters, a source or month / year stated in the question (`text.query_filters`) becomes
     a hard filter on the v2 dense search, dropped again if it finds nothing.
     Mode "dense" then fills the slots after the dense top `settings.passage_keep` from the
     top `settings.passage_pool` articles by their best body passage (core/passages.py), and
     adds each article's best passage to its text.
-    `article_vectors` ("v1" / "v2"), `keyword`, `rerank`, `parse_filters` and
+    `keyword`, `rerank`, `parse_filters` and
     `passage_rerank` override the defaults (eval)."""
     t0 = time.time()
     mode = "hybrid" if demo_mode else settings.retrieval_mode
-    vectors = article_vectors or settings.article_vectors
     use_keyword = (mode == "hybrid") if keyword is None else keyword
     use_rerank = (mode == "hybrid") if rerank is None else rerank
     keywords = extract_keywords(query) if use_keyword else []
-    k_dense, k_user, k_sql = (8, 4, 15) if demo_mode else (10, 5, 10)
-    use_passages = (mode == "dense" and vectors == "v2" and settings.passage_pool > 0
+    k_dense, k_sql = (8, 15) if demo_mode else (10, 10)
+    use_passages = (mode == "dense" and settings.passage_pool > 0
                     if passage_rerank is None else passage_rerank)
     if use_passages:
         k_dense = max(k_dense, settings.passage_pool)
-    sid = session_id if include_user_docs else None
     filters = {k: v for k, v in filters.items() if v}  # search_news passes every key, mostly None
     parsed = query_filters(query, articles._today_local()) if parse_filters and not filters else {}
     dense_filters = {**parsed, **filters}
@@ -338,18 +279,16 @@ def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: boo
     has_dates = any(dense_filters.get(k) for k in ("start_date", "end_date", "days"))
     recent = None if has_dates else recency_days(query)
     stats: dict[str, Any] = {"query": query, "keywords": keywords, "demo_mode": demo_mode,
-                             "mode": mode, "article_vectors": vectors, "recency_days": recent,
+                             "mode": mode, "recency_days": recent,
                              "parsed_filters": parsed}
 
     # Not a `with` block: its exit waits for every thread, so one hung leg (a network call
-    # that never returns, seen on v1 Pinecone 2026-10-19) would hang the whole question
+    # that never returns, seen on Pinecone 2026-10-19) would hang the whole question
     # despite the 20 s timeout. shutdown(wait=False) abandons a hung leg instead.
-    ex = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+    ex = concurrent.futures.ThreadPoolExecutor(max_workers=2)
     try:
         jobs = {
-            "dense": (ex.submit(_dense_v2_recent, query, k_dense, dense_filters, recent) if vectors == "v2"
-                      else ex.submit(_dense_articles, query, k_dense)),
-            "user_docs": ex.submit(_dense_user_docs, query, k_user, sid),
+            "dense": ex.submit(_dense_v2_recent, query, k_dense, dense_filters, recent),
             "keyword": ex.submit(_keyword, keywords, k_sql, kw_filters) if keywords else None,
         }
         found: dict[str, list[Candidate]] = {}
@@ -363,7 +302,7 @@ def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: boo
                 found[name] = []
     finally:
         ex.shutdown(wait=False, cancel_futures=True)
-    if parsed and vectors == "v2" and not found["dense"] and "dense_error" not in stats:
+    if parsed and not found["dense"] and "dense_error" not in stats:
         # Nothing matches the stated source / period: search without it, so the LLM still
         # has context and can say there is no exact match.
         found["dense"] = _dense_v2_recent(query, k_dense, filters, recency_days(query))
@@ -373,14 +312,9 @@ def hybrid_retrieve(query: str, *, session_id: str | None = None, demo_mode: boo
     stats["retrieve_ms"] = int((time.time() - t0) * 1000)
 
     dense = found["dense"]
-
-    for key in ("source", "language"):  # v2 already filtered inside Pinecone
-        if filters.get(key) and vectors != "v2":
-            attr = "source_name" if key == "source" else "language"
-            dense = [c for c in dense if getattr(c, attr) == filters[key]]
     if use_passages and dense:
         dense = _passage_rerank(query, dense, stats)
-    cands = _dedupe(found["user_docs"] + _interleave(dense, found["keyword"]))
+    cands = _dedupe(_interleave(dense, found["keyword"]))
     stats["unique"] = len(cands)
 
     t1 = time.time()
@@ -431,13 +365,9 @@ def format_context(cands: list[Candidate]) -> str:
     """The retrieved sources as numbered blocks for the system prompt."""
     blocks = []
     for i, c in enumerate(cands, 1):
-        if c.source_type == "uploaded_document":
-            label = f"📄 Uploaded document: {c.file_name or c.title}"
-            meta = ""
-        else:
-            label = f"📰 {c.source_name or 'unknown source'} ({c.language or '?'}): {c.title}"
-            meta = (f"Published: {c.published_date or 'unknown'} | Section: {c.section or c.section_group or 'n/a'}"
-                    f" | article_id: {c.article_id} | URL: {c.url or 'n/a'}\n")
+        label = f"📰 {c.source_name or 'unknown source'} ({c.language or '?'}): {c.title}"
+        meta = (f"Published: {c.published_date or 'unknown'} | Section: {c.section or c.section_group or 'n/a'}"
+                f" | article_id: {c.article_id} | URL: {c.url or 'n/a'}\n")
         score = f"{c.score:.3f}" if c.score is not None else "n/a"
         blocks.append(f"[Source {i} — {label}]\nRelevance: {score}\n{meta}Content:\n{c.text.strip()}")
     return "\n\n".join(blocks)

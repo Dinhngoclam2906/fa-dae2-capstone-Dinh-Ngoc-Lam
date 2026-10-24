@@ -9,11 +9,12 @@ Two question sets, both written by gpt-4o-mini from seed articles in marts.obt_a
   * topical (30): a broad question about the seed's topic; many articles can answer it.
     Graded by pooling every system's top 5 and having gpt-4o-mini judge each (0/1/2).
 
-Systems (the real code in core/retrieval.py, not a replay):
-  v1_hybrid           production today: v1 dense (Guardian chunks) + keyword + FlashRank
+Systems (the real code in core/retrieval.py, not a replay). The 2026-10-19 results also have
+v1_hybrid / v1_dense (the old Guardian-only OpenAI chunk index); that index was deleted on
+2026-10-24, so those two can no longer be re-run:
   v2_hybrid           cut-over candidate: v2 dense (gemini-embedding-2, all sources) + keyword + FlashRank
   v2_hybrid_norerank  v2 hybrid, interleaved, no rerank
-  v2_dense / v1_dense / keyword   the single legs
+  v2_dense / keyword  the single legs
   agent_default       hybrid_retrieve with the agent's defaults (v2 dense since the 2026-10-20
                       cut-over): checks the production path matches v2_dense
 BigQuery VECTOR_SEARCH is costed by dry run only (`vsearch_cost`): it reads the same
@@ -65,7 +66,7 @@ KNOWN_ITEM = [("en_en", "en", "English", "recent", 20), ("vi_vi", "vi", "Vietnam
               ("vi_vi", "vi", "Vietnamese", "old", 20)]
 TOPICAL = [("en_en", "en", "English", "recent", 10), ("vi_vi", "vi", "Vietnamese", "recent", 10),
            ("en_vi", "vi", "English", "recent", 10)]
-SYSTEMS = ["v1_hybrid", "v2_hybrid", "v2_hybrid_norerank", "v2_dense", "v1_dense", "keyword", "agent_default"]
+SYSTEMS = ["v2_hybrid", "v2_hybrid_norerank", "v2_dense", "keyword", "agent_default"]
 
 
 # ---------------------------------------------------------------------------- sample
@@ -167,21 +168,14 @@ def cmd_questions(_):
 def _system(name: str, question: str) -> list:
     from core import retrieval as R
     from core.text import extract_keywords
-    if name == "v1_hybrid":
-        return R.hybrid_retrieve(question, top_n=TOP_N, include_user_docs=False, article_vectors="v1",
-                                 keyword=True, rerank=True).candidates
     if name == "v2_hybrid":
-        return R.hybrid_retrieve(question, top_n=TOP_N, include_user_docs=False, article_vectors="v2",
-                                 keyword=True, rerank=True).candidates
+        return R.hybrid_retrieve(question, top_n=TOP_N, keyword=True, rerank=True).candidates
     if name == "v2_hybrid_norerank":
-        return R.hybrid_retrieve(question, top_n=TOP_N, include_user_docs=False, article_vectors="v2",
-                                 keyword=True, rerank=False).candidates
+        return R.hybrid_retrieve(question, top_n=TOP_N, keyword=True, rerank=False).candidates
     if name == "agent_default":
-        return R.hybrid_retrieve(question, top_n=TOP_N, include_user_docs=False).candidates
+        return R.hybrid_retrieve(question, top_n=TOP_N).candidates
     if name == "v2_dense":
         return R._dense_articles_v2(question, LEG_K, {})
-    if name == "v1_dense":
-        return R._dense_articles(question, LEG_K)
     if name == "keyword":
         kw = extract_keywords(question)
         return R._keyword(kw, LEG_K, {}) if kw else []
@@ -230,7 +224,6 @@ def cmd_run(args):
         done = {(r["qid"], r["system"]) for r in map(json.loads, RUNS.read_text(encoding="utf-8").splitlines())}
     systems = args.systems.split(",") if args.systems else SYSTEMS
     _system("v2_hybrid", "warm up")  # model loads / connections out of the latency numbers
-    _system("v1_hybrid", "warm up")
     with RUNS.open("a", encoding="utf-8") as f:
         for q in qs:
             for s in systems:

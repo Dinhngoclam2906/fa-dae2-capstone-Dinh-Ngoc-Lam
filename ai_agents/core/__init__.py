@@ -5,9 +5,8 @@ app (`app.py`) and the terminal agent (`cli_agent.py`).
     bq          BigQuery access with a bytes-billed cap on every query
     articles    plain data-access functions over marts.obt_articles
     text        query heuristics (keywords, retrieve-or-chat, Vietnamese detection)
-    retrieval   hybrid retrieval: dense (Pinecone) + keyword (BigQuery) -> rerank
+    retrieval   v2 dense retrieval (Pinecone) + passage rescue; "hybrid" mode adds keyword + rerank
     tools       the LangChain tools the agent can call
     agent       the LangGraph graph (retrieve -> chatbot <-> tools)
     memory      conversation checkpointer (Postgres if configured, else in-memory)
-    uploads     per-session PDF upload into the vector store
 """

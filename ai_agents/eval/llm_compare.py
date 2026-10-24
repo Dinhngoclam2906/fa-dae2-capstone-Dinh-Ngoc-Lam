@@ -95,10 +95,10 @@ def run_conversation(model: str, conv: str) -> list[dict]:
 
     from core.agent import build_agent
     agent = build_agent(llm=make_llm(model))
-    tid, sid = str(uuid.uuid4()), str(uuid.uuid4())
+    tid = str(uuid.uuid4())
     out = []
     for turn, (q, lang) in enumerate(CONVERSATIONS[conv]):
-        cfg = {"configurable": {"thread_id": tid, "session_id": sid}, "recursion_limit": 12}
+        cfg = {"configurable": {"thread_id": tid}, "recursion_limit": 12}
         t0, err = time.time(), None
         try:
             final = agent.invoke({"messages": [HumanMessage(content=q)]}, cfg)

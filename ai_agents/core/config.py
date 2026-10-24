@@ -53,16 +53,10 @@ class Settings:
     llm_model: str = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
     llm_reasoning_effort: str = os.getenv("AGENT_REASONING_EFFORT", "low")  # reasoning models only
     llm_max_tokens: int = _int("AGENT_MAX_TOKENS", 1500)
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
-
-    pinecone_index: str = os.getenv("PINECONE_INDEX", "guardian-capstone")
-    articles_namespace: str = os.getenv("PINECONE_ARTICLES_NAMESPACE", "guardian_articles")
-    user_docs_namespace: str = os.getenv("PINECONE_USER_DOCS_NAMESPACE", "user_documents")
 
     # Embeddings v2: gemini-embedding-2 article vectors (BigQuery vectors.article_embeddings,
-    # 768 dims) served from this index at 512 dims. "v1" is the original Guardian-only
-    # OpenAI chunk index: the eval's v1 systems, and user uploads still live there.
-    article_vectors: str = os.getenv("AGENT_ARTICLE_VECTORS", "v2")
+    # 768 dims) served from this index at 512 dims. The v1 index (Guardian-only OpenAI
+    # chunks, also home of the PDF uploads) was removed on 2026-10-24.
     pinecone_index_v2: str = os.getenv("PINECONE_INDEX_V2", "news-articles-v2")
     articles_namespace_v2: str = os.getenv("PINECONE_ARTICLES_NAMESPACE_V2", "articles")
     # Automatic retrieval. "dense": v2 dense only, ranked by similarity (the 2026-10-19 eval

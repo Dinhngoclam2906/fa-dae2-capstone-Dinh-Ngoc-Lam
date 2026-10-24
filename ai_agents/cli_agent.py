@@ -29,7 +29,7 @@ def main() -> int:
     threading.Thread(target=warm_up, daemon=True).start()
     checkpointer, kind = create_checkpointer()
     agent = build_agent(checkpointer)
-    session_id, thread_id = str(uuid.uuid4()), str(uuid.uuid4())
+    thread_id = str(uuid.uuid4())
     show_stats = args.stats
     print(f"Daily News AI Assistant - memory: {kind}. /new, /stats, /quit")
     print("=" * 64)
@@ -54,13 +54,13 @@ def main() -> int:
             continue
         t0, b0 = time.time(), bq.usage["bytes_billed"]
         try:
-            text, stats = ask(agent, q, thread_id=thread_id, session_id=session_id, demo_mode=args.demo)
+            text, stats = ask(agent, q, thread_id=thread_id, demo_mode=args.demo)
         except Exception as e:  # noqa: BLE001
             print(f"Error: {type(e).__name__}: {e}")
             continue
         print(f"\nAssistant: {text}")
         if show_stats:
-            keep = ("skipped", "mode", "keywords", "dense", "user_docs", "keyword", "unique", "returned",
+            keep = ("skipped", "mode", "keywords", "dense", "keyword", "unique", "returned",
                     "rerank_model", "retrieve_ms", "rerank_ms", "tools_used")
             print(f"\n  [stats] { {k: stats[k] for k in keep if k in stats} }")
             print(f"  [cost]  {time.time() - t0:.1f}s, BigQuery {(bq.usage['bytes_billed'] - b0) / 1e6:.0f} MB")

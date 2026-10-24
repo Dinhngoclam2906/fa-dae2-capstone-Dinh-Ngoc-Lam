@@ -90,6 +90,7 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-23 | Agent | Hung calls cost 20 s + the context; Pinecone SDK retried 6×; 3 s timeout + 1 retry |
 | 2026-10-23 | Tooling | `uv sync` would have uninstalled pinecone (not in pyproject / uv.lock) |
 | 2026-10-24 | Cloud | Cost report lost its OpenAI section to a transient 429; retry on 429/5xx |
+| 2026-10-24 | Tooling | `uv remove` of the PDF libs also dropped `lxml` (used by the VN crawler, only declared via `docx`) |
 
 ---
 
@@ -413,6 +414,19 @@ Reading the SQL found none of these:
 - **Fix:** `uv add pinecone==7.3.0 langchain-pinecone==0.2.13` (moved `packaging` 25.0 → 24.2;
   dbt parse and retrieval re-checked).
 - **Lesson:** before publishing, `uv sync --dry-run` must show nothing the app imports.
+
+### Removing a dependency took `lxml` with it (2026-10-24)
+- **Symptom:** `uv remove docx pdf2image pdfplumber pytesseract` (the PDF-upload removal)
+  also dropped `lxml` from `uv.lock`, and uninstalled stray venv packages (seaborn,
+  wordcloud, vadersentiment, used by `visualize_results.py`).
+- **Cause:** `lxml` was only in the lock as a dependency of `docx`, yet
+  `vn_news_backfill.py` uses it, behind a silent `html.parser` fallback (`_has_lxml()`). A
+  local VN crawl would have parsed differently from the Cloud Run image, which pins
+  `lxml==6.0.2` in `requirements-ingestion.txt`. The stray packages were never declared.
+- **Fix:** `uv add lxml==6.0.2` (the image's version; a bare `uv add lxml` picked 6.1.3).
+  The undeclared visualisation packages were left out (reinstall them only if needed).
+- **Lesson:** after any `uv remove`, diff `uv.lock` for removed `name =` lines and grep the
+  code for each one. A dependency you use must be declared, not pulled in by another package.
 
 ### Retrieval leg timeout never fired (2026-10-19, `fe3ff4f`)
 - **Symptom:** one v1 Pinecone call hung the eval for 12 minutes.

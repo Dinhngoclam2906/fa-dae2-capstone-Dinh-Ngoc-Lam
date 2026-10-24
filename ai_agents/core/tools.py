@@ -55,8 +55,7 @@ def search_news(query: str, start_date: Optional[str] = None, end_date: Optional
     results than the context already given, e.g. a date range, a source or a language.
     For exact names, numbers or quotes use search_articles_by_keywords. Filters: """
     from core.retrieval import hybrid_retrieve
-    res = hybrid_retrieve(query, top_n=max(1, min(limit, 10)), include_user_docs=False,
-                          start_date=start_date, end_date=end_date, source=source,
+    res = hybrid_retrieve(query, top_n=max(1, min(limit, 10)), start_date=start_date, end_date=end_date, source=source,
                           language=language, section_group=section_group)
     return {"query": query, "count": len(res.candidates),
             "results": [c.as_dict() for c in res.candidates]}
@@ -174,12 +173,12 @@ def get_knowledge_base_stats() -> dict[str, Any]:
     """Statistics of the semantic-search (vector) index: vectors per namespace."""
     from pinecone import Pinecone
     import os
-    stats = Pinecone(api_key=os.environ["PINECONE_API_KEY"]).Index(settings.pinecone_index).describe_index_stats()
-    return {"index": settings.pinecone_index, "dimension": stats.dimension,
+    stats = Pinecone(api_key=os.environ["PINECONE_API_KEY"]).Index(settings.pinecone_index_v2).describe_index_stats()
+    return {"index": settings.pinecone_index_v2, "dimension": stats.dimension,
             "total_vectors": stats.total_vector_count,
             "namespaces": {k: v.vector_count for k, v in stats.namespaces.items()},
-            "note": "The current index holds Guardian article chunks only; all sources are "
-                    "searchable through keyword search."}
+            "note": "One vector per article (title + opening), all 10 sources; articles are "
+                    "embedded every 4 hours, and keyword search also finds ones not yet embedded."}
 
 
 TOOLS = [

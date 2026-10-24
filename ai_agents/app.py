@@ -3,8 +3,8 @@
 #   uv run streamlit run ai_agents/app.py
 #
 # Replaces the old app.py + app_demo.py pair (merged; the demo variant's features are
-# here: PDF upload, demo mode, hybrid-search stats). Public-demo safety:
-#   * uploads are visible only to the session that made them (core/uploads.py);
+# here: demo mode, hybrid-search stats; its PDF upload was removed 2026-10-24).
+# Public-demo safety:
 #   * conversations are listed only within the browser session (no "switch to any
 #     thread ID" box: thread ids are random UUIDs);
 #   * a per-session question limit (AGENT_RATE_LIMIT_PER_HOUR) and per-query BigQuery
@@ -48,13 +48,11 @@ agent, memory_kind = get_agent()
 # ==================== SESSION STATE ====================
 def init_session():
     ss = st.session_state
-    ss.setdefault("session_id", str(uuid.uuid4()))
     if "threads" not in ss:
         tid = str(uuid.uuid4())
         ss.threads = {tid: {"name": "Conversation 1", "messages": [], "stats": []}}
         ss.thread_id = tid
     ss.setdefault("question_times", [])
-    ss.setdefault("uploaded", {})
     ss.setdefault("demo_mode", False)
     ss.setdefault("processing", False)
 
@@ -85,7 +83,6 @@ def answer(question: str) -> str:
     t0 = time.time()
     try:
         text, stats = ask(agent, question, thread_id=st.session_state.thread_id,
-                          session_id=st.session_state.session_id,
                           demo_mode=st.session_state.demo_mode)
     except Exception as e:  # noqa: BLE001
         return f"❌ Something went wrong: {type(e).__name__}: {str(e)[:300]}"
@@ -116,26 +113,6 @@ cols[3].caption(f"🟢 Model: {settings.llm_model}")
 
 # ==================== SIDEBAR ====================
 with st.sidebar:
-    st.markdown("### 📄 Upload a document")
-    up = st.file_uploader("A PDF to ask questions about (only you can see it)", type=["pdf"])
-    if up and up.name not in st.session_state.uploaded:
-        with st.spinner(f"📄 Processing {up.name}..."):
-            try:
-                from core.uploads import upload_pdf
-                n = upload_pdf(up.getvalue(), up.name, st.session_state.session_id)
-                st.session_state.uploaded[up.name] = n
-                st.success(f"✅ {up.name} ready ({n} chunks). Ask questions about it.")
-            except Exception as e:  # noqa: BLE001
-                st.error(f"❌ Could not process the PDF: {e}")
-    for name in st.session_state.uploaded:
-        st.caption(f"📄 {name}")
-    if st.session_state.uploaded and st.button("🗑️ Remove my documents", use_container_width=True):
-        from core.uploads import delete_session_uploads
-        n = delete_session_uploads(st.session_state.session_id)
-        st.session_state.uploaded = {}
-        st.success(f"Removed {n} chunks.")
-
-    st.divider()
     st.markdown("### 🎓 Demo mode")
     st.session_state.demo_mode = st.checkbox(
         "Enable demo mode", value=st.session_state.demo_mode,
@@ -162,8 +139,6 @@ with st.sidebar:
             c1.metric("🧠 Semantic", s.get("dense", 0))
             if hybrid:
                 c2.metric("🔤 Keyword", s.get("keyword", 0))
-            if s.get("user_docs"):
-                st.metric("📄 Your documents", s["user_docs"])
             if hybrid:
                 st.caption(f"🔍 _Keywords: {', '.join(s.get('keywords') or []) or 'none extracted'}_")
             st.metric("Unique after dedupe", s.get("unique", 0))
@@ -202,7 +177,7 @@ for m in current()["messages"]:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
-prompt = st.chat_input("💬 Ask about the news (English or Vietnamese), or your uploaded document...")
+prompt = st.chat_input("💬 Ask about the news (English or Vietnamese)...")
 if prompt:
     if re.fullmatch(r"\s*(bye|goodbye|see you|tạm biệt|hẹn gặp lại)[\s!.]*", prompt, re.IGNORECASE):
         current()["messages"] += [{"role": "user", "content": prompt},

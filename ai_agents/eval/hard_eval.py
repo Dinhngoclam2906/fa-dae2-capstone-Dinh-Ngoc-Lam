@@ -264,13 +264,12 @@ def _system(name: str, q: dict) -> dict:
     from core import retrieval as R
     from core.text import extract_keywords
     if name == "agent_default":
-        return {"ids": [c.article_id for c in R.hybrid_retrieve(q["question"], top_n=TOP_N,
-                                                                include_user_docs=False).candidates]}
+        return {"ids": [c.article_id for c in R.hybrid_retrieve(q["question"], top_n=TOP_N).candidates]}
     if name == "agent_nopassage":  # production retrieval without the passage rerank
-        return {"ids": [c.article_id for c in R.hybrid_retrieve(q["question"], top_n=TOP_N, include_user_docs=False,
+        return {"ids": [c.article_id for c in R.hybrid_retrieve(q["question"], top_n=TOP_N,
                                                                 passage_rerank=False).candidates]}
     if name == "agent_noparse":  # production retrieval without text.query_filters
-        return {"ids": [c.article_id for c in R.hybrid_retrieve(q["question"], top_n=TOP_N, include_user_docs=False,
+        return {"ids": [c.article_id for c in R.hybrid_retrieve(q["question"], top_n=TOP_N,
                                                                 parse_filters=False).candidates]}
     if name == "v2_dense":
         return {"ids": [c.article_id for c in R._dense_articles_v2(q["question"], TOP_N, {})]}
@@ -280,7 +279,7 @@ def _system(name: str, q: dict) -> dict:
     if name in ("agent_e2e", "agent_e2e_before"):
         from core.agent import ask, build_agent
         agent = _agent(build_agent)
-        answer, stats = ask(agent, q["question"], thread_id=str(uuid.uuid4()), session_id=None)
+        answer, stats = ask(agent, q["question"], thread_id=str(uuid.uuid4()))
         return {"answer": answer, "tools": stats.get("tools_used", []),
                 "cited_urls": sorted({u.rstrip(".,;:").rstrip("/") for u in _URL.findall(answer)})}
     raise ValueError(name)

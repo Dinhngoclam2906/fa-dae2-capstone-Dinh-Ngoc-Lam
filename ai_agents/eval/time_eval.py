@@ -118,11 +118,11 @@ def _one(name: str, q: dict) -> dict:
     if name == "agent_e2e":
         from core.agent import ask, build_agent
         agent = H._agent(build_agent)
-        answer, stats = ask(agent, q["question"], thread_id=str(uuid.uuid4()), session_id=None)
+        answer, stats = ask(agent, q["question"], thread_id=str(uuid.uuid4()))
         return {"answer": answer, "tools": stats.get("tools_used", []),
                 "cited_urls": sorted({u.rstrip(".,;:").rstrip("/") for u in H._URL.findall(answer)})}
     with _variant(name, q["question"]) as R:
-        res = R.hybrid_retrieve(q["question"], top_n=H.TOP_N, include_user_docs=False)
+        res = R.hybrid_retrieve(q["question"], top_n=H.TOP_N)
     return {"ids": [c.article_id for c in res.candidates], "recency_days": res.stats.get("recency_days")}
 
 
