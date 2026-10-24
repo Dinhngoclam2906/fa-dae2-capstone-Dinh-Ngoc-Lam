@@ -27,6 +27,7 @@ import html
 import os
 import smtplib
 import sys
+import time
 from datetime import date, datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -227,10 +228,14 @@ class Report:
             return
         import requests
         start = int(datetime.combine(self.month_start, datetime.min.time(), timezone.utc).timestamp())
-        r = requests.get("https://api.openai.com/v1/organization/costs", timeout=30,
-                         headers={"Authorization": f"Bearer {key}"},
-                         params={"start_time": start, "bucket_width": "1d", "limit": 31,
-                                 "group_by": "line_item"})
+        for attempt in range(4):  # the Costs API returns a transient 429 now and then (10-24 email)
+            r = requests.get("https://api.openai.com/v1/organization/costs", timeout=30,
+                             headers={"Authorization": f"Bearer {key}"},
+                             params={"start_time": start, "bucket_width": "1d", "limit": 31,
+                                     "group_by": "line_item"})
+            if r.status_code not in (429, 500, 502, 503, 504) or attempt == 3:
+                break
+            time.sleep(min(float(r.headers.get("retry-after") or 0) or 5 * 2 ** attempt, 60))
         r.raise_for_status()
         by_model: dict[str, list[float]] = {}
         for b in r.json().get("data", []):
