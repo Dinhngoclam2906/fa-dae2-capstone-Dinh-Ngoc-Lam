@@ -91,6 +91,7 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-23 | Tooling | `uv sync` would have uninstalled pinecone (not in pyproject / uv.lock) |
 | 2026-10-24 | Cloud | Cost report lost its OpenAI section to a transient 429; retry on 429/5xx |
 | 2026-10-24 | Tooling | `uv remove` of the PDF libs also dropped `lxml` (used by the VN crawler, only declared via `docx`) |
+| 2026-10-24 | Tooling | Moving compose files into `deploy/local/` would have changed the project name (new empty volumes) and lost `.env` |
 
 ---
 
@@ -564,6 +565,20 @@ Reading the SQL found none of these:
 ---
 
 ## 7. Local machine and tooling (Windows, 8 GB RAM)
+
+### Moving compose files changes more than the path (2026-10-24, `c195d5b`)
+- **Symptom (avoided):** moving the 3 `docker-compose*.yml` into `deploy/local/` and running
+  `docker compose -f deploy/local/x.yml up` would resolve `./dags`, `context: .` and the
+  `${...}` variables from `deploy/local/` (no `.env` there), and name the Compose project
+  `local`, so the Postgres / Airflow volumes would start empty next to the old ones.
+- **Cause:** Compose takes the project directory, the `.env` file and the default project
+  name from the first compose file's folder.
+- **Fix:** run them with `--project-directory .` from the repo root (the Makefile targets
+  do); only the Airflow `dockerfile:` became `deploy/local/Dockerfile.airflow`. Verified
+  without the Docker daemon by diffing `docker compose config` for the old and new file:
+  only the dockerfile lines differed, project name `fa-dae2-capstone-dinh-ngoc-lam`.
+- **Lesson:** before moving a compose file, diff `docker compose config` before and after
+  (mask the output: it prints interpolated secrets).
 
 - **Docker Desktop's WSL2 backend uses ~1.6–1.9 GB.** Quit it fully when crawling.
 - **Windows consoles garble Vietnamese:** run Python with `-X utf8`.
