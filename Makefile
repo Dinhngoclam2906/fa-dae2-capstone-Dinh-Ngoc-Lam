@@ -3,8 +3,8 @@
 # (or copy the command from the recipe below).
 
 ENV      := --env-file .env
-DBT      := cd capstone_dbt_project && uv run --env-file ../.env dbt
-COMPOSE  := docker compose --project-directory . -f deploy/local
+DBT      := cd transform && uv run --env-file ../.env dbt
+COMPOSE  := docker compose --project-directory . -f infra/local
 
 .DEFAULT_GOAL := help
 .PHONY: help install test lint check agent cli eval dbt-build dbt-freshness memory-db kafka airflow down
@@ -19,19 +19,19 @@ test:  ## Unit tests (no network, no credentials)
 	uv run pytest
 
 lint:  ## SQLFluff over the dbt models
-	cd capstone_dbt_project && uv run sqlfluff lint models
+	cd transform && uv run sqlfluff lint models
 
 check:  ## Pipeline health by rows: workflow runs, jobs, rows per source, vectors
 	uv run $(ENV) python .claude/skills/check-pipeline/check.py --runs 6
 
 agent:  ## Streamlit app
-	uv run $(ENV) streamlit run ai_agents/app.py
+	uv run $(ENV) streamlit run agent/app.py
 
 cli:  ## Terminal agent with retrieval stats
-	uv run $(ENV) python ai_agents/cli_agent.py --stats
+	uv run $(ENV) python agent/cli_agent.py --stats
 
 eval:  ## Hard-question regression benchmark (costs a few cents)
-	uv run $(ENV) python ai_agents/eval/hard_eval.py run
+	uv run $(ENV) python agent/eval/hard_eval.py run
 
 dbt-build:  ## dbt build against BigQuery (dev target)
 	$(DBT) build --profiles-dir .dbt

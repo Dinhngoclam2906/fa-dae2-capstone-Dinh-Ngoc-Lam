@@ -249,7 +249,7 @@ wheels = [
 [[package]]
 name = "capstone-dbt-project"
 version = "0.1.0"
-source = { virtual = "capstone_dbt_project" }
+source = { virtual = "transform" }
 dependencies = [
     { name = "dbt-core" },
     { name = "dbt-snowflake" },

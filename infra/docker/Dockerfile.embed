@@ -1,0 +1,16 @@
+# infra/docker/Dockerfile.embed - image for the embed-sync Cloud Run Job (agent/jobs/run_embed_job.sh):
+# gemini-embedding-2 article vectors -> BigQuery vectors.article_embeddings -> Pinecone.
+# Minimal: the two pipeline scripts and the core modules they import, not the agent.
+# Build from a minimal context (like infra/docker/Dockerfile.ingestion): the repo root has no
+# .gcloudignore.
+FROM python:3.13-slim
+
+WORKDIR /app
+
+COPY agent/jobs/requirements-embed.txt ./
+RUN pip install --no-cache-dir -r requirements-embed.txt
+
+COPY agent/core/__init__.py agent/core/config.py agent/core/bq.py agent/core/articles.py ./agent/core/
+COPY agent/jobs/embed_articles.py agent/jobs/sync_vector_index.py agent/jobs/run_embed_job.sh ./agent/jobs/
+
+CMD ["sh", "agent/jobs/run_embed_job.sh"]

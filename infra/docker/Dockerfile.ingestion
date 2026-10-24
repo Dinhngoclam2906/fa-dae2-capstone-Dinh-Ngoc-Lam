@@ -1,0 +1,15 @@
+# infra/docker/Dockerfile.ingestion - shared image for the guardian-ingestion and vn-ingestion
+# Cloud Run Jobs (vn-ingestion overrides the command with run_vn_ingestion_job.sh).
+# Minimal: just the crawl + BigQuery load scripts, not the full project.
+FROM python:3.13-slim
+
+WORKDIR /app
+
+COPY ingestion/requirements-ingestion.txt ./
+RUN pip install --no-cache-dir -r requirements-ingestion.txt
+
+COPY ingestion/guardian_api_backfill.py ingestion/vn_news_backfill.py ingestion/load_raw_to_bigquery.py ingestion/sync_job_state.py ingestion/raw_archive.py ./ingestion/
+COPY ingestion/run_ingestion_job.sh ingestion/run_vn_ingestion_job.sh ./ingestion/
+RUN chmod +x ingestion/run_ingestion_job.sh ingestion/run_vn_ingestion_job.sh
+
+CMD ["sh", "ingestion/run_ingestion_job.sh"]
