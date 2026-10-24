@@ -21,7 +21,8 @@ uv run --env-file .env python .claude/skills/check-pipeline/check.py --runs 6
 Healthy looks like:
 - the newest workflow runs are `SUCCEEDED`, every 4 h (00/04/08/12/16/20 UTC);
 - all 4 jobs' last execution `OK`;
-- every one of the 10 sources has rows in the last 24 h and `newest` within ~4 h of now
+- every one of the 12 sources has rows in the last 24 h (the small English editions, incl.
+  `dantri_en` / `vir` since 2026-10-24, can be quiet) and `newest` within ~4 h of now
   (the small English editions, `vneconomy_en` / `tuoitre_en`, can have quiet days; a big
   Vietnamese source or `guardian` at 0 is a real problem);
 - `without a current vector: 0` and Pinecone `+0 vs OBT` (a small positive gap right after

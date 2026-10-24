@@ -37,7 +37,16 @@ articles; storage 2.73 KB per article now, 1.71 KB after the 256-dim switch.
 | + Công Thương, VietnamFinance | ~440 | ~4.1 | ~11.5 |
 | + CafeF | ~880 | ~3.3 | ~9.5 |
 
-**Recommendation:** first wave Dân Trí + DTiNews + VIR (widest Vietnamese audience + two
+**Outcome (2026-10-24):** first wave built (`4d746eb`). **DTiNews (`dantri_en`) and VIR
+(`vir`) are live**, forward-only (first run: 100 + 33 articles; VIR's PR Newswire / Media
+OutReach wires, about half its feed, are skipped). **Dân Trí is not:** from Cloud Run every
+article page timed out (`ConnectTimeout`, 4 retries each) although its sitemap and RSS
+loaded and the same pages load from a home connection, so it apparently refuses datacenter
+addresses. Its crawler class stays; production runs without it (`d74d546`). Options: run it
+from a non-datacenter machine, or ask Dân Trí for access. Not via a proxy / IP rotation
+(that would be circumventing their block).
+
+**Recommendation (before building):** first wave Dân Trí + DTiNews + VIR (widest Vietnamese audience + two
 English options, ~300/day; fits this month's Pinecone write units); one finance site after
 that (VietnamFinance cheap, CafeF only after the 256 switch and on demand); Công Thương as a
 second-wave candidate. VEN and Báo Đầu tư need crawler work; Lao Động is out.

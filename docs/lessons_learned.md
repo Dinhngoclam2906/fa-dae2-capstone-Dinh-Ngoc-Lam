@@ -92,6 +92,8 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-24 | Cloud | Cost report lost its OpenAI section to a transient 429; retry on 429/5xx |
 | 2026-10-24 | Tooling | `uv remove` of the PDF libs also dropped `lxml` (used by the VN crawler, only declared via `docx`) |
 | 2026-10-24 | Tooling | Moving compose files into `deploy/local/` would have changed the project name (new empty volumes) and lost `.env` |
+| 2026-10-24 | Ingestion | Dân Trí refuses article requests from Cloud Run (datacenter IPs); a local test can't show it |
+| 2026-10-24 | dbt | A freshness check on a source with 0 rows fails dbt-build, which skips embed-sync for every source |
 | 2026-10-24 | Agent | An empty BigQuery array parameter is NULL: `ARRAY_LENGTH(@x) = 0` dropped every unscoped row |
 | 2026-10-24 | Tooling | Repo-wide path rewrite: a folder rename blocked on Windows, a regex that missed Docker destinations, `uv.lock` pinning the old workspace path |
 
@@ -154,6 +156,19 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
   - Check raw vs OBT counts and the "Other" share per source after every new source.
   - **Prefix numeric ids with the source name** (`vietnamnet-2565868`): raw merges on
     `article_id` across all sources.
+
+### A site that works from home can refuse Cloud Run (2026-10-24, `d74d546`)
+- **Symptom:** Dân Trí's first production run: every article page `ConnectTimeout` (4 retries
+  each) from 17:03; the vn-ingestion job would have hit its 1 h limit and loaded nothing for
+  any VN source. Its sitemap and RSS loaded fine from Cloud Run, and the same pages had
+  parsed 22/25 from a laptop an hour earlier.
+- **Cause:** dantri.com.vn apparently refuses connections from datacenter (Google Cloud)
+  addresses for article pages. DTiNews (dtinews.dantri.com.vn) and VIR were unaffected.
+- **Fix:** execution cancelled (user's go); Dân Trí taken out of the job loop and its
+  freshness check (the crawler class stays). Not worked around with proxies / IP rotation.
+- **Lesson:** a new source's first real run must be from Cloud Run, watched, before trusting
+  it; a local crawl proves the parser, not the access. Watch for a source with zero log
+  progress after its "new urls" line.
 
 ### Site access rules (2026-10-17/18)
 - news.tuoitre.vn 404s about every other request, so sitemap reads get 8 attempts.
@@ -270,6 +285,16 @@ Reading the SQL found none of these:
   reload.
 
 ---
+
+### Freshness on a source with no rows fails the whole build (2026-10-24, `d74d546`)
+- **Symptom:** after Dân Trí was cancelled, dbt-build (17:32) exited non-zero although all
+  49 build tests passed, so the workflow skipped embed-sync for every source that run.
+- **Cause:** the new `raw_data_dantri` freshness check found 0 rows (none ever loaded); dbt
+  source freshness errors on that, and dbt-build exits non-zero if freshness failed.
+- **Fix:** removed the check with the source (`d74d546`); next run SUCCEEDED.
+- **Lesson:** add a source's freshness check only once its first rows have landed (or ship
+  both together and verify the first run), because one source's freshness error stops
+  embeddings for all of them.
 
 ## 3. Cloud Run, Scheduler, Workflows, Build, IAM
 

@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Ask about the news in English or Vietnamese and get answers grounded in, and cited from,
-~490k articles across The Guardian and 9 Vietnamese news sites, refreshed every 4 hours.
+~494k articles across The Guardian and 11 Vietnamese news sites and editions, refreshed every 4 hours.
 
 ## Quick start
 
@@ -29,7 +29,7 @@ Daily News AI Assistant is a bilingual (English + Vietnamese) news chatbot built
 
 - **Multilingual semantic search** (Pinecone index `news-articles-v2`, `gemini-embedding-2` article vectors): an English question finds Vietnamese articles too
 - **Passage rescue** (BM25 over the top hits' full bodies): finds details deep inside an article that the vector doesn't see
-- **"My sources" picker**: each user chooses which of the 10 sites to search
+- **"My sources" picker**: each user chooses which of the 12 sources to search
 - **Question filters + recency**: a source or month stated in the question becomes a hard filter; "latest / mới nhất / this week" questions put recent articles first
 - **LangGraph agent with 10 read-only tools** on BigQuery (keyword search, browse, full article, summaries, trending, freshness, coverage)
 - **LLM `gpt-5.4-mini`** (chosen in `docs/llm_compare.md`), answering in the user's language
@@ -42,7 +42,7 @@ Daily News AI Assistant is a bilingual (English + Vietnamese) news chatbot built
 > roadmap and phase status (local file).
 
 **Status (2026-10-24):** the whole pipeline runs hands-off on GCP every 4 hours, and
-493,470 articles from 10 sources are searchable. Measured running cost ≈ $0.29/day
+494,018 articles from 12 sources are searchable. Measured running cost ≈ $0.29/day
 (≈ $9/month, `docs/cost_report.md`), under a $10/month budget.
 
 ## Project Structure
@@ -60,7 +60,7 @@ The rapid pace of news publication requires frequent ingestion and analysis to s
 - **Out of Scope**: True sub-minute streaming, social media integration, advanced ML model training.
 
 ### 4. Data Sources:
-A multi-source, bilingual ingestion architecture: 10 sources, all kept current every 4 hours.
+A multi-source, bilingual ingestion architecture: 12 sources, all kept current every 4 hours.
 
 | Source (`source_name`) | Language | Collected via | Since | Articles (2026-10-24) |
 |---|---|---|---|---|
@@ -73,6 +73,8 @@ A multi-source, bilingual ingestion architecture: 10 sources, all kept current e
 | VnEconomy English (`vneconomy_en`) | en | sitemap crawler | 2026-01 | 3,317 |
 | VnExpress (`vnexpress`) | vi | RSS only (no archive) | ~2026-10-08 | 2,526 |
 | VnExpress International (`vnexpress_en`) | en | RSS only | ~2026-10 | 701 |
+| DTiNews, Dân Trí English (`dantri_en`) | en | RSS (forward-only) | 2026-10-24 | 100 |
+| Vietnam Investment Review (`vir`) | en | news sitemap + RSS (forward-only; press-release wires skipped) | 2026-10-24 | 33 |
 | VietNamNet English (`vietnamnet_en`) | en | forward-only crawl | 2026-10-15 | 340 |
 
 - **Incremental loading** - per-source cursor + dedupe sidecar, so nothing is re-crawled or re-processed.
@@ -122,7 +124,7 @@ Key Features:
 - Downloads/cleans the HuggingFace historical archive and crawls the Guardian Content API for everything since, with a resumable cursor, lock file, and daily-quota handling.
 
 **5.1.2.2. Vietnamese news crawler** (`ingestion/vn_news_backfill.py`, `run_vn_backfill_all.sh`):
-- One crawler for all 9 Vietnamese sites and editions: sitemap-driven for Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet and their English editions; RSS-only for VnExpress (no usable archive). Per-source resumable state, incremental Parquet flushing (every 100 articles), per-site concurrency and delays tuned for stability over raw speed.
+- One crawler for all 11 Vietnamese sites and editions: sitemap-driven for Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet and their English editions; RSS-only for VnExpress (no usable archive). Per-source resumable state, incremental Parquet flushing (every 100 articles), per-site concurrency and delays tuned for stability over raw speed.
 
 **5.1.2.3. BigQuery loader** (`ingestion/load_raw_to_bigquery.py`):
 - Parquet → GCS landing bucket → BigQuery staging table → `MERGE` into `raw.raw_data` (idempotent, dedupes on `article_id`). One command, `--source hf|api|vn`, handles all sources.
@@ -131,7 +133,7 @@ Key Features:
 **5.1.2.4. Automated pipeline: Cloud Workflows + Cloud Run Jobs** (`orchestration/workflows/news_pipeline.yaml`, `orchestration/workflows/deploy.sh`):
 - **One DAG, `news-pipeline`, every 4 hours** (Cloud Scheduler `0 */4 * * *` UTC). It runs four Cloud Run Jobs one after another, each waiting for the previous one to finish:
   1. `guardian-ingestion` - Guardian Content API crawl + load (`infra/docker/Dockerfile.ingestion`, `run_ingestion_job.sh`). The Guardian `API_KEY` comes from **Secret Manager**.
-  2. `vn-ingestion` - the 9 Vietnamese crawlers in parallel, then one load (`run_vn_ingestion_job.sh`). Running after Guardian means the two `MERGE`s into `raw.raw_data` never overlap.
+  2. `vn-ingestion` - the 11 Vietnamese crawlers in parallel, then one load (`run_vn_ingestion_job.sh`). Running after Guardian means the two `MERGE`s into `raw.raw_data` never overlap.
   3. `dbt-build` - `dbt source freshness`, then `dbt build` (5.1.2.5).
   4. `embed-sync` - new article vectors to BigQuery and Pinecone (`infra/docker/Dockerfile.embed`, `agent/jobs/run_embed_job.sh`).
 - Failure rules: a failed ingestion doesn't block the chain; a failed `dbt-build` skips `embed-sync`. The full chain takes ≈ 6 minutes; on average an article is searchable ≈ 2 hours after it is published.
@@ -338,7 +340,7 @@ Ref: dim_articles.section_key > dim_sections.section_key
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │          DENSE SEARCH (Pinecone news-articles-v2)               │
-│  • gemini-embedding-2 query vector, all 10 sources, 2 languages │
+│  • gemini-embedding-2 query vector, all 12 sources, 2 languages │
 │  • top 30 articles, filters applied inside Pinecone             │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
@@ -372,7 +374,7 @@ Ref: dim_articles.section_key > dim_sections.section_key
                     └──────────────────┘
 ```
 
-**My sources:** the app's sidebar lets each user pick the sites they read (all 10 by
+**My sources:** the app's sidebar lets each user pick the sites they read (all 12 by
 default, with *All / Tiếng Việt / English* presets; `cli_agent.py --sources tuoitre,vnexpress`
 in the terminal). The choice scopes every search, the automatic retrieval and every tool,
 unless the question itself names a site ("what did the Guardian write…"), which still wins.
