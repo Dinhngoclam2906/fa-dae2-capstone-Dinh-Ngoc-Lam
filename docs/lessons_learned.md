@@ -92,6 +92,7 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-24 | Cloud | Cost report lost its OpenAI section to a transient 429; retry on 429/5xx |
 | 2026-10-24 | Tooling | `uv remove` of the PDF libs also dropped `lxml` (used by the VN crawler, only declared via `docx`) |
 | 2026-10-24 | Tooling | Moving compose files into `deploy/local/` would have changed the project name (new empty volumes) and lost `.env` |
+| 2026-10-24 | Tooling | Repo-wide path rewrite: a folder rename blocked on Windows, a regex that missed Docker destinations, `uv.lock` pinning the old workspace path |
 
 ---
 
@@ -565,6 +566,19 @@ Reading the SQL found none of these:
 ---
 
 ## 7. Local machine and tooling (Windows, 8 GB RAM)
+
+### Three traps in a repo-wide path rewrite (2026-10-24, PR #14)
+- **`git mv <folder>` → "Permission denied" on Windows** although no process used it (an editor
+  or indexer handle on the folder itself). Moving its entries one by one (`git mv` for tracked,
+  `mv` for untracked) and then removing the empty folder worked.
+- **A regex rewrite left the Dockerfile half-done:** `(?<![/\w])ai_agents` skipped `./ai_agents/`
+  (a `/` before it), so `COPY ... ./ai_agents/jobs/` stayed while `CMD` became `agent/jobs/...`;
+  the image would have failed at start. Same for `${{ github.workspace }}/capstone_dbt_project`.
+  Found by grepping every old name after the rewrite, before building.
+- **`uv lock` fails after renaming a workspace member** ("Distribution not found at ...old path")
+  because `uv.lock` stores `source = { virtual = "<path>" }`; fix that line, then `uv lock`.
+- **Lesson:** after any bulk rewrite, grep for every old path (not just the patterns you
+  rewrote), then build and run the real thing before calling it done.
 
 ### Moving compose files changes more than the path (2026-10-24, `c195d5b`)
 - **Symptom (avoided):** moving the 3 `docker-compose*.yml` into `deploy/local/` and running

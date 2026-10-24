@@ -1,6 +1,6 @@
 # Plan: repo layout Phase B (component folders)
 
-**Status:** planned 2026-10-24, **deferred until after the GCP trial decision (2026-12-09)**.
+**Status: DONE 2026-10-24** (PR #14, merge `605a8bb`; the user decided to upgrade, which unblocked it). Planned the same day; the plan below is kept as written. Old → new paths: `docs/repo_layout.md`.
 Phase A (`c195d5b`) did the low-risk part: `ai_agents/jobs/`, `legacy/` folders,
 `deploy/local/`, tests, Makefile, MIT license. Phase B regroups the repo by pipeline
 component, the layout most well-known data / ML repos use.
