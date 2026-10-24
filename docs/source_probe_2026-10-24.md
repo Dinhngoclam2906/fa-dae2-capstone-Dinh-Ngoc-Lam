@@ -1,0 +1,43 @@
+# Candidate news sites: feasibility probe (2026-10-24)
+
+**Why:** users read different sites, so the agent got a "My sources" picker (`0879ec1`); new
+sites add choice. Collected **forward-only** by default (no backfill), so each site costs
+storage in proportion to its daily output. Pinecone (free plan, 2 GB) is the binding limit:
+1.35 GB used (67%), full in ~5.3 months at today's ~1,500 articles/day, ~15 months after the
+planned 256-dim switch (PROGRESS_LOG "Resume here" item 6).
+
+**Method:** read-only, the crawler's user agent, 1 s between requests, ~15-25 requests per
+site: robots.txt (rules for `*`, listed sitemaps), sitemap structure and recent URLs per day,
+RSS, and one real article's metadata (`og:title`, `article:published_time`, JSON-LD type,
+paragraph text in the HTML). Terms of use were not reviewed.
+
+| Site | Lang | Usable feed | Articles/day (est.) | Article metadata | Verdict |
+|---|---|---|---|---|---|
+| dantri.com.vn (Dân Trí) | vi | `/rss/home.rss` (100 items ≈ 9 h); monthly sitemaps `/sitemaps/Article-YYYY-MM-01.xml` | ~250 | JSON-LD NewsArticle, `article:published_time` | easy |
+| vir.com.vn (Vietnam Investment Review) | en | `/newssitemap-site-1.xml`; `/rss_feed/` | ~20-55 | NewsArticle, published time, `article:section` | easy |
+| congthuong.vn (Công Thương) | vi | `/news-sitemap.xml` (RSS has only 7 items) | ~65-100 | NewsArticle, published time, section | easy |
+| vietnamfinance.vn | vi | `/sitemap.xml` (1,000 recent, dated); `/home.rss` | ~55-70 | NewsArticle, published time | easy |
+| cafef.vn | vi | 5-day sitemaps `/sitemaps/sitemaps-YYYY-M-D1-D2.xml` back to 2016 (Tuổi Trẻ's layout); `/google-news-sitemap.xml` | **~440** (Oct 6-9: 436-476) | NewsArticle, published time without offset (local) | easy, high volume |
+| dtinews.dantri.com.vn (Dân Trí English) | en | `/rss/home.rss` (100 items ≈ 4 days) | ~25 | no JSON-LD, no published-time meta: date from the page | doable |
+| ven.congthuong.vn (Công Thương English) | en | none (sitemap / RSS 404); ~30 article links on the homepage | low | — | needs a listing-page crawl mode |
+| baodautu.vn (Báo Đầu tư) | vi | monthly sitemaps return "Not found act function sitemap_month"; RSS index link broken | ? | — | broken feeds; revisit |
+| laodong.vn (Lao Động) | vi | every URL (incl. robots.txt) returns a JavaScript cookie challenge | ? | — | **skip**: passing it would circumvent bot protection |
+
+All robots.txt files allow `*` (no crawl-delay); the disallowed paths (print / AMP / tag /
+ajax pages) don't touch article URLs. No paywall markers found. No site's JSON-LD carries
+`articleBody`, so each needs an HTML body selector, like the current crawlers.
+
+**Cost per site:** ~420 embedding tokens per article (measured 2026-10-24) ≈ $0.08 per 1,000
+articles; storage 2.73 KB per article now, 1.71 KB after the 256-dim switch.
+
+| Plan (forward-only) | Extra/day | Months to full at 512 dims | At 256 dims |
+|---|---|---|---|
+| today's 10 sources | — | ~5.3 | ~15 |
+| + Dân Trí, DTiNews, VIR | ~300 | ~4.4 | ~12.5 |
+| + Công Thương, VietnamFinance | ~440 | ~4.1 | ~11.5 |
+| + CafeF | ~880 | ~3.3 | ~9.5 |
+
+**Recommendation:** first wave Dân Trí + DTiNews + VIR (widest Vietnamese audience + two
+English options, ~300/day; fits this month's Pinecone write units); one finance site after
+that (VietnamFinance cheap, CafeF only after the 256 switch and on demand); Công Thương as a
+second-wave candidate. VEN and Báo Đầu tư need crawler work; Lao Động is out.
