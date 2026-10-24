@@ -6,8 +6,8 @@ serving copy holding the first 512 dims, re-normalised (gemini-embedding-2 is tr
 for truncation; the bake-off scored 512 ≈ 768). Rebuildable at any time with no
 embedding cost.
 
-    uv run --env-file .env python ai_agents/sync_vector_index.py status
-    uv run --env-file .env python ai_agents/sync_vector_index.py sync          # new rows only
+    uv run --env-file .env python ai_agents/jobs/sync_vector_index.py status
+    uv run --env-file .env python ai_agents/jobs/sync_vector_index.py sync          # new rows only
 
 Per vector: id = article_id; metadata = source_name, language, section_group, pub_date
 (YYYY-MM-DD), pub_ts (unix seconds, for range filters), title, url and a 240-char
@@ -34,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # for core.*
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # ai_agents/, for core.*
 from core import bq  # noqa: E402
 from core.config import settings  # noqa: E402
 

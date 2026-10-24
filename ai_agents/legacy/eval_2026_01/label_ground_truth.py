@@ -1,9 +1,9 @@
-# ai_agents/label_ground_truth.py
+# ai_agents/legacy/eval_2026_01/label_ground_truth.py
 # FROZEN (2026-10-24): part of the original 2026-01 retrieval eval (Snowflake + the v1
 # Pinecone index `guardian-capstone`). The v1 index was deleted on 2026-10-24 and the
 # ground truth is labelled against its Guardian chunks, so this can no longer run. Kept as
-# capstone evidence with its results (evaluation_results.json / *.png). The current evals
-# are in ai_agents/eval/ (retrieval_eval.py, hard_eval.py; docs/eval_refresh.md).
+# capstone evidence with its results (evaluation_results.json / *.png, same folder; moved
+# here from ai_agents/ on 2026-10-24). The current evals are in ai_agents/eval/ (retrieval_eval.py, hard_eval.py; docs/eval_refresh.md).
 
 import json
 from typing import List, Dict

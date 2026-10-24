@@ -32,9 +32,9 @@ folder in the scratchpad, keeping the relative paths:
 ```bash
 CTX=<scratchpad>/embed_ctx; rm -rf "$CTX"; mkdir -p "$CTX"
 # copy the Dockerfile + every file it COPYs, e.g. for embed-sync:
-cp --parents Dockerfile.embed ai_agents/requirements-embed.txt ai_agents/core/__init__.py \
+cp --parents Dockerfile.embed ai_agents/jobs/requirements-embed.txt ai_agents/core/__init__.py \
   ai_agents/core/config.py ai_agents/core/bq.py ai_agents/core/articles.py \
-  ai_agents/embed_articles.py ai_agents/sync_vector_index.py ai_agents/run_embed_job.sh "$CTX"/
+  ai_agents/jobs/embed_articles.py ai_agents/jobs/sync_vector_index.py ai_agents/jobs/run_embed_job.sh "$CTX"/
 cat > "$CTX/cloudbuild.yaml" <<EOF
 steps:
 - name: gcr.io/cloud-builders/docker

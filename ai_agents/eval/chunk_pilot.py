@@ -43,7 +43,8 @@ import numpy as np
 import polars as pl
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent))  # ai_agents/, for core.* and embed_articles
+sys.path.insert(0, str(HERE.parent))  # ai_agents/, for core.*
+sys.path.insert(0, str(HERE.parent / "jobs"))  # for embed_articles
 sys.path.insert(0, str(HERE))
 import hard_eval as H  # noqa: E402
 

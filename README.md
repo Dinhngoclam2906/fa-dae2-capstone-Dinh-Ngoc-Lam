@@ -1,5 +1,29 @@
 # Daily News AI Assistant
 
+[![CI](https://github.com/Dinhngoclam2906/fa-dae2-capstone-Dinh-Ngoc-Lam/actions/workflows/pr_ci.yml/badge.svg?branch=main)](https://github.com/Dinhngoclam2906/fa-dae2-capstone-Dinh-Ngoc-Lam/actions/workflows/pr_ci.yml)
+![Python 3.13](https://img.shields.io/badge/python-3.13-blue)
+![dbt](https://img.shields.io/badge/dbt-BigQuery-orange)
+![GCP](https://img.shields.io/badge/GCP-Cloud%20Run%20%7C%20Workflows-4285F4)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+Ask about the news in English or Vietnamese and get answers grounded in, and cited from,
+~490k articles across The Guardian and 9 Vietnamese news sites, refreshed every 4 hours.
+
+## Quick start
+
+```bash
+git clone https://github.com/Dinhngoclam2906/fa-dae2-capstone-Dinh-Ngoc-Lam.git && cd fa-dae2-capstone-Dinh-Ngoc-Lam
+uv sync                         # Python 3.13, dependencies via uv
+cp .env.example .env            # then fill in GCP_PROJECT, NEWS_SALT, OPENAI_API_KEY, PINECONE_API_KEY
+gcloud auth application-default login
+make test                       # unit tests, no credentials needed
+make agent                      # Streamlit chat app (make cli for the terminal version)
+```
+
+`make help` lists every command (pipeline health check, dbt build, eval, local Docker
+services). Without `make`, copy the command from the `Makefile`. Full setup is at the end
+of this README.
+
 ## Overview
 Daily News AI Assistant is a bilingual (English + Vietnamese) news chatbot built on an end-to-end data platform: ingestion from 10 news sources, a BigQuery warehouse modelled with dbt, and a **RAG (Retrieval-Augmented Generation)** agent that answers from those articles with citations. It combines:
 
@@ -108,10 +132,10 @@ Key Features:
   1. `guardian-ingestion` - Guardian Content API crawl + load (`Dockerfile.ingestion`, `run_ingestion_job.sh`). The Guardian `API_KEY` comes from **Secret Manager**.
   2. `vn-ingestion` - the 9 Vietnamese crawlers in parallel, then one load (`run_vn_ingestion_job.sh`). Running after Guardian means the two `MERGE`s into `raw.raw_data` never overlap.
   3. `dbt-build` - `dbt source freshness`, then `dbt build` (5.1.2.5).
-  4. `embed-sync` - new article vectors to BigQuery and Pinecone (`Dockerfile.embed`, `ai_agents/run_embed_job.sh`).
+  4. `embed-sync` - new article vectors to BigQuery and Pinecone (`Dockerfile.embed`, `ai_agents/jobs/run_embed_job.sh`).
 - Failure rules: a failed ingestion doesn't block the chain; a failed `dbt-build` skips `embed-sync`. The full chain takes ≈ 6 minutes; on average an article is searchable ≈ 2 hours after it is published.
 - **Why Workflows, not Cloud Composer:** Workflows is pay-per-step (≈ $0/month here); Composer is an always-on Airflow environment (≈ $300-400/month even idle). One linear 4-step pipeline with no date backfills doesn't need Composer.
-- **Article embeddings** (`ai_agents/embed_articles.py`, `sync_vector_index.py`): every article in `marts.obt_articles` is embedded with `gemini-embedding-2` on Vertex AI (title + first 1,500 characters, 768 dims) into BigQuery `vectors.article_embeddings`, the source of truth, then copied at 512 dims into Pinecone `news-articles-v2`. The job also stores each article's full body in `vectors.article_bodies` for the agent's passage rescue. Incremental by `(article_id, content_hash)`, so new articles, edits and new sources are picked up automatically; a daily token cap bounds spend. Model choice: `docs/embedding_bakeoff.md`.
+- **Article embeddings** (`ai_agents/jobs/embed_articles.py`, `sync_vector_index.py`): every article in `marts.obt_articles` is embedded with `gemini-embedding-2` on Vertex AI (title + first 1,500 characters, 768 dims) into BigQuery `vectors.article_embeddings`, the source of truth, then copied at 512 dims into Pinecone `news-articles-v2`. The job also stores each article's full body in `vectors.article_bodies` for the agent's passage rescue. Incremental by `(article_id, content_hash)`, so new articles, edits and new sources are picked up automatically; a daily token cap bounds spend. Model choice: `docs/embedding_bakeoff.md`.
 - Cloud Run Jobs start from a clean container every run, so `sync_job_state.py` round-trips the crawlers' cursors and the loader's pending-merge state through GCS (pull before, push after, even on a partial failure).
 - Both crawlers keep their cursor on the still-filling tail (today + yesterday for Guardian, the current month for VN) instead of moving past it, so every run picks up articles published since the last one.
 - **Bronze raw archive** (`raw_archive.py`): every article the crawlers store is also kept exactly as received (VN page HTML, Guardian API JSON) as gzipped JSON Lines in a Coldline bucket (`gs://<rawhtml bucket>/raw/source=<s>/fetch_date=<d>/`). Append-only, so a parser fix is an offline re-parse instead of a re-crawl.
@@ -363,73 +387,50 @@ Each change to retrieval was measured on real questions, through the real code, 
 | Hard set (95 questions, the regression benchmark) | question filters: constraint compliance 0.46 → 0.98; passage rescue: deep-detail found@5 0.50 → 0.70 | `docs/hard_eval.md` |
 | LLM comparison (5 models) | `gpt-5.4-mini` gave the best answers (~$7 per 1,000 turns) | `docs/llm_compare.md` |
 
-The original 2026-01 eval (`ai_agents/evaluation.py`, 4 strategies on the Guardian-only index) is kept, frozen, as the first baseline. Bugs, incidents and lessons are collected in `docs/lessons_learned.md`.
+The original 2026-01 eval (`ai_agents/legacy/eval_2026_01/`, 4 strategies on the Guardian-only index) is kept, frozen, as the first baseline. Bugs, incidents and lessons are collected in `docs/lessons_learned.md`.
 
 ---
 
-**Project Structure** (abridged - omits `__pycache__`, `.venv`, `target`, `dbt_packages`, `logs`):
+**Project Structure** (abridged - omits `__pycache__`, `.venv`, `target`, `dbt_packages`, `logs`).
+Each folder is one part of the pipeline; the production images are built from the root `Dockerfile.*`.
 ```
 fa-dae2-capstone-Dinh-Ngoc-Lam/
-├── .github/workflows/
-│   └── pr_ci.yml                                  # PR CI: lint + dbt test on BigQuery (keyless WIF)
-├── .claude/skills/                                 # check-pipeline, deploy-job-image, log-update procedures
-├── ai_agents/                                      # RAG agent (BigQuery since 2026-10-18)
-│   ├── core/                                       # The agent: config, bq, articles, text, retrieval, passages, tools, agent, llm, memory
-│   ├── app.py / cli_agent.py                       # Streamlit and terminal front ends over core/
-│   ├── embed_articles.py / sync_vector_index.py    # embed-sync job: Gemini vectors → BigQuery → Pinecone
-│   ├── run_embed_job.sh / requirements-embed.txt   # embed-sync entrypoint + image deps
-│   ├── eval/                                       # Current evals: retrieval_eval, hard_eval, time_eval, llm_compare, bake-off
-│   ├── capstone_tool_calling_agent.py              # Compatibility shim for the frozen 2026-01 eval
-│   ├── evaluation.py / baseline_systems.py         # FROZEN 2026-01 eval (v1 index, deleted 2026-10-24)
-│   └── label_ground_truth*.py / visualize_results.py
-├── capstone_dbt_project/                           # dbt project (BigQuery)
-│   ├── .dbt/profiles.yml                           # the single dbt profile (use --profiles-dir .dbt)
-│   ├── Dockerfile                                  # dbt-build Cloud Run Job image
-│   ├── macros/                                     # generate_news_hash, section_utils, generate_schema_name, ...
+├── ai_agents/                          # RAG agent (BigQuery since 2026-10-18)
+│   ├── core/                           # the agent: config, bq, articles, text, retrieval, passages, tools, agent, llm, memory
+│   ├── app.py / cli_agent.py           # Streamlit and terminal front ends over core/
+│   ├── jobs/                           # embed-sync Cloud Run Job: embed_articles, sync_vector_index, run_embed_job.sh
+│   ├── eval/                           # current evals: hard_eval (benchmark), retrieval_eval, time_eval, llm_compare, bake-off
+│   └── legacy/eval_2026_01/            # FROZEN first eval (Guardian-only v1 index, deleted 2026-10-24) + its results
+├── capstone_dbt_project/               # dbt project (BigQuery)
+│   ├── .dbt/profiles.yml               # the single dbt profile (use --profiles-dir .dbt)
+│   ├── Dockerfile                      # dbt-build Cloud Run Job image
+│   ├── macros/                         # generate_news_hash, section_utils, generate_schema_name, ...
 │   ├── models/
-│   │   ├── 01_staging/                             # stg_sf__guardian, _sources.yml (freshness per source)
-│   │   ├── 02_intermediate/                        # int_article_metrics (ephemeral)
-│   │   ├── 03_mart/                                # obt_articles (live), vw_articles_search_optimized; dim_* / fct_articles (frozen, disabled)
-│   │   └── monitoring/                             # news_freshness
-│   ├── tests/                                      # assert_data_source_consistency (test_scd_content_changes disabled)
-│   ├── dbt_project.yml
-│   └── packages.yml                                # dbt_utils
-├── dags/
-│   ├── capstone_crawling_ingestion.py               # DAG: guardian_ingestion (batch load → trigger dbt)
-│   └── capstone_dbt_orchestration.py                # DAG: capstone_dbt_orchestration (debug → clean → build)
+│   │   ├── 01_staging/                 # stg_sf__guardian, _sources.yml (freshness per source)
+│   │   ├── 02_intermediate/            # int_article_metrics (ephemeral)
+│   │   ├── 03_mart/                    # obt_articles (live), vw_articles_search_optimized; dim_* / fct_articles (frozen)
+│   │   └── monitoring/                 # news_freshness
+│   └── tests/                          # assert_data_source_consistency (test_scd_content_changes disabled)
 ├── scripts/
-│   ├── batch_data/
-│   │   ├── batch_data_collector.py / batch_data_ingestion.py   # Legacy Snowflake path
-│   │   ├── hf_archive_to_parquet.py                             # HF archive → Parquet
-│   │   ├── guardian_api_backfill.py                             # Guardian Content API crawler
-│   │   ├── vn_news_backfill.py / run_vn_backfill_all.sh         # Crawler for the 9 Vietnamese sites / editions
-│   │   ├── load_raw_to_bigquery.py                              # Parquet → GCS → BigQuery raw.raw_data
-│   │   ├── sync_job_state.py                                    # Cloud Run Job: pull/push cursor + pending-merge state to GCS
-│   │   ├── raw_archive.py                                       # Bronze: raw HTML / API JSON as .jsonl.gz -> Coldline bucket
-│   │   ├── run_ingestion_job.sh                                 # guardian-ingestion entrypoint (sync state → crawl → load → sync state)
-│   │   ├── run_vn_ingestion_job.sh                              # vn-ingestion entrypoint (9 VN crawlers in parallel → load)
-│   │   └── requirements-ingestion.txt                           # Minimal deps for the ingestion container image
-│   ├── monitoring/                                 # cost_report.py + deploy script (daily cost email, monitoring.cost_daily)
-│   └── real_time_data/
-│       ├── kafka_producer.py / kafka_consumer.py   # Guardian API → Kafka → PostgreSQL (unused in production)
-│       └── migrate_add_data_source.py
-├── workflows/
-│   ├── news_pipeline.yaml                          # Cloud Workflows DAG: guardian → vn → dbt-build → embed-sync
-│   └── deploy.sh                                   # deploy the workflow + its schedules (needs GCP_PROJECT)
-├── sql/init.sql                                    # PostgreSQL staging schema bootstrap
-├── docs/                                           # phase reports, decisions, eval reports, cost report, lessons_learned
-├── images/                                         # architecture diagram + ERD
-├── data/                                           # local Parquet/CSV working data
-├── docker-compose.yml                              # langgraph-postgres (agent memory)
-├── docker-compose-kafka.yml                        # kafka + kafdrop + airflow metadata pg
-├── docker-compose-airflow.yml                      # airflow
-├── Dockerfile.airflow
-├── Dockerfile.ingestion                            # Image for the guardian-/vn-ingestion Cloud Run Jobs (crawl + load only)
-├── Dockerfile.embed                                # Image for the embed-sync Cloud Run Job
-├── Dockerfile.cost                                 # Image for the cost-report Cloud Run Job
-├── pyproject.toml / uv.lock                        # uv-managed deps (dbt-bigquery, polars, langgraph, ...)
-├── requirements.txt                                # Airflow-image dependency subset
-└── .env.example                                    # Guardian / GCP / BigQuery / Pinecone / Postgres / agent config
+│   ├── batch_data/                     # crawlers, BigQuery loader, Bronze archive, Cloud Run Job entrypoints
+│   │   └── legacy/                     # Snowflake-era collector / loader
+│   ├── monitoring/                     # cost_report.py + deploy script (daily cost email, monitoring.cost_daily)
+│   └── real_time_data/                 # Kafka producer / consumer (unused in production)
+├── workflows/                          # Cloud Workflows DAG news_pipeline.yaml + deploy.sh (schedules)
+├── dags/                               # Airflow DAGs (local/manual): guardian_ingestion, capstone_dbt_orchestration
+├── deploy/local/                       # docker compose: agent-memory Postgres, Kafka, Airflow (+ Dockerfile.airflow)
+├── tests/                              # pytest unit tests (no network): question parsing, passage rescue, retrieval
+├── docs/                               # phase reports, decisions, eval reports, cost report, lessons_learned
+├── images/                             # architecture diagram + ERD
+├── sql/init.sql                        # PostgreSQL staging schema bootstrap
+├── .claude/skills/                     # runbooks: check-pipeline, deploy-job-image, log-update
+├── .github/workflows/pr_ci.yml         # CI: unit tests, SQLFluff, dbt test on BigQuery (keyless WIF)
+├── Dockerfile.ingestion / .embed / .cost   # images for the ingestion, embed-sync and cost-report jobs
+├── Makefile                            # make help: common commands
+├── pyproject.toml / uv.lock            # uv-managed dependencies
+├── requirements.txt                    # Airflow-image dependency subset
+├── .env.example                        # every setting, with defaults
+└── LICENSE                             # MIT
 ```
 
 **Setup Instructions:**
@@ -451,12 +452,15 @@ gcloud config set project <your GCP project id>
 gcloud auth application-default login
 ```
 
-**4. Start Local Docker Services** (split by concern - start only what you need):
+**4. Start Local Docker Services** (in `deploy/local/`, split by concern - start only what you need; run from the repo root):
 ```
-docker compose -f docker-compose.yml up -d            # agent memory (Postgres, port 5433)
-docker compose -f docker-compose-kafka.yml up -d       # kafka + kafdrop + airflow metadata pg
-docker compose -f docker-compose-airflow.yml up -d     # airflow
+make memory-db     # agent memory (Postgres, port 5433); without it the agent keeps history in memory
+make kafka         # kafka + kafdrop + airflow metadata pg
+make airflow       # airflow
+make down          # stop them all
 ```
+The targets run `docker compose --project-directory . -f deploy/local/<file>.yml ...`, so paths,
+`.env` and the Compose project name (and with it the existing volumes) stay those of the repo root.
 
 **5. Run Ingestion:**
 
@@ -500,15 +504,20 @@ uv run --env-file ../.env dbt build --profiles-dir .dbt
 
 **7. Run the Agent** (from the repo root):
 ```
-uv run --env-file .env streamlit run ai_agents/app.py
-# or
-uv run --env-file .env python ai_agents/cli_agent.py --stats
+make agent         # = uv run --env-file .env streamlit run ai_agents/app.py
+make cli           # = uv run --env-file .env python ai_agents/cli_agent.py --stats
 ```
 
-Regression benchmark (the hard question set; stages are listed in its docstring):
+Tests and the regression benchmark:
 ```
-uv run --env-file .env python ai_agents/eval/hard_eval.py run
+make test          # unit tests (also run in CI on every push and PR)
+make eval          # hard question set through the real retrieval (stages in its docstring)
+make check         # pipeline health by rows: workflow runs, jobs, rows per source, vectors
 ```
 
 **8. Verify Data:**
 Check `raw.raw_data` in BigQuery (row counts and `MAX(loaded_at)` per `source_name`), the `staging` / `marts` / `monitoring` datasets after a dbt build, and that `vectors.article_embeddings` and the Pinecone index match `marts.obt_articles`.
+
+## License
+
+[MIT](LICENSE) © 2026 Dinh Ngoc Lam

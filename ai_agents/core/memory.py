@@ -1,7 +1,7 @@
 """Conversation memory (LangGraph checkpointer).
 
 Postgres when LANGGRAPH_POSTGRES_PASSWORD is set and the database answers (local:
-`docker compose -f docker-compose.yml up -d`), otherwise in-memory: history then lasts
+`make memory-db`, i.e. `docker compose --project-directory . -f deploy/local/docker-compose.yml up -d`), otherwise in-memory: history then lasts
 for the process lifetime, which is fine for a demo and costs nothing.
 """
 

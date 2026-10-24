@@ -1,8 +1,10 @@
 [project]
 name = "fa-dae2-capstone-dinh-ngoc-lam"
 version = "0.1.0"
-description = "Add your description here"
+description = "Bilingual news RAG assistant on a GCP data platform: 10-source ingestion, BigQuery + dbt, Pinecone, LangGraph"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "aiohttp>=3.13.1",
@@ -69,6 +71,7 @@ dev = [
 ]
 pr-ci = [
     "dbt-bigquery>=1.10.0",
+    "pytest>=8.4.2",
     "sqlfluff>=3.4.2",
     "sqlfluff-templater-dbt>=3.4.2",
 ]
@@ -91,6 +94,11 @@ en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/dow
 
 [tool.pyright]
 extraPaths = [
-    "./scripts/data_collection",
-    "./scripts/ingestion"
+    "./ai_agents",
+    "./ai_agents/jobs",
+    "./scripts/batch_data"
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["ai_agents"]

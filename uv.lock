@@ -841,6 +841,7 @@ dev = [
 ]
 pr-ci = [
     { name = "dbt-bigquery" },
+    { name = "pytest" },
     { name = "sqlfluff" },
     { name = "sqlfluff-templater-dbt" },
 ]
@@ -919,6 +920,7 @@ dev = [
 ]
 pr-ci = [
     { name = "dbt-bigquery", specifier = ">=1.10.0" },
+    { name = "pytest", specifier = ">=8.4.2" },
     { name = "sqlfluff", specifier = ">=3.4.2" },
     { name = "sqlfluff-templater-dbt", specifier = ">=3.4.2" },
 ]

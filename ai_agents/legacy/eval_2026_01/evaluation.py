@@ -1,9 +1,9 @@
-# ai_agents/evaluation.py
+# ai_agents/legacy/eval_2026_01/evaluation.py
 # FROZEN (2026-10-24): part of the original 2026-01 retrieval eval (Snowflake + the v1
 # Pinecone index `guardian-capstone`). The v1 index was deleted on 2026-10-24 and the
 # ground truth is labelled against its Guardian chunks, so this can no longer run. Kept as
-# capstone evidence with its results (evaluation_results.json / *.png). The current evals
-# are in ai_agents/eval/ (retrieval_eval.py, hard_eval.py; docs/eval_refresh.md).
+# capstone evidence with its results (evaluation_results.json / *.png, same folder; moved
+# here from ai_agents/ on 2026-10-24). The current evals are in ai_agents/eval/ (retrieval_eval.py, hard_eval.py; docs/eval_refresh.md).
 """
 Comprehensive evaluation framework for RAG systems.
 
@@ -570,7 +570,7 @@ class RAGEvaluator:
         
         # Save results
         if save_results:
-            output_file = "ai_agents/evaluation_results.json"
+            output_file = "ai_agents/legacy/eval_2026_01/evaluation_results.json"
             with open(output_file, "w") as f:
                 json.dump(all_results, f, indent=2)
             print(f"\n✅ Results saved to {output_file}")

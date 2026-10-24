@@ -6,10 +6,10 @@ BigQuery `vectors.article_embeddings`, the source of truth for vectors. Replaces
 Snowflake -> Pinecone chunk pipeline (data_ingestion_to_pinecone.py, deleted 2026-10-24 with
 its v1 index; in git history).
 
-    uv run --env-file .env python ai_agents/embed_articles.py status
-    uv run --env-file .env python ai_agents/embed_articles.py embed --limit 50   # smoke test
-    uv run --env-file .env python ai_agents/embed_articles.py embed --full       # backfill
-    uv run --env-file .env python ai_agents/embed_articles.py embed              # daily: last 40 days
+    uv run --env-file .env python ai_agents/jobs/embed_articles.py status
+    uv run --env-file .env python ai_agents/jobs/embed_articles.py embed --limit 50   # smoke test
+    uv run --env-file .env python ai_agents/jobs/embed_articles.py embed --full       # backfill
+    uv run --env-file .env python ai_agents/jobs/embed_articles.py embed              # daily: last 40 days
 
 Incremental by design: an article is pending when (article_id, content_hash) has no row
 for this model, so new articles, new sources and edited articles are picked up by the
@@ -23,7 +23,7 @@ vector so an article is never embedded without a body. `bodies` fills in what's 
 (a repair over the last --window-days of publication months, ~0.5 GB; --full = whole corpus,
 the first backfill, ~2.5 GB):
 
-    uv run --env-file .env python ai_agents/embed_articles.py bodies [--full]
+    uv run --env-file .env python ai_agents/jobs/embed_articles.py bodies [--full]
 
 Text: "title: {title} | text: {first 1,500 chars of the body}" - gemini-embedding-2's
 documented document format (it rejects task_type; queries use
@@ -49,7 +49,7 @@ import numpy as np
 import polars as pl
 from google.cloud import bigquery
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # for core.*
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # ai_agents/, for core.*
 from core import bq  # noqa: E402
 from core.articles import BODY_BUCKET_SQL, BODY_BUCKETS, body_bucket  # noqa: E402
 
@@ -106,7 +106,7 @@ def ensure_table():
     c = bq.client()
     ds = bigquery.Dataset(f"{_project()}.{DATASET}")
     ds.location = os.getenv("BQ_LOCATION", "asia-southeast1")
-    ds.description = "Article embeddings (source of truth for the vector index). Written by ai_agents/embed_articles.py."
+    ds.description = "Article embeddings (source of truth for the vector index). Written by ai_agents/jobs/embed_articles.py."
     c.create_dataset(ds, exists_ok=True)
     t = bigquery.Table(table_ref(), schema=SCHEMA)
     t.time_partitioning = bigquery.TimePartitioning(type_=bigquery.TimePartitioningType.MONTH,

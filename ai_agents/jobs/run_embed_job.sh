@@ -1,5 +1,5 @@
 #!/bin/sh
-# Entrypoint for the embed-sync Cloud Run Job (daily, after dbt-build).
+# Entrypoint for the embed-sync Cloud Run Job (step 4 of the news-pipeline workflow, after dbt-build).
 #
 # 1. embed: vectors for every article in marts.obt_articles that has none for the current
 #    (article_id, content_hash). --full looks at ALL months (~0.1 GB when nothing is
@@ -11,7 +11,7 @@
 set -u
 
 rc=0
-python ai_agents/embed_articles.py embed --full --max-tokens 30000000 || rc=1
-python ai_agents/sync_vector_index.py sync || rc=1
+python ai_agents/jobs/embed_articles.py embed --full --max-tokens 30000000 || rc=1
+python ai_agents/jobs/sync_vector_index.py sync || rc=1
 
 exit "$rc"

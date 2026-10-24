@@ -15,7 +15,7 @@ source .env
 echo "Setting up Snowflake connection: snowflake_default"
 
 # Delete old connection if exists
-docker compose -f docker-compose-airflow.yml exec -T airflow-scheduler \
+docker compose --project-directory . -f deploy/local/docker-compose-airflow.yml exec -T airflow-scheduler \
     airflow connections delete snowflake_default || true
 
 # Smart key selection: prefer container path, fall back to host path
@@ -29,7 +29,7 @@ fi
 # If the key is inside the container (recommended way), just use private_key_file
 if [[ "$PRIVATE_KEY_PATH" == /opt/airflow/.secret/* ]]; then
     echo "Using private key from inside container: $PRIVATE_KEY_PATH"
-    docker compose -f docker-compose-airflow.yml exec -T airflow-scheduler \
+    docker compose --project-directory . -f deploy/local/docker-compose-airflow.yml exec -T airflow-scheduler \
         airflow connections add snowflake_default \
             --conn-type snowflake \
             --conn-login "$SNOWFLAKE_USER" \
@@ -51,7 +51,7 @@ if [ -f "$PRIVATE_KEY_PATH" ]; then
     echo "Reading private key from host: $PRIVATE_KEY_PATH"
     PRIVATE_KEY_CONTENT=$(cat "$PRIVATE_KEY_PATH" | base64 -w 0)
     
-    docker compose -f docker-compose-airflow.yml exec -T airflow-scheduler \
+    docker compose --project-directory . -f deploy/local/docker-compose-airflow.yml exec -T airflow-scheduler \
         airflow connections add snowflake_default \
             --conn-type snowflake \
             --conn-login "$SNOWFLAKE_USER" \

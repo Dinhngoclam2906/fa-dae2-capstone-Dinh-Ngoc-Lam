@@ -15,12 +15,12 @@ source .env
 echo "Setting up PostgreSQL connection: postgres_kafka_default"
 
 # Delete old connection if exists (suppress warnings)
-docker compose -f docker-compose-airflow.yml exec -T airflow-scheduler \
+docker compose --project-directory . -f deploy/local/docker-compose-airflow.yml exec -T airflow-scheduler \
     bash -c "PYTHONWARNINGS='ignore' airflow connections delete postgres_kafka_default" \
     2>&1 | grep -E "(Successfully deleted|Did not find)" || true
 
 # Add new connection (suppress warnings)
-docker compose -f docker-compose-airflow.yml exec -T airflow-scheduler \
+docker compose --project-directory . -f deploy/local/docker-compose-airflow.yml exec -T airflow-scheduler \
     bash -c "PYTHONWARNINGS='ignore' airflow connections add postgres_kafka_default \
         --conn-type postgres \
         --conn-host kafka-postgres \

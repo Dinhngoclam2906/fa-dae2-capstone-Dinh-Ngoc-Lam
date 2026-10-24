@@ -1,7 +1,7 @@
 # visualize_results_improved.py
 # FROZEN (2026-10-24): charts for the original 2026-01 retrieval eval. Still runs on the
 # saved evaluation_results.json, but needs matplotlib + seaborn, which are not declared in
-# pyproject.toml (`uv run --with matplotlib --with seaborn python ai_agents/visualize_results.py`).
+# pyproject.toml (`uv run --with matplotlib --with seaborn python ai_agents/legacy/eval_2026_01/visualize_results.py`).
 # The current evals are in ai_agents/eval/.
 
 import json
@@ -13,7 +13,7 @@ import seaborn as sns
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
-def visualize_evaluation_results(results_file: str = "ai_agents/evaluation_results.json"):
+def visualize_evaluation_results(results_file: str = "ai_agents/legacy/eval_2026_01/evaluation_results.json"):
     """Create comprehensive comparison charts from evaluation results."""
     
     with open(results_file, "r") as f:
@@ -273,8 +273,8 @@ def visualize_evaluation_results(results_file: str = "ai_agents/evaluation_resul
     plt.tight_layout()
     
     # Save figure
-    plt.savefig('ai_agents/evaluation_results.png', dpi=300, bbox_inches='tight')
-    print("✅ Comprehensive chart saved to ai_agents/evaluation_results.png")
+    plt.savefig('ai_agents/legacy/eval_2026_01/evaluation_results.png', dpi=300, bbox_inches='tight')
+    print("✅ Comprehensive chart saved to ai_agents/legacy/eval_2026_01/evaluation_results.png")
     
     # Also create individual charts for slides
     create_individual_charts(short_methods, precision, recall, mrr, ndcg, 
@@ -307,8 +307,8 @@ def create_individual_charts(methods, precision, recall, mrr, ndcg,
     ax.set_ylim(0, 1.1)
     
     plt.tight_layout()
-    plt.savefig('ai_agents/metrics_comparison.png', dpi=300, bbox_inches='tight')
-    print("✅ Metrics comparison chart saved to ai_agents/metrics_comparison.png")
+    plt.savefig('ai_agents/legacy/eval_2026_01/metrics_comparison.png', dpi=300, bbox_inches='tight')
+    print("✅ Metrics comparison chart saved to ai_agents/legacy/eval_2026_01/metrics_comparison.png")
     plt.close()
     
     # 2. Improvement Chart (for results slide)
@@ -342,8 +342,8 @@ def create_individual_charts(methods, precision, recall, mrr, ndcg,
     ax.grid(axis='y', alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig('ai_agents/improvement_chart.png', dpi=300, bbox_inches='tight')
-    print("✅ Improvement chart saved to ai_agents/improvement_chart.png")
+    plt.savefig('ai_agents/legacy/eval_2026_01/improvement_chart.png', dpi=300, bbox_inches='tight')
+    print("✅ Improvement chart saved to ai_agents/legacy/eval_2026_01/improvement_chart.png")
     plt.close()
 
 

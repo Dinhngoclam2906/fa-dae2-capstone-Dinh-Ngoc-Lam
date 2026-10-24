@@ -3,9 +3,14 @@ name: PR CI - SQLFluff Linting and dbt Testing
 # No `paths:` filter on purpose: PR_CI is a required status check on main (branch
 # protection), and a required check that never starts (a PR touching no SQL/dbt
 # files) would block the merge forever.
+# Also on every push to main (routine work is pushed straight there): it doesn't block the
+# push, but the tests still run and the README badge shows main's real state.
 on:
   pull_request:
     branches: [main, develop]
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 # Keyless BigQuery auth: GitHub's OIDC token is exchanged through Workload Identity
 # Federation (pool github-pool, provider restricted to this repository) for a
@@ -46,6 +51,11 @@ jobs:
 
       - name: Install CI dependencies
         run: uv sync --group pr_ci --no-dev
+
+      # Pure-logic tests of the agent (question parsing, passage rescue, retrieval helpers):
+      # no network, no credentials. Config in pyproject.toml [tool.pytest.ini_options].
+      - name: Run unit tests
+        run: uv run pytest
 
       # The tracked capstone_dbt_project/.dbt/profiles.yml already has a BigQuery `ci`
       # target (method: oauth = the ADC credentials the auth step just wrote).
