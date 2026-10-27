@@ -75,3 +75,27 @@ Read-only probe for the next source; a draft `CongThuong` crawler class exists l
   4 workers / 1 s, state sync, accepted values, freshness only with its first rows, agent
   source list + parser ('Công Thương' is also the ministry's name: match "báo Công Thương" /
   congthuong, not the bare phrase).
+
+## VEN probe (2026-10-27)
+
+ven.congthuong.vn, Công Thương's English edition (Vietnam Economic News). Read-only probe; no
+crawler code written yet.
+
+- **Access:** robots.txt `Allow: /` (same file as congthuong.vn). No bot challenge.
+- **Enumeration: listing pages only.** `/sitemap.xml`, `/sitemap-index.xml`, `/news-sitemap.xml`,
+  `/rss`, `/rss.xml`, `/home.rss` all 404. The homepage lists 30 articles; the five text
+  categories (`/industry`, `/news-and-events`, `/society`, `/tourism`, `/trade`) list ~40 each:
+  185 unique articles, ids 57732-59963. Infographic / Photo / longform / video are formats, skip.
+- **Volume: ~5 articles/day** (ids 59695 on 09-03 → 59963 on ~10-27). Too small to matter for
+  Pinecone.
+- **Parsing:** the draft `CongThuong` parser works unchanged (same CMS): 14/14 random pages
+  parsed (title, date, section, body 1.9-11k chars). Ids `ven-<trailing digits>`.
+- **Sections:** Society, News and Events, Industry, Trade, Tourism. Only Society maps today;
+  'news and events' (→ National News), 'industry' / 'trade' (→ Economy & Business) and
+  'tourism' (→ Lifestyle & Travel) need `section_utils` keywords, together with Công Thương's
+  'Năng lượng' / 'Thương mại' / 'Công nghiệp'.
+- **Crawler work needed:** a listing-page mode (the crawler only reads XML sitemaps / RSS):
+  read the homepage + 5 category pages each run (6 requests), keep links matching
+  `-<digits>.html`, fetch unseen ones. Forward-only: category pages reach back to 2025-11, so
+  drop parsed articles older than `--from-date` on the first run (or accept ~185 older articles).
+- **Order:** after Công Thương has had a clean run (one new source at a time).
