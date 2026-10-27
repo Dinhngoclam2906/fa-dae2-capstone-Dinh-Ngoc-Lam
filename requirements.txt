@@ -3,7 +3,6 @@ apache-airflow-providers-postgres==5.9.0
 apache-airflow-providers-celery==3.13.0
 apache-airflow-providers-redis==3.8.0
 apache-airflow-providers-http==4.12.0
-apache-airflow-providers-apache-kafka==1.4.0
 
 dbt-core==1.10.15
 dbt-postgres==1.9.1
@@ -11,7 +10,6 @@ dbt-bigquery==1.12.1
 
 psycopg2-binary==2.9.10
 snowflake-connector-python[pandas,secure-local-storage]==3.18.0
-kafka-python>=2.2.0
 redis==4.6.0
 
 # BigQuery ingestion (Phase 2/3: guardian_api_backfill.py, load_raw_to_bigquery.py)

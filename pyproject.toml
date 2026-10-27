@@ -10,7 +10,6 @@ dependencies = [
     "aiohttp>=3.13.1",
     "beautifulsoup4>=4.15.0",
     "choco>=1.0.5",
-    "confluent-kafka>=2.13.0",
     "dbt-bigquery>=1.10.0",
     "dbt-core>=1.10.13",
     "en-core-web-sm",
@@ -18,11 +17,10 @@ dependencies = [
     "flashrank>=0.2.10",
     "git-filter-repo>=2.47.0",
     "google-cloud-bigquery>=3.45.0",
-    "google-cloud-storage>=2.4,<3.2",  # dbt-bigquery (all current versions) caps this at <3.2
+    "google-cloud-storage>=2.4,<3.2", # dbt-bigquery (all current versions) caps this at <3.2
     "huggingface-hub[hf-xet]>=0.35.3",
     "ijson>=3.4.0",
     "joblib>=1.5.2",
-    "kafka-python>=2.2.15",
     "kaggle>=1.7.4.5",
     "keybert>=0.9.0",
     "langchain>=1.1.0",
@@ -81,7 +79,6 @@ airflow = [
     "dbt-postgres>=1.8.0",
     "snowflake-connector-python[pandas,secure-local-storage]>=3.17.0",
     "psycopg[binary]>=3.2",
-    "kafka-python>=2.0.2",           # remove if you don’t produce/consume from DAGs
 ]
 
 [tool.uv.workspace]

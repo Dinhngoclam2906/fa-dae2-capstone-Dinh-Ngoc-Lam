@@ -106,17 +106,13 @@ Guardian API ─┐                                        ┌─> Bronze archiv
 
 **5.1.1. Real-time / frequent-poll Pipeline:**
 
-**5.1.1.1. Kafka Producer/Consumer** (`ingestion/streaming/`):
-Purpose: poll the Guardian API and stream new articles through Kafka to PostgreSQL staging.
-Key Features:
-- State Tracking: PostgreSQL table tracks processed articles (avoid duplicates)
-- Incremental Polling: Only fetches articles not yet seen
-- Rate Limiting: Handles Guardian API limits (sleeps on 429 errors)
-- Idempotent: Safe to re-run (won't create duplicates)
+The real-time path is **frequent polling**: the Cloud Run ingestion jobs (5.1.2.4) fetch new
+articles every 4 hours at no fixed cost. News needs no sub-minute delivery and there is a single
+consumer, so a message broker adds cost without benefit.
 
-> Built and tested (milestone M03) but **unused in production**: frequent polling by the
-> Cloud Run ingestion jobs (5.1.2.4) delivers new articles every 4 hours at no fixed cost,
-> so Kafka lands data in local PostgreSQL only. Whether to remove it is still open.
+> A Kafka producer/consumer path (Guardian API → Kafka → PostgreSQL staging) was built and tested
+> for milestone M03, never used in production, and **removed on 2026-10-27**. It is in git history
+> up to commit `bceb138` (`ingestion/streaming/`, `infra/local/docker-compose-kafka.yml`).
 
 **5.1.2. Batch & Backfill Data Processing:**
 
@@ -171,7 +167,6 @@ The dbt (data build tool) layer transforms raw multi-source article data into **
 - **Pinecone:** serverless vector index for the agent's semantic search.
 - **LangGraph + LangChain:** the conversational agent and its tools.
 - **OpenAI (`gpt-5.4-mini`):** the chat model.
-- **Kafka:** Real-time streaming primitive for the Guardian API path (built, unused in production).
 - **Airflow:** Local/manual orchestration of the ingestion + dbt steps (validated end-to-end; production uses Cloud Workflows).
 - **GitHub Actions:** PR CI (`dbt debug` → `deps` → SQLFluff → `dbt test`) against BigQuery, authenticated **keylessly** via Workload Identity Federation as a read-only `ci-runner` service account; a required status check on `main`.
 
@@ -405,8 +400,7 @@ these in `docs/repo_layout.md`.
 ```
 fa-dae2-capstone-Dinh-Ngoc-Lam/
 ├── ingestion/                  # 1. collect: crawlers, BigQuery loader, Bronze archive, Cloud Run Job entrypoints
-│   ├── legacy/                 #    Snowflake-era collector / loader
-│   └── streaming/              #    Kafka producer / consumer (unused in production)
+│   └── legacy/                 #    Snowflake-era collector / loader
 ├── transform/                  # 2. model: the dbt project (BigQuery), its Dockerfile = dbt-build job image
 │   ├── models/                 #    01_staging -> 02_intermediate -> 03_mart (obt_articles) + monitoring
 │   ├── macros/  tests/         #    section_utils, generate_news_hash, ...; custom data tests
@@ -423,7 +417,7 @@ fa-dae2-capstone-Dinh-Ngoc-Lam/
 ├── monitoring/                 # daily cost report (cost_report.py, deploy script)
 ├── infra/
 │   ├── docker/                 # Dockerfile.ingestion / .embed / .cost (the Cloud Run Job images)
-│   └── local/                  # docker compose: agent-memory Postgres, Kafka, Airflow; Dockerfile.airflow; sql/init.sql
+│   └── local/                  # docker compose: agent-memory Postgres, Airflow; Dockerfile.airflow; sql/init.sql
 ├── tests/                      # pytest unit tests (no network): question parsing, passage rescue, retrieval
 ├── docs/                       # reports, decisions, eval results, lessons_learned; images/ (diagram + ERD)
 ├── data/                       # local working data (git-ignored; the crawlers' cwd-relative state lives here)
@@ -458,7 +452,6 @@ gcloud auth application-default login
 **4. Start Local Docker Services** (in `infra/local/`, split by concern - start only what you need; run from the repo root):
 ```
 make memory-db     # agent memory (Postgres, port 5433); without it the agent keeps history in memory
-make kafka         # kafka + kafdrop + airflow metadata pg
 make airflow       # airflow
 make down          # stop them all
 ```
@@ -486,12 +479,6 @@ Load everything to BigQuery:
 uv run python ingestion/load_raw_to_bigquery.py --source hf
 uv run python ingestion/load_raw_to_bigquery.py --source api
 uv run python ingestion/load_raw_to_bigquery.py --source vn --max-bytes-billed 5000000000
-```
-
-Real-time (Guardian API → Kafka → PostgreSQL only, unused in production):
-```
-uv run python ingestion/streaming/kafka_producer.py --once --max-articles 100
-uv run python ingestion/streaming/kafka_consumer.py --once
 ```
 
 **6. Build the warehouse (dbt, from `transform/`):**

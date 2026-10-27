@@ -404,19 +404,6 @@ wheels = [
 ]
 
 [[package]]
-name = "confluent-kafka"
-version = "2.13.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b4/d0/1f5055331fa660225de6829b143e6f083913f0a96481134a91390bad62c1/confluent_kafka-2.13.0.tar.gz", hash = "sha256:eff7a4391a9e6d4a33f0c05d0935b200a7463834f1f5d6e6253be318f910babd", size = 273621, upload-time = "2026-01-05T10:25:08.078Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/bd/c2ab440b4c4847a37b21e9623bbeaf17982ca45595ad62b8435a26d680f7/confluent_kafka-2.13.0-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:0af90b3c566786017a01693da0ec4a876ca14cf37bc6164872652a6cf2702453", size = 3195849, upload-time = "2026-01-05T10:24:00.854Z" },
-    { url = "https://files.pythonhosted.org/packages/6a/40/a25a5895cf522bada81fc7ba6c0ad29219843206ede4e8d2138b7b095652/confluent_kafka-2.13.0-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:f25d05604dd92e9de72707582dded53aeb4737ef2e2c097a3ca08650200fc446", size = 3634806, upload-time = "2026-01-05T10:24:05.496Z" },
-    { url = "https://files.pythonhosted.org/packages/fd/46/db30d27184ac8fb673ca469d576ef582def0b613a69456631734f7a5e267/confluent_kafka-2.13.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:74ddf5ec7fa6058221a619c850f44bdbe8d969d7ed6efe8abdc857d2e233df20", size = 3720848, upload-time = "2026-01-05T10:24:07.831Z" },
-    { url = "https://files.pythonhosted.org/packages/fc/f8/5b940a080ab71fc3c585839eae0c26341a749a7ebc001fca0276aff9df40/confluent_kafka-2.13.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:f8d1d00397f3f32a1bcf4604d4164bf75838bd009e1e28282a7ae25e16814ea4", size = 3977677, upload-time = "2026-01-05T10:24:09.988Z" },
-    { url = "https://files.pythonhosted.org/packages/e1/cf/f9f979c08cfe1b8fd9203b329fc5c8c410e948f01272434bc1ce0c6334a5/confluent_kafka-2.13.0-cp313-cp313-win_amd64.whl", hash = "sha256:9d1fd035e2c47c4db5fe9b0f59a28fe2f2f1012887290dd0ea7d46741f686e99", size = 4153481, upload-time = "2026-01-05T10:24:12.167Z" },
-]
-
-[[package]]
 name = "cryptography"
 version = "46.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -772,7 +759,6 @@ dependencies = [
     { name = "aiohttp" },
     { name = "beautifulsoup4" },
     { name = "choco" },
-    { name = "confluent-kafka" },
     { name = "dbt-bigquery" },
     { name = "dbt-core" },
     { name = "en-core-web-sm" },
@@ -784,7 +770,6 @@ dependencies = [
     { name = "huggingface-hub", extra = ["hf-xet"] },
     { name = "ijson" },
     { name = "joblib" },
-    { name = "kafka-python" },
     { name = "kaggle" },
     { name = "keybert" },
     { name = "langchain" },
@@ -828,7 +813,6 @@ airflow = [
     { name = "dbt-bigquery" },
     { name = "dbt-core" },
     { name = "dbt-postgres" },
-    { name = "kafka-python" },
     { name = "psycopg", extra = ["binary"] },
     { name = "snowflake-connector-python", extra = ["pandas", "secure-local-storage"] },
 ]
@@ -851,7 +835,6 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.1" },
     { name = "beautifulsoup4", specifier = ">=4.15.0" },
     { name = "choco", specifier = ">=1.0.5" },
-    { name = "confluent-kafka", specifier = ">=2.13.0" },
     { name = "dbt-bigquery", specifier = ">=1.10.0" },
     { name = "dbt-core", specifier = ">=1.10.13" },
     { name = "en-core-web-sm", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0.tar.gz" },
@@ -863,7 +846,6 @@ requires-dist = [
     { name = "huggingface-hub", extras = ["hf-xet"], specifier = ">=0.35.3" },
     { name = "ijson", specifier = ">=3.4.0" },
     { name = "joblib", specifier = ">=1.5.2" },
-    { name = "kafka-python", specifier = ">=2.2.15" },
     { name = "kaggle", specifier = ">=1.7.4.5" },
     { name = "keybert", specifier = ">=0.9.0" },
     { name = "langchain", specifier = ">=1.1.0" },
@@ -907,7 +889,6 @@ airflow = [
     { name = "dbt-bigquery", specifier = ">=1.8.0" },
     { name = "dbt-core", specifier = ">=1.8.0" },
     { name = "dbt-postgres", specifier = ">=1.8.0" },
-    { name = "kafka-python", specifier = ">=2.0.2" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "snowflake-connector-python", extras = ["pandas", "secure-local-storage"], specifier = ">=3.17.0" },
 ]
@@ -1729,15 +1710,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/02/49/9d1284d0dc65e2c757b74c6687b6d319b02f822ad039e5c512df9194d9dd/jupyter_core-5.9.1.tar.gz", hash = "sha256:4d09aaff303b9566c3ce657f580bd089ff5c91f5f89cf7d8846c3cdf465b5508", size = 89814, upload-time = "2025-10-16T19:19:18.444Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e7/e7/80988e32bf6f73919a113473a604f5a8f09094de312b9d52b79c2df7612b/jupyter_core-5.9.1-py3-none-any.whl", hash = "sha256:ebf87fdc6073d142e114c72c9e29a9d7ca03fad818c5d300ce2adc1fb0743407", size = 29032, upload-time = "2025-10-16T19:19:16.783Z" },
-]
-
-[[package]]
-name = "kafka-python"
-version = "2.2.15"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/da/67/1434436f3cb409443f72a4843b877ac2d9bf586a31a0e966cf1dc4dc9a94/kafka_python-2.2.15.tar.gz", hash = "sha256:e0f480a45f3814cb0eb705b8b4f61069e1be61dae0d8c69d0f1f2da33eea1bd5", size = 347870, upload-time = "2025-07-01T17:37:53.686Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e6/35/e8bfed5425e8fe685bd03ec3f5135ee8b88c11558baa59c0d12fbd2a20ae/kafka_python-2.2.15-py2.py3-none-any.whl", hash = "sha256:84c0993cd4f7f2f01e92d8104ea9bdf631aff72fc5e6ea62eb3bdf1d56528fc3", size = 309751, upload-time = "2025-07-01T17:37:51.87Z" },
 ]
 
 [[package]]

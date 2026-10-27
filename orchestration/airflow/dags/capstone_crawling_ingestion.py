@@ -4,9 +4,9 @@ Guardian Ingestion DAG
 
 Incremental ("real-time enough") Guardian Content API crawl -> BigQuery -> trigger dbt.
 
-Replaces the old Kafka producer/consumer real-time path (kept in
-ingestion/streaming/ but not scheduled here - see PROGRESS_LOG.md's Kafka
-parking-lot entry for the full keep-vs-remove discussion, still open). Each run of
+Replaces the old Kafka producer/consumer real-time path (removed from the repo on
+2026-10-27; it is in git history before that date - see PROGRESS_LOG.md's Kafka
+parking-lot entry for the keep-vs-remove discussion). Each run of
 guardian_api_backfill.py resumes from its own saved cursor up to today, so scheduling
 this frequently gives near-real-time freshness without a message broker - news
 articles don't need sub-minute delivery, and there's only ever been one consumer of
