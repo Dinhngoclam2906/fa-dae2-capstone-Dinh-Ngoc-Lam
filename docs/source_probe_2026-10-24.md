@@ -99,3 +99,18 @@ crawler code written yet.
   `-<digits>.html`, fetch unseen ones. Forward-only: category pages reach back to 2025-11, so
   drop parsed articles older than `--from-date` on the first run (or accept ~185 older articles).
 - **Order:** after Công Thương has had a clean run (one new source at a time).
+
+## Báo Đầu tư and Lao Động re-check (2026-10-27)
+
+- **Báo Đầu tư (baodautu.vn): still broken feeds, but listing pages work.** robots.txt `Allow: /`.
+  `/sitemap.xml` is a valid index (167 children, `news-YYYY-M.xml` back to 2013-01), but every
+  monthly child tried (2025-12, 2026-9, 2026-10) answers HTTP 200 with the 44-byte body
+  `Not found act function sitemap_month` (a server-side error, every time: not truncation).
+  `/rss/tin-moi.rss` is valid RSS with **0 items**; `/rss.html` returns the homepage. What works:
+  `/sitemaps/categories.xml` (21 sections, `-d<N>/` paths) and the homepage (88 article links,
+  `...-d<id>.html`, ids up to 732219). So it fits the **listing-page mode** VEN needs: homepage +
+  section pages each run. Skip the advertising section (`muc-thong-tin-quang-ba-d80`) and likely
+  corporate PR (`thong-tin-doanh-nghiep-d36`). Volume and article parsing not measured yet.
+- **Lao Động (laodong.vn): skip, final.** Every URL, robots.txt included, still returns a
+  JavaScript cookie challenge (`document.cookie="D1N=..."; location.reload()`). Answering it
+  means defeating their bot protection, which this project doesn't do.
