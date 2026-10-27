@@ -70,7 +70,7 @@ SOURCE_NAMES = {"guardian": "The Guardian", "tuoitre": "Tuổi Trẻ", "thanhnie
                 "vneconomy": "VnEconomy", "vietnamnet": "VietNamNet", "vnexpress": "VnExpress",
                 "tuoitre_en": "Tuoi Tre News", "vneconomy_en": "VnEconomy (English)",
                 "vietnamnet_en": "VietNamNet Global", "vnexpress_en": "VnExpress International",
-                "dantri": "Dân Trí", "dantri_en": "DTiNews", "vir": "Vietnam Investment Review",
+                "dantri_en": "DTiNews", "vir": "Vietnam Investment Review",
                 "vietnamfinance": "VietnamFinance"}
 # (phrase, language, window in days back from asked_on). Some are deliberately outside the
 # recency_days patterns ("in the last few days", "mấy ngày qua").

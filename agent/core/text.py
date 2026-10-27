@@ -162,7 +162,8 @@ _SOURCE_PATTERNS = [
     (r"Tuổi Trẻ|Tuoi Tre|TUỔI TRẺ|(?i:báo tuổi trẻ|báo tuoi tre)", ["tuoitre", "tuoitre_en"]),
     (r"Thanh Niên|Thanh Nien|THANH NIÊN|(?i:báo thanh niên|báo thanh nien)", ["thanhnien"]),
     # "dân trí" is also a common phrase (public awareness, "nâng cao dân trí").
-    (r"Dân Trí|Dan Tri|DÂN TRÍ|(?i:báo dân trí|báo dan tri|dantri)", ["dantri", "dantri_en"]),
+    # Dân Trí itself was dropped (2026-10-27: it refuses Cloud Run), so its name scopes to DTiNews.
+    (r"Dân Trí|Dan Tri|DÂN TRÍ|(?i:báo dân trí|báo dan tri|dantri)", ["dantri_en"]),
     (r"(?i)vneconomy", ["vneconomy", "vneconomy_en"]),
     (r"(?i)vietnamnet", ["vietnamnet", "vietnamnet_en"]),
     (r"(?i)vnexpress", ["vnexpress", "vnexpress_en"]),
@@ -282,8 +283,8 @@ def refers_to_previous(query: str) -> bool:
 
 
 INTRO = (
-    "I'm a news assistant for The Guardian and thirteen Vietnamese news sites and editions "
-    "(Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet, VnExpress, Dân Trí and their English "
+    "I'm a news assistant for The Guardian and twelve Vietnamese news sites and editions "
+    "(Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet, VnExpress and their English "
     "editions, plus Vietnam Investment Review and VietnamFinance), "
     "hundreds of thousands of articles, updated every 4 hours. I can find articles by topic, date, "
     "source or section, summarise them, and show what's trending. I answer in English or "

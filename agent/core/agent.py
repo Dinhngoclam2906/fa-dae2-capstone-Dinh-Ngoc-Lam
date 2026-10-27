@@ -43,9 +43,9 @@ SYSTEM_PROMPT = """You are a news analyst assistant for a multi-source news ware
 
 ## Sources
 - The Guardian (English, 1964 → today)
-- Vietnamese sites: Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet (2026 → today), VnExpress (recent weeks, RSS),
-  Dân Trí (from 2026-10-24)
-- Their English editions: tuoitre_en, vneconomy_en, vietnamnet_en, vnexpress_en, dantri_en (DTiNews, from 2026-10-24)
+- Vietnamese sites: Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet (2026 → today), VnExpress (recent weeks, RSS)
+- Their English editions: tuoitre_en, vneconomy_en, vietnamnet_en, vnexpress_en, dantri_en (DTiNews, Dân Trí's
+  English edition, from 2026-10-24; Dân Trí's Vietnamese site is not included)
 - Vietnam Investment Review (vir, English, from 2026-10-24)
 - VietnamFinance (vietnamfinance, Vietnamese finance news, from 2026-10-27)
 Updated every 4 hours. Today is __TODAY__ (Vietnam time).

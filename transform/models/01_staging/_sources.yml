@@ -54,11 +54,11 @@ sources:
               - accepted_values:
                   values: ['batch', 'realtime']
           - name: source_name
-            description: "Origin site: 'guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'vietnamnet', or the English editions 'tuoitre_en' (news.tuoitre.vn) / 'vneconomy_en' (en.vneconomy.vn) / 'vietnamnet_en' (vietnamnet.vn/en), plus 'vnexpress' / 'vnexpress_en' (RSS-only), and since 2026-10-24 'dantri' / 'dantri_en' (DTiNews) / 'vir' (Vietnam Investment Review), since 2026-10-27 'vietnamfinance'"
+            description: "Origin site: 'guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'vietnamnet', or the English editions 'tuoitre_en' (news.tuoitre.vn) / 'vneconomy_en' (en.vneconomy.vn) / 'vietnamnet_en' (vietnamnet.vn/en), plus 'vnexpress' / 'vnexpress_en' (RSS-only), and since 2026-10-24 'dantri_en' (DTiNews) / 'vir' (Vietnam Investment Review), since 2026-10-27 'vietnamfinance'"
             tests:
               - not_null
               - accepted_values:
-                  values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'tuoitre_en', 'vneconomy_en', 'vietnamnet', 'vietnamnet_en', 'vnexpress', 'vnexpress_en', 'dantri', 'dantri_en', 'vir', 'vietnamfinance']
+                  values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'tuoitre_en', 'vneconomy_en', 'vietnamnet', 'vietnamnet_en', 'vnexpress', 'vnexpress_en', 'dantri_en', 'vir', 'vietnamfinance']
           - name: language
             description: "Article language: 'en' or 'vi'"
             tests:

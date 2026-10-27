@@ -19,7 +19,8 @@ pids=""
 # dantri (dantri.com.vn) is NOT in the loop: its article pages time out from Cloud Run
 # (ConnectTimeout on every page, 2026-10-24) although its sitemap / RSS load and the same
 # pages load from a home connection - it apparently refuses datacenter addresses. The
-# crawler class stays for a run from elsewhere; dantri_en (dtinews.dantri.com.vn) works.
+# source was dropped on 2026-10-27 (no proxies; DTiNews covers it in English). Its
+# crawler class stays only as the base of dantri_en (dtinews.dantri.com.vn), which works.
 for s in tuoitre thanhnien vneconomy tuoitre_en vneconomy_en vietnamnet vietnamnet_en vnexpress vnexpress_en \
          dantri_en vir vietnamfinance; do
   # VnExpress (RSS-only, by policy) gets a gentler rate: 2 workers, 1.5 s apart; the
