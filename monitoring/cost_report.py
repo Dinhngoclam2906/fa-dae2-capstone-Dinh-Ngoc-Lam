@@ -116,6 +116,10 @@ class Report:
                    DATE(creation_time) = @d AS is_day, SUM(total_bytes_billed) AS b
             FROM `region-{REGION}`.INFORMATION_SCHEMA.JOBS_BY_PROJECT
             WHERE DATE(creation_time) BETWEEN @m0 AND @d AND job_type = 'QUERY'
+              -- A script's bytes are the sum of its child statements, which are listed too
+              -- (dbt's insert_overwrite MERGE): counting both overstated usage by ~40%.
+              -- Without the parents it equals the billing export to 0.01 GiB (10-24..26).
+              AND IFNULL(statement_type, '') != 'SCRIPT'
             GROUP BY 1, 2""", self.dparams())
         before = sum((r["b"] or 0) for r in rows if not r["is_day"]) / TIB
         day_total = sum((r["b"] or 0) for r in rows if r["is_day"]) / TIB
