@@ -98,6 +98,7 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-24 | Tooling | Repo-wide path rewrite: a folder rename blocked on Windows, a regex that missed Docker destinations, `uv.lock` pinning the old workspace path |
 | 2026-10-27 | BigQuery | Physical storage billing + `insert_overwrite` every 4 h: ~80% of the billed bytes were time travel + fail-safe; the cost report (logical bytes) showed a fifth of the bill |
 | 2026-10-27 | Tooling | Python text mode on Windows rewrote LF files as CRLF (a shell script the Linux image runs) |
+| 2026-10-27 | BigQuery | `INFORMATION_SCHEMA.JOBS` lists a script and its child statements: summing all jobs counted dbt's insert_overwrite MERGE twice (+40%) |
 
 ---
 
@@ -315,6 +316,18 @@ Reading the SQL found none of these:
   and `scratch` stay physical (0.9 GiB). The model can only change once per 14 days.
 - **Lesson:** physical billing pays off for append-mostly tables, not for tables rewritten
   several times a day. Check an estimate against the billing export whenever one exists.
+
+### Summing `INFORMATION_SCHEMA.JOBS` counts scripts twice (2026-10-27, `b44435f`)
+- **Symptom:** the cost report said the pipeline scanned 24.3 GiB on 10-26; the billing export
+  billed 17.4 GiB. A planned optimisation (static partitions, "partition discovery is ~⅓ of the
+  bill") was built on the inflated view.
+- **Cause:** dbt's `insert_overwrite` runs as a BigQuery script. JOBS lists the parent
+  (`statement_type = 'SCRIPT'`, bytes = the sum of its children) and every child statement
+  (the MERGE), so a plain `SUM(total_bytes_billed)` counts the MERGE twice.
+- **Fix:** exclude SCRIPT parents (`IFNULL(statement_type, '') != 'SCRIPT'`); the sum then equals
+  the export's Analysis usage to 0.01 GiB (10-24..26).
+- **Lesson:** when summing JOBS, drop script parents (or children, not both). Reconcile any usage
+  estimate with the billing export before optimising against it.
 
 ## 3. Cloud Run, Scheduler, Workflows, Build, IAM
 
