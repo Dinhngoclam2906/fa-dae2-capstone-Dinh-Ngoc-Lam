@@ -136,7 +136,8 @@ class Article:
 @dataclass
 class Skipped:
     """parse_article's answer for a page rejected ON PURPOSE (e.g. a press-release wire):
-    marked seen so it is never fetched again, unlike a failed parse, which is retried."""
+    marked seen so it is never fetched again, unlike a failed parse, which is retried
+    (up to --max-failures runs, see record_failures)."""
     article_id: str
     reason: str
 
@@ -640,10 +641,40 @@ class Vir(HtmlNewsSource):
         return [f"{self.base_url}/newssitemap-site-1.xml", f"{self.base_url}/rss_feed/"]
 
 
+class VietnamFinance(HtmlNewsSource):
+    """VietnamFinance (vietnamfinance.vn, finance), added 2026-10-27 FORWARD-ONLY: its
+    /sitemap.xml lists the latest ~750 articles (~2 weeks, dated), read for the current
+    month. /home.rss is stale (stops 2026-09-07), so it is not used. JSON-LD NewsArticle
+    has headline / datePublished but no articleSection, and article:section is always
+    'News': the section is the JSON-LD BreadcrumbList's top crumb ('Tài chính'). Body in
+    div.detail-content. Ids: the number after '-d' (`...-d152776.html`), prefixed."""
+    name = "vietnamfinance"
+    base_url = "https://vietnamfinance.vn"
+    sitemap_index_url = ""
+    BODY_SELECTORS = ("div.detail-content",)
+    SECTION_SELECTORS: tuple[str, ...] = ()
+    H1_SELECTORS = ("h1.detail-title", "h1")
+    _ID_RE = re.compile(r"-d(\d{4,})\.html?(?:$|[?#])")
+
+    def article_id(self, url):
+        m = self._ID_RE.search(url)
+        return f"{self.name}-{m.group(1)}" if m else super().article_id(url)
+
+    def parse_article(self, html, url, lastmod):
+        art = super().parse_article(html, url, lastmod)
+        if art is not None:
+            art.section_name = _jsonld_breadcrumb_section(html)
+        return art
+
+    def month_sitemap_urls(self, index_children, year, month):
+        return [f"{self.base_url}/sitemap.xml"] if _is_current_month(year, month) else []
+
+
 SOURCES: dict[str, NewsSource] = {
     s.name: s
     for s in (TuoiTre(), ThanhNien(), VnEconomy(), TuoiTreEn(), VnEconomyEn(), VietnamNet(),
-              VietnamNetEn(), VnExpress(), VnExpressEn(), DanTri(), DanTriEn(), Vir())
+              VietnamNetEn(), VnExpress(), VnExpressEn(), DanTri(), DanTriEn(), Vir(),
+              VietnamFinance())
 }
 
 
@@ -920,6 +951,30 @@ def append_seen(path: Path, ids: list[str]) -> None:
         fh.write("\n".join(ids) + "\n")
 
 
+def record_failures(
+    failures: dict[str, int], failed: list[str], parsed: list[str], max_failures: int
+) -> list[str]:
+    """Update the per-article failure counts in place; return the ids to give up on.
+
+    A page that fails (fetch error or no title/date/body: mostly video and photo pages)
+    is retried every run while its month is in the tail - ~450 pages a run before
+    2026-10-27. After `max_failures` counted runs it is given up and marked seen, like a
+    Skipped page. A run counts only if some page of the batch parsed: when none did,
+    the site changed its HTML or blocked us, and counting would silently drop everything.
+    max_failures <= 0 never gives up."""
+    for aid in parsed:
+        failures.pop(aid, None)
+    if not parsed or max_failures <= 0:
+        return []
+    gave_up = []
+    for aid in failed:
+        failures[aid] = failures.get(aid, 0) + 1
+        if failures[aid] >= max_failures:
+            del failures[aid]
+            gave_up.append(aid)
+    return gave_up
+
+
 # -------------------------------------------------------------------------- crawl
 
 
@@ -944,6 +999,8 @@ def crawl_month(
     run_tag: str,
     raw_dir: Path | None = raw_archive.DEFAULT_DIR,
     flush_every: int = 100,
+    failures: dict[str, int] | None = None,
+    max_failures: int = 0,
 ) -> tuple[int, bool, int]:
     """Return (n_written, ok, n_new_urls). ok is False on a sitemap failure or when the
     run budget truncated the month - the caller must NOT advance the cursor then.
@@ -958,7 +1015,8 @@ def crawl_month(
     what makes data show up in the output directory while a month is still in
     progress, and it also means a kill mid-month loses at most one partial batch.
     Each flush also writes the batch's raw HTML to `raw_dir` (Bronze; see
-    raw_archive.py), unless it is None."""
+    raw_archive.py), unless it is None. Pages that keep failing are counted in
+    `failures` and given up after `max_failures` runs (record_failures)."""
     crawl_ts = datetime.now(timezone.utc).replace(tzinfo=None)
 
     frontier: dict[str, tuple[str, datetime | None]] = {}
@@ -1006,7 +1064,8 @@ def crawl_month(
 
     written = 0
     parsed = 0
-    failed = 0
+    failed_ids: list[str] = []
+    ok_ids: list[str] = []
     skip_ids: list[str] = []
     part = 0
     buffer: list[dict] = []
@@ -1029,13 +1088,14 @@ def crawl_month(
 
     if items:
         with ThreadPoolExecutor(max_workers=max(1, concurrency)) as ex:
-            futures = [ex.submit(_one, item) for item in items]
+            futures = {ex.submit(_one, item): item[0] for item in items}
             for fut in as_completed(futures):
                 res = fut.result()
                 art = res[0] if res else None
                 if art is None:
-                    failed += 1
+                    failed_ids.append(futures[fut])
                     continue
+                ok_ids.append(futures[fut])
                 if isinstance(art, Skipped):
                     skip_ids.append(art.article_id)
                     continue
@@ -1071,10 +1131,20 @@ def crawl_month(
     if skip_ids:  # rejected on purpose: never fetch again
         append_seen(seen_path, skip_ids)
         seen.update(skip_ids)
-    if failed or skip_ids:
+    gave_up: list[str] = []
+    if failures is not None:
+        gave_up = record_failures(failures, failed_ids, ok_ids, max_failures)
+        if gave_up:  # failed max_failures runs in a row: stop re-fetching them
+            append_seen(seen_path, gave_up)
+            seen.update(gave_up)
+            logger.info("[%s] %04d-%02d: gave up on %d pages after %d failed runs: %s",
+                        source.name, year, month, len(gave_up), max_failures,
+                        " ".join(frontier[a][0] for a in gave_up[:20])
+                        + (" ..." if len(gave_up) > 20 else ""))
+    if failed_ids or skip_ids:
         logger.info(
-            "[%s] %04d-%02d: %d parsed, %d failed/skipped, %d skipped on purpose",
-            source.name, year, month, parsed, failed, len(skip_ids),
+            "[%s] %04d-%02d: %d parsed, %d failed/skipped, %d skipped on purpose, %d given up",
+            source.name, year, month, parsed, len(failed_ids), len(skip_ids), len(gave_up),
         )
     return written, (sitemaps_ok and not truncated), len(frontier)
 
@@ -1126,6 +1196,9 @@ def main() -> int:
         help="default: data/batch/vn_news_state.<source>.json (per-source, so the "
         "three sources run in parallel with independent state/lock/seen)",
     )
+    ap.add_argument("--max-failures", type=int, default=6,
+                    help="give up on (mark seen) a page that failed this many runs in a row "
+                         "(6 = one day at the 4-hourly schedule; 0 = retry forever)")
     ap.add_argument("--dry-run", action="store_true", help="walk sitemaps + count urls only")
     ap.add_argument("--reset", action="store_true", help="ignore saved cursor + seen set")
     args = ap.parse_args()
@@ -1146,6 +1219,7 @@ def main() -> int:
     lock.write_text(f"pid={os.getpid()} source={args.source} started={datetime.now(timezone.utc).isoformat()}\n")
 
     seen_path = state_file.with_suffix(".seen")
+    failures_path = state_file.with_suffix(".failures.json")  # {article_id: failed runs}
     run_tag = datetime.now().strftime("%Y%m%dT%H%M%S")
     realtime_floor = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
         days=args.realtime_cutoff_days
@@ -1172,6 +1246,7 @@ def main() -> int:
                         args.source, cursor.strftime("%Y-%m"), tail_month.strftime("%Y-%m"))
             cursor = tail_month
         seen = set() if args.reset else load_seen(seen_path)
+        failures: dict[str, int] = {} if args.reset else load_state(failures_path)
 
         session = make_session(pool=max(16, args.concurrency + 4))
         logger.info("[%s] sitemap index: %s", args.source, source.sitemap_index_url)
@@ -1210,7 +1285,9 @@ def main() -> int:
                 output_dir=args.output_dir / args.source,
                 seen_path=seen_path, run_tag=run_tag,
                 raw_dir=Path(args.raw_archive_dir) if args.raw_archive_dir else None,
+                failures=failures, max_failures=args.max_failures,
             )
+            save_state(failures_path, failures)
             run_new += n
             totals += n
             months_done += 1

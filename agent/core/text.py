@@ -156,6 +156,8 @@ _SOURCE_PATTERNS = [
     (r"(?i)vneconomy \(?english\)?|en\.vneconomy", ["vneconomy_en"]),
     (r"(?i)dtinews|dân trí english|dan tri english", ["dantri_en"]),
     (r"\bVIR\b|(?i:vietnam investment review|vir\.com\.vn)", ["vir"]),
+    # One word only: "Vietnam finance" is also an ordinary topic.
+    (r"(?i)vietnamfinance", ["vietnamfinance"]),
     (r"(?i)\bguardian\b", ["guardian"]),
     (r"Tuổi Trẻ|Tuoi Tre|TUỔI TRẺ|(?i:báo tuổi trẻ|báo tuoi tre)", ["tuoitre", "tuoitre_en"]),
     (r"Thanh Niên|Thanh Nien|THANH NIÊN|(?i:báo thanh niên|báo thanh nien)", ["thanhnien"]),
@@ -280,9 +282,9 @@ def refers_to_previous(query: str) -> bool:
 
 
 INTRO = (
-    "I'm a news assistant for The Guardian and twelve Vietnamese news sites and editions "
+    "I'm a news assistant for The Guardian and thirteen Vietnamese news sites and editions "
     "(Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet, VnExpress, Dân Trí and their English "
-    "editions, plus Vietnam Investment Review), "
+    "editions, plus Vietnam Investment Review and VietnamFinance), "
     "hundreds of thousands of articles, updated every 4 hours. I can find articles by topic, date, "
     "source or section, summarise them, and show what's trending. I answer in English or "
     "Vietnamese.\n\nTry: \"What's the latest on fuel prices in Vietnam?\" or "

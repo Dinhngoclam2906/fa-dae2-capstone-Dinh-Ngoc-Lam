@@ -9,8 +9,9 @@ history every 4 hours. The bulk Parquet data itself does NOT need this treatment
 each run's crawl output gets uploaded to GCS by load_raw_to_bigquery.py's own
 upload_tree() regardless, so only these two small JSON files need to round-trip.
 
-The vn-ingestion job round-trips its three per-source crawler states plus their
-`.seen` sidecars (~1.5 MB each: the VN crawler's dedupe set) the same way.
+The vn-ingestion job round-trips its per-source crawler states plus their `.seen`
+sidecars (~1.5 MB each: the VN crawler's dedupe set) and `.failures.json` (pages that
+keep failing, counted until given up) the same way.
 
 Usage:
     python sync_job_state.py pull [JOB]   # before running the crawl+load
@@ -31,14 +32,14 @@ from google.cloud import storage
 load_dotenv()
 
 VN_SOURCES = ("tuoitre", "thanhnien", "vneconomy", "tuoitre_en", "vneconomy_en", "vietnamnet", "vietnamnet_en", "vnexpress", "vnexpress_en",
-              "dantri", "dantri_en", "vir")
+              "dantri", "dantri_en", "vir", "vietnamfinance")
 STATE_FILES = {
     "guardian-ingestion": [
         "data/batch/guardian_api_state.json",
         "data/batch/.pending_merge.api.json",
     ],
     "vn-ingestion": [
-        *(f"data/batch/vn_news_state.{s}.{ext}" for s in VN_SOURCES for ext in ("json", "seen")),
+        *(f"data/batch/vn_news_state.{s}.{ext}" for s in VN_SOURCES for ext in ("json", "seen", "failures.json")),
         "data/batch/.pending_merge.vn.json",
     ],
 }

@@ -15,7 +15,7 @@ free allowance is used up. Read-only apart from --save; ~0.1 GB of BigQuery per 
 Not counted (inside free tiers at our volume): Workflows, Scheduler, Secret Manager,
 Cloud Build, Logging, Monitoring. Not counted at all: Gemini query embeddings (~10 tokens
 a question) and one-off eval embeddings (e.g. the $1.23 chunk pilot); the billing
-export will show those.
+export shows those: its official cost + credits for the previous day are a note at the end.
 """
 
 from __future__ import annotations
@@ -47,6 +47,10 @@ PRICES = {
     "bq_analysis_tib": (1.0, 8.4375),
     "bq_active_logical_gib_mo": (10.0, 0.02),
     "bq_longterm_logical_gib_mo": (10.0, 0.01),
+    # Physical SKUs have their own 10 GiB; active price read from the billing export's
+    # `price` field (2026-10-27), long-term assumed half of it like the logical SKUs.
+    "bq_active_physical_gib_mo": (10.0, 0.046),
+    "bq_longterm_physical_gib_mo": (10.0, 0.023),
     "run_jobs_vcpu_s": (0.0, 0.0000216),   # no free tier listed for jobs: conservative
     "run_jobs_gib_s": (0.0, 0.0000024),
     "gemini_embedding_2_mtok": (0.0, 0.20),
@@ -54,6 +58,10 @@ PRICES = {
 }
 GCS_GIB_MO = {("ASIA-SOUTHEAST1", "STANDARD"): 0.02, ("ASIA-SOUTHEAST1", "COLDLINE"): 0.005,
               ("US", "STANDARD"): 0.026}
+# Pinecone Starter: 2 GB per project. Bytes per vector = 4 x dims + metadata; 682 B of
+# metadata + snippet is from the 2026-10-24 measurement (1.35 GB / 494k vectors at 512 dims).
+PINECONE_LIMIT_BYTES = 2e9
+PINECONE_META_BYTES = 682
 
 
 def tiered(key: str, used_before: float, used_day: float) -> float:
@@ -126,19 +134,36 @@ class Report:
     # ---------------------------------------------------------------- BigQuery storage
     def bigquery_storage(self):
         # Table metadata, not INFORMATION_SCHEMA.TABLE_STORAGE (needs a project-level grant).
-        a = l = 0.0
+        # Each dataset is billed on logical OR physical bytes. Physical bytes include time
+        # travel (7 days of overwritten partitions: insert_overwrite every 4 h makes it about
+        # half), and fail-safe (7 more days) is billed too but not in the metadata; with
+        # steady churn it is about the time-travel size, so that stands in for it (10-26:
+        # 29.1 GiB estimated vs 30.9 billed; logical-only had shown a fifth of the cost).
+        la = ll = pa = pl = tt = 0.0
         for ds in self.bq.list_datasets():
+            physical = self.bq.get_dataset(ds.reference)._properties.get("storageBillingModel") == "PHYSICAL"
             for t in self.bq.list_tables(ds.reference):
                 if t.table_type != "TABLE":
                     continue
                 props = self.bq.get_table(t.reference)._properties
-                lt = int(props.get("numLongTermBytes", 0))
-                a += (int(props.get("numBytes", 0)) - lt) / GIB
-                l += lt / GIB
-        mo = tiered("bq_active_logical_gib_mo", 0, a) + tiered("bq_longterm_logical_gib_mo", 0, l)
+                n = lambda k: int(props.get(k, 0)) / GIB  # noqa: E731
+                if physical:
+                    tt += n("numTimeTravelPhysicalBytes")
+                    pa += n("numActivePhysicalBytes") + n("numTimeTravelPhysicalBytes")
+                    pl += n("numLongTermPhysicalBytes")
+                else:
+                    la += n("numBytes") - n("numLongTermBytes")
+                    ll += n("numLongTermBytes")
         days = calendar.monthrange(self.day.year, self.day.month)[1]
-        self.add("BigQuery", "storage (logical)", round(a + l, 2), "GiB stored",
-                 mo / days, mo / days * self.day.day)
+        lmo = tiered("bq_active_logical_gib_mo", 0, la) + tiered("bq_longterm_logical_gib_mo", 0, ll)
+        pmo = tiered("bq_active_physical_gib_mo", 0, pa) + tiered("bq_longterm_physical_gib_mo", 0, pl)
+        self.add("BigQuery", "storage (logical-billed datasets)", round(la + ll, 2), "GiB stored",
+                 lmo / days, lmo / days * self.day.day)
+        self.add("BigQuery", "storage (physical-billed, incl. time travel + fail-safe)", round(pa + pl, 2),
+                 "GiB stored", pmo / days, pmo / days * self.day.day)
+        if pa + pl:
+            self.notes.append(f"BigQuery physical storage: {2 * tt:,.1f} of {pa + pl:,.1f} GiB is time travel "
+                              f"+ fail-safe (overwritten partitions kept 7 + 7 days).")
 
     # ---------------------------------------------------------------- Gemini embeddings
     def gemini(self):
@@ -215,10 +240,30 @@ class Report:
             return
         from pinecone import Pinecone
         pc = Pinecone(api_key=key)
+        # New vectors per day = articles embedded for the first time over the last 7 days (a
+        # re-embed overwrites its vector). Not cost_daily's saved counts: backfilled days hold
+        # the count of the day the backfill ran. ~35 MB scanned.
+        new_per_day = self.q(f"""
+            SELECT COUNTIF(DATE(first) BETWEEN DATE_SUB(@d, INTERVAL 6 DAY) AND @d) / 7 AS n
+            FROM (SELECT MIN(embedded_at) AS first FROM `{self.project}.vectors.article_embeddings`
+                  GROUP BY article_id)""", [bigquery.ScalarQueryParameter("d", "DATE", self.day)])[0]["n"] or 0
+        used = growth = 0.0  # bytes, bytes/day
         for ix in pc.list_indexes():
-            n = pc.Index(ix.name).describe_index_stats().total_vector_count
+            stats = pc.Index(ix.name).describe_index_stats()
+            n, per = stats.total_vector_count, 4 * stats.dimension + PINECONE_META_BYTES
             self.add("Pinecone", f"index {ix.name} (Starter plan)", n, "vectors", 0.0, 0.0)
-        self.notes.append("Pinecone Starter is free up to 2 GB; the paid plan has a $50/month minimum.")
+            used += n * per
+            growth += new_per_day * per
+        self.add("Pinecone", "storage (estimated, Starter limit 2 GB)", round(used / 1e9, 3), "GB", 0.0, 0.0)
+        msg = f"Pinecone storage ≈ {used / 1e9:.2f} of 2 GB ({used / PINECONE_LIMIT_BYTES:.0%})"
+        if growth > 0:
+            months = (PINECONE_LIMIT_BYTES - used) / growth / 30.4
+            msg = (("WARNING: " if months < 2 else "") + msg +
+                   f", growing {growth / 1e6:.1f} MB/day ({new_per_day:,.0f} new articles/day over 7 days):"
+                   f" full in ~{months:.1f} months"
+                   f" (~{self.day + timedelta(days=round(months * 30.4))})")
+        self.notes.append(msg + ". Estimate: 4 B x dims + 682 B metadata per vector (measured 10-24). "
+                          "At the limit writes fail with 429 (embed-sync too); paid plan has a $50/month minimum.")
 
     # ---------------------------------------------------------------- OpenAI
     def openai(self):
@@ -255,6 +300,42 @@ class Report:
             self.add("OpenAI", "all models", "", "", 0.0, 0.0)
         self.notes.append("OpenAI is its billed cost (Costs API); the last day can still grow for a few hours.")
 
+    # ---------------------------------------------------------------- official GCP bill
+    def billing_export(self):
+        """Google's own cost + credits from the BigQuery billing export (on since 2026-10-23),
+        as a check on the estimates above; notes only, so nothing is counted twice. A day's
+        rows keep arriving for ~1.5 days, so it reports the day before the report day."""
+        tables = [t.table_id for t in self.bq.list_tables(f"{self.project}.billing_export")
+                  if t.table_id.startswith("gcp_billing_export_v1_")]
+        if not tables:
+            self.notes.append("Billing export: no table yet.")
+            return
+        d1 = self.day - timedelta(days=1)
+        m0 = d1.replace(day=1)
+        params = [bigquery.ScalarQueryParameter("m0", "DATE", m0), bigquery.ScalarQueryParameter("d1", "DATE", d1)]
+        bill = self.q(f"""
+            SELECT DATE(usage_start_time) = @d1 AS is_d1, MIN(DATE(usage_start_time)) AS first_day,
+                   SUM(cost / currency_conversion_rate) AS cost,
+                   SUM(IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0) / currency_conversion_rate) AS credits
+            FROM `{self.project}.billing_export.{tables[0]}`
+            WHERE _PARTITIONTIME >= TIMESTAMP(@m0) AND DATE(usage_start_time) BETWEEN @m0 AND @d1
+            GROUP BY 1""", params)
+        if not bill:
+            self.notes.append(f"Billing export: no rows for {m0}..{d1} yet.")
+            return
+        day = next((r for r in bill if r["is_d1"]), {"cost": 0.0, "credits": 0.0})
+        cost, credits = sum(r["cost"] for r in bill), sum(r["credits"] for r in bill)
+        first = min(r["first_day"] for r in bill)
+        est = self.q(f"""
+            SELECT SUM(day_usd) AS usd FROM `{self.project}.monitoring.cost_daily`
+            WHERE day = @d1 AND service NOT IN ('OpenAI', 'Pinecone')""", params)[0]["usd"]
+        usd = lambda x: f"${abs(x):.2f}" if round(x, 2) >= 0 else f"-${abs(x):.2f}"  # noqa: E731, no "$-0.00"
+        self.notes.append(
+            f"Official GCP bill (billing export) for {d1}: {usd(day['cost'])} cost, {usd(day['credits'])} credits, "
+            f"{usd(day['cost'] + day['credits'])} to pay"
+            + (f" (this report's GCP estimate for that day: {usd(est)})" if est is not None else "")
+            + f". {first}..{d1}: {usd(cost)} cost, {usd(cost + credits)} to pay.")
+
     def _secret(self, name: str) -> str:
         try:
             d = self.get(f"https://secretmanager.googleapis.com/v1/projects/{self.project}"
@@ -266,7 +347,7 @@ class Report:
     # ---------------------------------------------------------------- run + render
     def run(self):
         for part in (self.bigquery_queries, self.bigquery_storage, self.gemini, self.cloud_run,
-                     self.storage, self.pinecone, self.openai):
+                     self.storage, self.pinecone, self.openai, self.billing_export):
             try:
                 part()
             except Exception as e:  # noqa: BLE001 - one broken source must not kill the report

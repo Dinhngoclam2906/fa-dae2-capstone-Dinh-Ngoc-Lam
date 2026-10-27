@@ -24,6 +24,7 @@ SOURCES = {
     "dantri": ("Dân Trí", "vi"),
     "dantri_en": ("DTiNews, Dân Trí (English)", "en"),
     "vir": ("Vietnam Investment Review (English)", "en"),
+    "vietnamfinance": ("VietnamFinance", "vi"),
 }
 
 SECTION_GROUPS = [
