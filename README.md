@@ -417,7 +417,7 @@ fa-dae2-capstone-Dinh-Ngoc-Lam/
 ├── monitoring/                 # daily cost report (cost_report.py, deploy script)
 ├── infra/
 │   ├── docker/                 # Dockerfile.ingestion / .embed / .cost (the Cloud Run Job images)
-│   └── local/                  # docker compose: agent-memory Postgres, Airflow; Dockerfile.airflow; sql/init.sql
+│   └── local/                  # docker compose: agent-memory Postgres, Airflow; Dockerfile.airflow
 ├── tests/                      # pytest unit tests (no network): question parsing, passage rescue, retrieval
 ├── docs/                       # reports, decisions, eval results, lessons_learned; images/ (diagram + ERD)
 ├── data/                       # local working data (git-ignored; the crawlers' cwd-relative state lives here)
