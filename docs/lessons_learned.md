@@ -96,6 +96,8 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-24 | dbt | A freshness check on a source with 0 rows fails dbt-build, which skips embed-sync for every source |
 | 2026-10-24 | Agent | An empty BigQuery array parameter is NULL: `ARRAY_LENGTH(@x) = 0` dropped every unscoped row |
 | 2026-10-24 | Tooling | Repo-wide path rewrite: a folder rename blocked on Windows, a regex that missed Docker destinations, `uv.lock` pinning the old workspace path |
+| 2026-10-27 | BigQuery | Physical storage billing + `insert_overwrite` every 4 h: ~80% of the billed bytes were time travel + fail-safe; the cost report (logical bytes) showed a fifth of the bill |
+| 2026-10-27 | Tooling | Python text mode on Windows rewrote LF files as CRLF (a shell script the Linux image runs) |
 
 ---
 
@@ -295,6 +297,24 @@ Reading the SQL found none of these:
 - **Lesson:** add a source's freshness check only once its first rows have landed (or ship
   both together and verify the first run), because one source's freshness error stops
   embeddings for all of them.
+
+### Physical storage billing kept two weeks of overwritten partitions (2026-10-27, `c9fb163`)
+- **Symptom:** the first billing-export rows showed BigQuery "Active Physical Storage" at
+  $0.033/day from 10-26, while the cost report priced storage at $0.007/day.
+- **Cause:** `raw` / `staging` / `marts` had been set to PHYSICAL billing on 2026-09-09
+  (compressed bytes are cheaper per GiB). But physical billing also charges for time travel
+  (7 days) and fail-safe (7 more), and `insert_overwrite` rewrites the recent months of
+  `stg_sf__guardian` and `obt_articles` every 4 h (raw's MERGE too): 19.6 of 24.3 physical
+  GiB were old copies (`obt_articles`: 1.0 GB current, 5.65 GB active). The report summed
+  logical `numBytes` and logical prices. Fail-safe bytes aren't in table metadata, and
+  `INFORMATION_SCHEMA.TABLE_STORAGE` needs a project-level grant; with steady churn,
+  time-travel bytes are a good stand-in (29.1 GiB estimated vs 30.9 billed).
+- **Fix:** the report prices each dataset by its billing model ($0.046/GiB-mo physical, read
+  from the export's `price` field). With the user's go, the three datasets were switched to
+  LOGICAL (time travel / fail-safe not billed): storage ≈ $0.66 → $0.18/month. `monitoring`
+  and `scratch` stay physical (0.9 GiB). The model can only change once per 14 days.
+- **Lesson:** physical billing pays off for append-mostly tables, not for tables rewritten
+  several times a day. Check an estimate against the billing export whenever one exists.
 
 ## 3. Cloud Run, Scheduler, Workflows, Build, IAM
 
@@ -615,6 +635,18 @@ Reading the SQL found none of these:
   because `uv.lock` stores `source = { virtual = "<path>" }`; fix that line, then `uv lock`.
 - **Lesson:** after any bulk rewrite, grep for every old path (not just the patterns you
   rewrote), then build and run the real thing before calling it done.
+
+### Python text mode wrote CRLF into a shell script (2026-10-27)
+- **Symptom:** after a scripted edit, git warned "CRLF will be replaced by LF" on
+  `run_vn_backfill_all.sh` and `sync_job_state.py`.
+- **Cause:** `open(p, "w")` on Windows translates `
+` to `
+`. Git would normalise on
+  commit, but job images are built from the working copy, and `sh` in the Linux image fails
+  on ``.
+- **Fix:** `sed -i 's/$//'` before building; later edits use `open(..., newline="")`.
+- **Lesson:** on this laptop, script file edits with `newline=""` (or the Edit tool), and
+  check `git diff` for CRLF warnings before building an image.
 
 ### Moving compose files changes more than the path (2026-10-24, `c195d5b`)
 - **Symptom (avoided):** moving the 3 `docker-compose*.yml` into `deploy/local/` and running
