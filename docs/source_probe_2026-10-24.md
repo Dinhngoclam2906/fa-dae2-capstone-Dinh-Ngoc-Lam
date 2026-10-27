@@ -50,3 +50,28 @@ from a non-datacenter machine, or ask Dân Trí for access. Not via a proxy / IP
 English options, ~300/day; fits this month's Pinecone write units); one finance site after
 that (VietnamFinance cheap, CafeF only after the 256 switch and on demand); Công Thương as a
 second-wave candidate. VEN and Báo Đầu tư need crawler work; Lao Động is out.
+
+## Công Thương probe (2026-10-27)
+
+Read-only probe for the next source; a draft `CongThuong` crawler class exists locally only
+(not committed or deployed until VietnamFinance has had a clean run).
+
+- **Access:** robots.txt `Allow: /` (only `/fv*/Watch` disallowed); sitemaps load in 1-2 s.
+- **Enumeration:** `/news-sitemap.xml` = 203 URLs over ~2 days (**~100 articles/day**);
+  `/sitemap-index.xml` lists `sitemap-article-YYYY-M-N.xml` parts back to **2015-01**
+  (2026-09: 4 parts, 2,738 URLs), so unlike VietnamFinance a backfill is possible.
+- **Parsing:** JSON-LD NewsArticle (headline, datePublished; no articleSection),
+  `article:section` meta gives the section, body in `[itemprop=articleBody]`
+  (`div.edittor-content`), title `h1.article-detail-title`. Ids `congthuong-<trailing digits>`
+  (203/203 unique). 12/12 random pages parsed.
+- **Not news, to skip (like VIR's wires):** lottery results (sections 'Xổ số miền Nam XSMN',
+  'Xổ số Vietlott'…; ~8% of the feed, 16/203), horoscopes ('tử vi'), lunar calendar ('lịch âm').
+  The draft returns `Skipped` for those (checked on 3 lottery pages).
+- **Section groups:** most map already (Thời sự, Xã hội, Văn hóa - Giải trí, Xe và Công nghệ,
+  Quản lý thị trường, Thị trường, Tài chính, Pháp luật). 'Năng lượng', 'Thương mại',
+  'Công nghiệp' (+ 'Khuyến công') would land in Other: add them to Economy & Business in
+  `section_utils` when the source goes live.
+- **When adding:** forward-only like the others (current month = news sitemap), job loop
+  4 workers / 1 s, state sync, accepted values, freshness only with its first rows, agent
+  source list + parser ('Công Thương' is also the ministry's name: match "báo Công Thương" /
+  congthuong, not the bare phrase).
