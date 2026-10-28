@@ -103,6 +103,10 @@ crawler code written yet.
   `-<digits>.html`, fetch unseen ones. Forward-only: category pages reach back to 2025-11, so
   drop parsed articles older than `--from-date` on the first run (or accept ~185 older articles).
 - **Order:** after Công Thương has had a clean run (one new source at a time).
+- **Outcome (2026-10-28, `bb97bf8`): live**, forward-only. New `read_listing()` hook: VEN reads
+  the 6 listing pages each run; pages older than 30 days are Skipped as backlog. First Cloud Run
+  run: 63 articles, 121 backlog skipped, 1 photo page failing; anchored section keywords
+  ('News and Events', 'Industry', 'Trade', 'Tourism') took its Other share from 87% to 0%.
 
 ## Báo Đầu tư and Lao Động re-check (2026-10-27)
 
