@@ -157,6 +157,13 @@ class NewsSource:
     ) -> list[str]:
         raise NotImplementedError
 
+    def read_listing(
+        self, session: requests.Session, url: str, *, sleep: float, listed: bool = True
+    ) -> list[tuple[str, datetime | None]]:
+        """(loc, lastmod) entries of one URL from month_sitemap_urls: a sitemap or RSS
+        feed by default; sources without either override it (VEN reads listing pages)."""
+        return fetch_sitemap(session, url, sleep=sleep, listed=listed)
+
     # -- cheap per-URL metadata ---------------------------------------
     def article_id(self, url: str) -> str:
         """Default: the slug (URL path without host or extension)."""
@@ -705,11 +712,62 @@ class CongThuong(HtmlNewsSource):
         return sorted(u for u in index_children if pat.search(u))
 
 
+class Ven(CongThuong):
+    """VEN (ven.congthuong.vn, Vietnam Economic News: Công Thương's English edition, ~5/day),
+    added 2026-10-28 FORWARD-ONLY. No sitemap or RSS (all 404), so each run reads the
+    homepage + the 5 text categories (6 requests, ~185 links; Infographic / Photo / longform
+    / video are formats and are left out) and keeps links ending `-<digits>.html`. Same CMS
+    as Công Thương, so its parser works unchanged. Category pages reach back months: pages
+    older than MAX_AGE_DAYS are backlog, not news, and are Skipped (marked seen, never
+    fetched again), so the first run doesn't load articles outside the OBT's recent window."""
+    name = "ven"
+    language = "en"
+    base_url = "https://ven.congthuong.vn"
+    sitemap_index_url = ""
+    LISTING_PATHS = ("", "/news-and-events", "/industry", "/trade", "/society", "/tourism")
+    MAX_AGE_DAYS = 30
+    _LINK_RE = re.compile(r"-\d{4,}\.html?$")
+
+    def month_sitemap_urls(self, index_children, year, month):
+        return [self.base_url + p for p in self.LISTING_PATHS] if _is_current_month(year, month) else []
+
+    def read_listing(self, session, url, *, sleep, listed=True):
+        try:
+            page = fetch(session, url, sleep=sleep).decode("utf-8", "replace")
+        except FetchError as e:
+            raise SitemapError(f"{url}: {e}") from e
+        links = self.listing_links(page)
+        if not links:
+            # A layout change must fail the month, not read as "nothing new".
+            raise SitemapError(f"{url}: no article links on the listing page")
+        return [(u, None) for u in links]
+
+    def listing_links(self, page: str) -> list[str]:
+        soup = BeautifulSoup(page, "html.parser")
+        out: dict[str, None] = {}
+        for a in soup.select("a[href]"):
+            href = a["href"].split("#", 1)[0].split("?", 1)[0]
+            if self._LINK_RE.search(href):
+                if href.startswith("/"):
+                    href = self.base_url + href
+                if href.startswith(self.base_url + "/"):
+                    out[href] = None
+        return list(out)
+
+    def parse_article(self, html, url, lastmod):
+        art = super().parse_article(html, url, lastmod)
+        if isinstance(art, Article):
+            age = datetime.now(timezone.utc).replace(tzinfo=None) - art.web_publication_date
+            if age > timedelta(days=self.MAX_AGE_DAYS):
+                return Skipped(art.article_id, f"older than {self.MAX_AGE_DAYS} days (listing backlog)")
+        return art
+
+
 SOURCES: dict[str, NewsSource] = {
     s.name: s
     for s in (TuoiTre(), ThanhNien(), VnEconomy(), TuoiTreEn(), VnEconomyEn(), VietnamNet(),
               VietnamNetEn(), VnExpress(), VnExpressEn(), DanTri(), DanTriEn(), Vir(),
-              VietnamFinance(), CongThuong())
+              VietnamFinance(), CongThuong(), Ven())
 }
 
 
@@ -1059,7 +1117,7 @@ def crawl_month(
     listed = set(index_children)
     for sm in source.month_sitemap_urls(index_children, year, month):
         try:
-            entries = fetch_sitemap(session, sm, sleep=sleep, listed=sm in listed)
+            entries = source.read_listing(session, sm, sleep=sleep, listed=sm in listed)
         except SitemapError as e:
             # Month incomplete: the caller must not advance the cursor past it.
             logger.error("sitemap %s failed: %s", sm, e)
@@ -1189,7 +1247,7 @@ def dry_run_month(session, source, index_children, year, month, *, sleep) -> int
     listed = set(index_children)
     for sm in source.month_sitemap_urls(index_children, year, month):
         try:
-            entries = fetch_sitemap(session, sm, sleep=sleep, listed=sm in listed)
+            entries = source.read_listing(session, sm, sleep=sleep, listed=sm in listed)
         except SitemapError as e:
             logger.warning("[dry-run] %s unreadable (%s) - count is a lower bound", sm, e)
             continue

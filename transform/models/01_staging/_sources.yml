@@ -54,11 +54,11 @@ sources:
               - accepted_values:
                   values: ['batch', 'realtime']
           - name: source_name
-            description: "Origin site: 'guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'vietnamnet', or the English editions 'tuoitre_en' (news.tuoitre.vn) / 'vneconomy_en' (en.vneconomy.vn) / 'vietnamnet_en' (vietnamnet.vn/en), plus 'vnexpress' / 'vnexpress_en' (RSS-only), and since 2026-10-24 'dantri_en' (DTiNews) / 'vir' (Vietnam Investment Review), since 2026-10-27 'vietnamfinance', since 2026-10-28 'congthuong' (Công Thương)"
+            description: "Origin site: 'guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'vietnamnet', or the English editions 'tuoitre_en' (news.tuoitre.vn) / 'vneconomy_en' (en.vneconomy.vn) / 'vietnamnet_en' (vietnamnet.vn/en), plus 'vnexpress' / 'vnexpress_en' (RSS-only), and since 2026-10-24 'dantri_en' (DTiNews) / 'vir' (Vietnam Investment Review), since 2026-10-27 'vietnamfinance', since 2026-10-28 'congthuong' (Công Thương) / 'ven' (its English edition, Vietnam Economic News)"
             tests:
               - not_null
               - accepted_values:
-                  values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'tuoitre_en', 'vneconomy_en', 'vietnamnet', 'vietnamnet_en', 'vnexpress', 'vnexpress_en', 'dantri_en', 'vir', 'vietnamfinance', 'congthuong']
+                  values: ['guardian', 'tuoitre', 'thanhnien', 'vneconomy', 'tuoitre_en', 'vneconomy_en', 'vietnamnet', 'vietnamnet_en', 'vnexpress', 'vnexpress_en', 'dantri_en', 'vir', 'vietnamfinance', 'congthuong', 'ven']
           - name: language
             description: "Article language: 'en' or 'vi'"
             tests:
@@ -193,3 +193,12 @@ sources:
             warn_after: {count: 24, period: hour}
             error_after: {count: 48, period: hour}
             filter: "source_name = 'congthuong'"
+      - name: raw_data_ven
+        identifier: raw_data
+        description: raw_data rows for VEN, Công Thương's English edition (freshness only; ~5/day)
+        config:
+          loaded_at_field: loaded_at
+          freshness:
+            warn_after: {count: 48, period: hour}
+            error_after: {count: 96, period: hour}
+            filter: "source_name = 'ven'"

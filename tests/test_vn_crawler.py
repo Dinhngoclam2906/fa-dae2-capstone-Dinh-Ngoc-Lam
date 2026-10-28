@@ -73,3 +73,30 @@ def test_congthuong_emagazine_body():
     </body></html>"""
     out = src.parse_article(html, "https://congthuong.vn/e-magazine-nghi-quyet-so-57-478524.html", None)
     assert isinstance(out, vn.Article) and len(out.body_text) > 120
+
+
+def test_ven_listing_links():
+    src = vn.SOURCES["ven"]
+    page = """<a href="/moit-launches-innovation-campaign-59965.html">a</a>
+    <a href="/moit-launches-innovation-campaign-59965.html#c">dup</a>
+    <a href="https://ven.congthuong.vn/emirates-marks-10-years-of-hanoi-operations-59960.html">b</a>
+    <a href="https://congthuong.vn/other-site-478777.html">other host</a>
+    <a href="/industry">category</a><a href="tel:0866594498">tel</a>"""
+    assert src.listing_links(page) == [
+        "https://ven.congthuong.vn/moit-launches-innovation-campaign-59965.html",
+        "https://ven.congthuong.vn/emirates-marks-10-years-of-hanoi-operations-59960.html",
+    ]
+    assert src.article_id("https://ven.congthuong.vn/emirates-marks-10-years-59960.html") == "ven-59960"
+    assert src.month_sitemap_urls([], 2020, 1) == []  # forward-only: current month only
+
+
+def test_ven_skips_backlog():
+    src = vn.SOURCES["ven"]
+    page = """<html><head><meta property="article:section" content="Trade">
+    <meta property="article:published_time" content="{}"></head><body><h1>T</h1>
+    <div itemprop="articleBody"><p>""" + "Trade grew. " * 40 + """</p></div></body></html>"""
+    url = "https://ven.congthuong.vn/trade-59000.html"
+    old = src.parse_article(page.format("2025-11-02T08:00:00+07:00"), url, None)
+    assert isinstance(old, vn.Skipped)
+    new = vn.datetime.now(vn.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    assert isinstance(src.parse_article(page.format(new), url, None), vn.Article)
