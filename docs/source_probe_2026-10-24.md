@@ -75,6 +75,10 @@ Read-only probe for the next source; a draft `CongThuong` crawler class exists l
   4 workers / 1 s, state sync, accepted values, freshness only with its first rows, agent
   source list + parser ('Công Thương' is also the ministry's name: match "báo Công Thương" /
   congthuong, not the bare phrase).
+- **Outcome (2026-10-28, `21237fa`): live**, forward-only from 2026-10. First Cloud Run run:
+  212 articles, 18 lottery pages skipped, 2 e-magazine pages failing. New section keywords
+  ('Thương mại', 'Năng lượng', 'Công nghiệp', 'Công Thương 24h', 'Giá cả', 'Điện', 'An toàn thực phẩm'…)
+  took its Other share from 20% to 0%.
 
 ## VEN probe (2026-10-27)
 
