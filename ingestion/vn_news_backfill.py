@@ -670,11 +670,44 @@ class VietnamFinance(HtmlNewsSource):
         return [f"{self.base_url}/sitemap.xml"] if _is_current_month(year, month) else []
 
 
+class CongThuong(HtmlNewsSource):
+    """Công Thương (congthuong.vn, Ministry of Industry and Trade newspaper), added
+    2026-10-28 FORWARD-ONLY (~100/day). The current month reads /news-sitemap.xml (~230 URLs,
+    ~2 days); past months read the index's `sitemap-article-YYYY-M-N.xml` parts (back to
+    2015-01), so a backfill is possible. JSON-LD NewsArticle has headline / datePublished
+    but no articleSection; article:section meta has it. Body in [itemprop=articleBody].
+    Ids: trailing digits, prefixed. Lottery results ('Xổ số miền Nam XSMN', Vietlott...,
+    ~8% of the feed), horoscopes and the lunar calendar are not news: Skipped, marked seen."""
+    name = "congthuong"
+    base_url = "https://congthuong.vn"
+    sitemap_index_url = "https://congthuong.vn/sitemap-index.xml"
+    BODY_SELECTORS = ("div[itemprop='articleBody']", "div.edittor-content")
+    SECTION_SELECTORS: tuple[str, ...] = ()
+    H1_SELECTORS = ("h1.article-detail-title", "h1")
+    _ID_RE = re.compile(r"-(\d{5,})\.html?(?:$|[?#])")
+
+    def article_id(self, url):
+        m = self._ID_RE.search(url)
+        return f"{self.name}-{m.group(1)}" if m else super().article_id(url)
+
+    def parse_article(self, html, url, lastmod):
+        art = super().parse_article(html, url, lastmod)
+        if art is not None and re.match(r"(?i)xổ số|vietlott|tử vi|lịch âm", art.section_name):
+            return Skipped(art.article_id, art.section_name)
+        return art
+
+    def month_sitemap_urls(self, index_children, year, month):
+        if _is_current_month(year, month):
+            return [f"{self.base_url}/news-sitemap.xml"]
+        pat = re.compile(rf"/sitemap-article-{year}-{month}-\d+\.xml$")
+        return sorted(u for u in index_children if pat.search(u))
+
+
 SOURCES: dict[str, NewsSource] = {
     s.name: s
     for s in (TuoiTre(), ThanhNien(), VnEconomy(), TuoiTreEn(), VnEconomyEn(), VietnamNet(),
               VietnamNetEn(), VnExpress(), VnExpressEn(), DanTri(), DanTriEn(), Vir(),
-              VietnamFinance())
+              VietnamFinance(), CongThuong())
 }
 
 

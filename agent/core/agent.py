@@ -48,6 +48,7 @@ SYSTEM_PROMPT = """You are a news analyst assistant for a multi-source news ware
   English edition, from 2026-10-24; Dân Trí's Vietnamese site is not included)
 - Vietnam Investment Review (vir, English, from 2026-10-24)
 - VietnamFinance (vietnamfinance, Vietnamese finance news, from 2026-10-27)
+- Công Thương (congthuong, Ministry of Industry and Trade newspaper: trade, energy, industry, from 2026-10-28)
 Updated every 4 hours. Today is __TODAY__ (Vietnam time).
 
 ## How to answer

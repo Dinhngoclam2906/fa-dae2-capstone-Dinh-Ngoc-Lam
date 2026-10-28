@@ -42,3 +42,23 @@ def test_vietnamfinance_ids():
     url = "https://vietnamfinance.vn/gelex-vuot-88-ke-hoach-loi-nhuan-nam-2026-sau-9-thang-d152776.html"
     assert src.article_id(url) == "vietnamfinance-152776"
     assert src.month_sitemap_urls([], 2020, 1) == []  # forward-only: current month only
+
+
+def test_congthuong_ids_and_sitemaps():
+    src = vn.SOURCES["congthuong"]
+    url = "https://congthuong.vn/thanh-hoa-siet-chat-an-toan-thuc-pham-478777.html"
+    assert src.article_id(url) == "congthuong-478777"
+    index = ["https://congthuong.vn/sitemap-article-2026-9-1.xml",
+             "https://congthuong.vn/sitemap-article-2026-9-2.xml",
+             "https://congthuong.vn/sitemap-article-2026-10-1.xml"]
+    assert src.month_sitemap_urls(index, 2026, 9) == index[:2]  # past month: its parts only
+
+
+def test_congthuong_skips_lottery():
+    src = vn.SOURCES["congthuong"]
+    html = """<html><head><meta property="article:section" content="Xổ số miền Nam XSMN">
+    <meta property="article:published_time" content="2026-10-28T16:30:00+07:00"></head>
+    <body><h1 class="article-detail-title">XSMN 28/10</h1>
+    <div itemprop="articleBody"><p>""" + "Kết quả xổ số. " * 40 + """</p></div></body></html>"""
+    out = src.parse_article(html, "https://congthuong.vn/xsmn-28-10-478900.html", None)
+    assert isinstance(out, vn.Skipped) and out.article_id == "congthuong-478900"
