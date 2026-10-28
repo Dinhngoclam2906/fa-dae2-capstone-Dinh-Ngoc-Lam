@@ -62,3 +62,14 @@ def test_congthuong_skips_lottery():
     <div itemprop="articleBody"><p>""" + "Kết quả xổ số. " * 40 + """</p></div></body></html>"""
     out = src.parse_article(html, "https://congthuong.vn/xsmn-28-10-478900.html", None)
     assert isinstance(out, vn.Skipped) and out.article_id == "congthuong-478900"
+
+
+def test_congthuong_emagazine_body():
+    src = vn.SOURCES["congthuong"]
+    html = """<html><head><meta property="article:section" content="Công Thương 57">
+    <meta property="article:published_time" content="2026-10-27T14:09:00+07:00"></head>
+    <body><h1>E-magazine | Nghị quyết số 57</h1>
+    <article class="mastercms-emag-article edittor-content content-full-width"><p>""" + "Chuyển đổi số. " * 40 + """</p></article>
+    </body></html>"""
+    out = src.parse_article(html, "https://congthuong.vn/e-magazine-nghi-quyet-so-57-478524.html", None)
+    assert isinstance(out, vn.Article) and len(out.body_text) > 120

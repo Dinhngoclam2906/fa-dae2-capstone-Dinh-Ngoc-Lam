@@ -677,11 +677,13 @@ class CongThuong(HtmlNewsSource):
     2015-01), so a backfill is possible. JSON-LD NewsArticle has headline / datePublished
     but no articleSection; article:section meta has it. Body in [itemprop=articleBody].
     Ids: trailing digits, prefixed. Lottery results ('Xổ số miền Nam XSMN', Vietlott...,
-    ~8% of the feed), horoscopes and the lunar calendar are not news: Skipped, marked seen."""
+    ~8% of the feed), horoscopes and the lunar calendar are not news: Skipped, marked seen.
+    Video pages (VideoObject, no text) fail and are given up by the retry limit."""
     name = "congthuong"
     base_url = "https://congthuong.vn"
     sitemap_index_url = "https://congthuong.vn/sitemap-index.xml"
-    BODY_SELECTORS = ("div[itemprop='articleBody']", "div.edittor-content")
+    # E-magazine / long-form pages put the body in <article class="... edittor-content">.
+    BODY_SELECTORS = ("div[itemprop='articleBody']", "div.edittor-content", "article.edittor-content")
     SECTION_SELECTORS: tuple[str, ...] = ()
     H1_SELECTORS = ("h1.article-detail-title", "h1")
     _ID_RE = re.compile(r"-(\d{5,})\.html?(?:$|[?#])")
