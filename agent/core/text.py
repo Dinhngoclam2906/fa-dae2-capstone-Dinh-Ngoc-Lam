@@ -289,9 +289,9 @@ def refers_to_previous(query: str) -> bool:
 
 
 INTRO = (
-    "I'm a news assistant for The Guardian and fourteen Vietnamese news sites and editions "
+    "I'm a news assistant for The Guardian and fifteen Vietnamese news sites and editions "
     "(Tuổi Trẻ, Thanh Niên, VnEconomy, VietNamNet, VnExpress and their English "
-    "editions, plus Vietnam Investment Review, VietnamFinance and Công Thương with its English edition VEN), "
+    "editions, plus Vietnam Investment Review, VietnamFinance, Báo Đầu tư and Công Thương with its English edition VEN), "
     "hundreds of thousands of articles, updated every 4 hours. I can find articles by topic, date, "
     "source or section, summarise them, and show what's trending. I answer in English or "
     "Vietnamese.\n\nTry: \"What's the latest on fuel prices in Vietnam?\" or "

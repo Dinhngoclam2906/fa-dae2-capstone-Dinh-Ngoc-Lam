@@ -119,6 +119,19 @@ crawler code written yet.
   `...-d<id>.html`, ids up to 732219). So it fits the **listing-page mode** VEN needs: homepage +
   section pages each run. Skip the advertising section (`muc-thong-tin-quang-ba-d80`) and likely
   corporate PR (`thong-tin-doanh-nghiep-d36`). Volume and article parsing not measured yet.
+- **Báo Đầu tư probe (2026-10-29).** Sitemaps / RSS unchanged (broken). Listing pages: homepage
+  (~90-110 links) + 21 section pages (~32 each; 14 on the small ones) = 352 unique links per pass.
+  **Parsing:** no JSON-LD, no `article:*` meta, no `h1`: title `div.title-detail`, section the
+  uppercase link above it (`div.col630 div.text-uppercase a`), date `span.post-time`
+  ('29/10/2026 21:21', Vietnam time), sapo `div.sapo_detail` + body `#content_detail_news`
+  (median 4.2k chars, no related-news leakage). Ids `baodautu-<n>` from `-d<n>.html`.
+  **All 352 links:** 288 parsed, 64 Skipped (58 older than 30 days, 6 'Thông tin doanh
+  nghiệp'), **0 failed**. **Volume ~90/day** (91 on 10-29 by 21:21 local). Sections left out:
+  d80 (ads) and d36 (corporate PR, also Skipped by name when listed elsewhere). New anchored
+  keywords: 'Đầu tư và Pháp luật' → Politics (before Economy, which 'đầu tư' would hit),
+  'Điểm tin nổi bật' → National News, 'Phát triển bền vững' → Science & Environment.
+  Built as `BaoDauTu` on a new `ListingSource` mixin (VEN's listing mode, shared), `8c331c7`.
+  **Outcome (2026-10-29): live**, forward-only. First (scheduled 16:00 UTC) run: 288 articles, 0% Other.
 - **Lao Động (laodong.vn): skip, final.** Every URL, robots.txt included, still returns a
   JavaScript cookie challenge (`document.cookie="D1N=..."; location.reload()`). Answering it
   means defeating their bot protection, which this project doesn't do.
