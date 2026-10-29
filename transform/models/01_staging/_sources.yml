@@ -202,3 +202,12 @@ sources:
             warn_after: {count: 48, period: hour}
             error_after: {count: 96, period: hour}
             filter: "source_name = 'ven'"
+      - name: raw_data_baodautu
+        identifier: raw_data
+        description: raw_data rows for Báo Đầu tư (freshness only; listing pages, ~90/day)
+        config:
+          loaded_at_field: loaded_at
+          freshness:
+            warn_after: {count: 24, period: hour}
+            error_after: {count: 48, period: hour}
+            filter: "source_name = 'baodautu'"
