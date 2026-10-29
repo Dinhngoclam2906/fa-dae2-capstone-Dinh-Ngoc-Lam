@@ -50,6 +50,7 @@ SYSTEM_PROMPT = """You are a news analyst assistant for a multi-source news ware
 - VietnamFinance (vietnamfinance, Vietnamese finance news, from 2026-10-27)
 - Công Thương (congthuong, Ministry of Industry and Trade newspaper: trade, energy, industry, from 2026-10-28)
   and its English edition VEN (ven, Vietnam Economic News, from 2026-10-28)
+- Báo Đầu tư (baodautu, Vietnamese investment / business news, from 2026-10-29)
 Updated every 4 hours. Today is __TODAY__ (Vietnam time).
 
 ## How to answer

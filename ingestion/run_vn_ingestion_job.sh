@@ -22,20 +22,20 @@ pids=""
 # source was dropped on 2026-10-27 (no proxies; DTiNews covers it in English). Its
 # crawler class stays only as the base of dantri_en (dtinews.dantri.com.vn), which works.
 for s in tuoitre thanhnien vneconomy tuoitre_en vneconomy_en vietnamnet vietnamnet_en vnexpress vnexpress_en \
-         dantri_en vir vietnamfinance congthuong ven; do
+         dantri_en vir vietnamfinance congthuong ven baodautu; do
   # VnExpress (RSS-only, by policy) gets a gentler rate: 2 workers, 1.5 s apart; the
   # sites added since 2026-10-24 get 4 workers, 1 s apart.
   case "$s" in
     vnexpress*)         rate="--concurrency 2 --sleep 1.5" ;;
-    dantri*|vir|vietnamfinance|congthuong|ven) rate="--concurrency 4 --sleep 1" ;;
+    dantri*|vir|vietnamfinance|congthuong|ven|baodautu) rate="--concurrency 4 --sleep 1" ;;
     *)                  rate="--concurrency 6 --sleep 0.75" ;;
   esac
-  # Added 2026-10-24 / 10-27 / 10-28 FORWARD-ONLY: their month floor is the month they were added
+  # Added 2026-10-24 / 10-27 / 10-28 / 10-29 FORWARD-ONLY: their month floor is the month they were added
   # (their current-month feeds hold only the last ~2 days to 3 weeks anyway). A Jan-Oct 2026
   # backfill of dantri_en / vir is planned after the Pinecone 256-dim switch
   # (PROGRESS_LOG "Resume here").
   case "$s" in
-    dantri*|vir|vietnamfinance|congthuong|ven) from="2026-10-01" ;;
+    dantri*|vir|vietnamfinance|congthuong|ven|baodautu) from="2026-10-01" ;;
     *)           from="2026-01-01" ;;
   esac
   python ingestion/vn_news_backfill.py --source "$s" --from-date "$from" $rate &

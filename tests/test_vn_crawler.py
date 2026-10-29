@@ -100,3 +100,36 @@ def test_ven_skips_backlog():
     assert isinstance(old, vn.Skipped)
     new = vn.datetime.now(vn.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
     assert isinstance(src.parse_article(page.format(new), url, None), vn.Article)
+
+
+_BDT_PAGE = """<html><head><meta property="og:title" content="og"></head><body>
+<div class="col630 ml-auto"><div class="fs16 text-uppercase"><a href="/kinh-doanh-d3/">{section}</a></div>
+<div class="title-detail"> Xuất nhập khẩu lập đỉnh </div>
+<span class="post-time"> - {when}</span>
+<div class="sapo_detail">Tóm tắt bài.</div>
+<div id="content_detail_news"><p>""" + "Kim ngạch tăng. " * 30 + """</p></div></div></body></html>"""
+
+
+def test_baodautu_parse():
+    src = vn.SOURCES["baodautu"]
+    url = "https://baodautu.vn/xuat-nhap-khau-d733491.html"
+    now_vn = vn.datetime.now(vn.timezone.utc) + vn.timedelta(hours=7)
+    art = src.parse_article(_BDT_PAGE.format(section="Kinh doanh", when=now_vn.strftime("%d/%m/%Y %H:%M")), url, None)
+    assert isinstance(art, vn.Article)
+    assert art.article_id == "baodautu-733491"
+    assert art.web_title == "Xuất nhập khẩu lập đỉnh" and art.section_name == "Kinh doanh"
+    assert art.body_text.startswith("Tóm tắt bài.\n\nKim ngạch")
+    # post-time is Vietnam time: stored as naive UTC, 7 h earlier
+    assert art.web_publication_date == now_vn.replace(second=0, microsecond=0, tzinfo=None) - vn.timedelta(hours=7)
+    pr = src.parse_article(_BDT_PAGE.format(section="Thông tin doanh nghiệp", when=now_vn.strftime("%d/%m/%Y %H:%M")), url, None)
+    assert isinstance(pr, vn.Skipped)
+    assert isinstance(src.parse_article(_BDT_PAGE.format(section="Kinh doanh", when="02/09/2025 08:00"), url, None), vn.Skipped)
+
+
+def test_baodautu_listing_links():
+    src = vn.SOURCES["baodautu"]
+    page = """<a href="https://baodautu.vn/xuat-nhap-khau-d733491.html">a</a>
+    <a href="/kinh-doanh-d3/">section</a><a href="https://baodautu.vn/bai-khac-d733416.html?x=1">b</a>"""
+    assert src.listing_links(page) == ["https://baodautu.vn/xuat-nhap-khau-d733491.html",
+                                       "https://baodautu.vn/bai-khac-d733416.html"]
+    assert len(src.month_sitemap_urls([], 2020, 1)) == 0

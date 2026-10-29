@@ -32,7 +32,7 @@ from google.cloud import storage
 load_dotenv()
 
 VN_SOURCES = ("tuoitre", "thanhnien", "vneconomy", "tuoitre_en", "vneconomy_en", "vietnamnet", "vietnamnet_en", "vnexpress", "vnexpress_en",
-              "dantri_en", "vir", "vietnamfinance", "congthuong", "ven")
+              "dantri_en", "vir", "vietnamfinance", "congthuong", "ven", "baodautu")
 STATE_FILES = {
     "guardian-ingestion": [
         "data/batch/guardian_api_state.json",

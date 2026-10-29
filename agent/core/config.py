@@ -26,6 +26,7 @@ SOURCES = {
     "vietnamfinance": ("VietnamFinance", "vi"),
     "congthuong": ("Công Thương", "vi"),
     "ven": ("VEN, Vietnam Economic News (Công Thương English)", "en"),
+    "baodautu": ("Báo Đầu tư", "vi"),
 }
 
 SECTION_GROUPS = [

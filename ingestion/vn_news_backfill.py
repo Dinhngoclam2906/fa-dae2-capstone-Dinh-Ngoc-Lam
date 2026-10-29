@@ -712,19 +712,13 @@ class CongThuong(HtmlNewsSource):
         return sorted(u for u in index_children if pat.search(u))
 
 
-class Ven(CongThuong):
-    """VEN (ven.congthuong.vn, Vietnam Economic News: Công Thương's English edition, ~5/day),
-    added 2026-10-28 FORWARD-ONLY. No sitemap or RSS (all 404), so each run reads the
-    homepage + the 5 text categories (6 requests, ~185 links; Infographic / Photo / longform
-    / video are formats and are left out) and keeps links ending `-<digits>.html`. Same CMS
-    as Công Thương, so its parser works unchanged. Category pages reach back months: pages
-    older than MAX_AGE_DAYS are backlog, not news, and are Skipped (marked seen, never
-    fetched again), so the first run doesn't load articles outside the OBT's recent window."""
-    name = "ven"
-    language = "en"
-    base_url = "https://ven.congthuong.vn"
-    sitemap_index_url = ""
-    LISTING_PATHS = ("", "/news-and-events", "/industry", "/trade", "/society", "/tourism")
+class ListingSource(NewsSource):
+    """Mixin for sites with no usable sitemap or RSS: each run reads LISTING_PATHS (the
+    homepage + section pages, current month only) and keeps the links matching _LINK_RE.
+    Section pages reach back months: pages older than MAX_AGE_DAYS are backlog, not news,
+    and are Skipped (marked seen, never fetched again), so the first run doesn't load
+    articles outside the OBT's recent window. Put it first in the bases."""
+    LISTING_PATHS: tuple[str, ...] = ("",)
     MAX_AGE_DAYS = 30
     _LINK_RE = re.compile(r"-\d{4,}\.html?$")
 
@@ -763,11 +757,71 @@ class Ven(CongThuong):
         return art
 
 
+class Ven(ListingSource, CongThuong):
+    """VEN (ven.congthuong.vn, Vietnam Economic News: Công Thương's English edition, ~5/day),
+    added 2026-10-28 FORWARD-ONLY. No sitemap or RSS (all 404), so each run reads the
+    homepage + the 5 text categories (6 requests, ~185 links; Infographic / Photo / longform
+    / video are formats and are left out) and keeps links ending `-<digits>.html`. Same CMS
+    as Công Thương, so its parser works unchanged."""
+    name = "ven"
+    language = "en"
+    base_url = "https://ven.congthuong.vn"
+    sitemap_index_url = ""
+    LISTING_PATHS = ("", "/news-and-events", "/industry", "/trade", "/society", "/tourism")
+
+
+class BaoDauTu(ListingSource, HtmlNewsSource):
+    """Báo Đầu tư (baodautu.vn, investment / business), added 2026-10-29 FORWARD-ONLY. Its
+    monthly sitemaps answer "Not found act function sitemap_month" and the RSS is empty, so
+    each run reads the homepage + the section pages from /sitemaps/categories.xml. Left out:
+    the advertising section (d80) and corporate PR (d36); articles of those sections that
+    show up elsewhere are Skipped by section name. No JSON-LD and no published-time meta:
+    title div.title-detail, section the uppercase link above it, date span.post-time
+    ('29/10/2026 21:21', Vietnam time), body #content_detail_news after the sapo.
+    Ids: the number after '-d' (`...-d733491.html`), prefixed."""
+    name = "baodautu"
+    base_url = "https://baodautu.vn"
+    sitemap_index_url = ""
+    LISTING_PATHS = (
+        "", "/thoi-su-dau-tu-d1/", "/toan-canh-dau-tu-d2/", "/kinh-doanh-d3/", "/doanh-nhan-d4/",
+        "/ngan-hang--bao-hiem-d5/", "/dau-tu-tai-chinh-d6/", "/thi-truong-dia-oc-d7/",
+        "/tieu-dung-d8/", "/o-to-xe-may-d9/", "/khoa-hoc-va-cong-nghe-d10/", "/doi-song-d27/",
+        "/dau-tu-va-phap-luat-d41/", "/phat-trien-ben-vung-d52/", "/suc-khoe-doanh-nghiep-d53/",
+        "/quoc-te-d54/", "/du-lich-d55/", "/diem-tin-noi-bat-d76/", "/kinh-te-so-d77/",
+        "/y-te---suc-khoe-d78/",
+    )
+    SKIP_SECTIONS = frozenset({"thông tin doanh nghiệp", "mục thông tin quảng bá"})
+    BODY_SELECTORS = ("#content_detail_news",)
+    SECTION_SELECTORS = ("div.col630 div.text-uppercase a",)
+    H1_SELECTORS = ("div.title-detail",)
+    _ID_RE = re.compile(r"-d(\d{4,})\.html?(?:$|[?#])")
+    _LINK_RE = re.compile(r"-d\d{4,}\.html?$")
+
+    def article_id(self, url):
+        m = self._ID_RE.search(url)
+        return f"{self.name}-{m.group(1)}" if m else super().article_id(url)
+
+    def parse_article(self, html, url, lastmod):
+        soup = BeautifulSoup(html, "lxml" if _has_lxml() else "html.parser")
+        t = soup.select_one("span.post-time")
+        m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})\s+(\d{1,2}):(\d{2})", t.get_text()) if t else None
+        page_dt = (datetime(int(m[3]), int(m[2]), int(m[1]), int(m[4]), int(m[5])) - timedelta(hours=7)
+                   if m else None)  # Vietnam time -> naive UTC
+        art = super().parse_article(html, url, page_dt or lastmod)
+        if isinstance(art, Article):
+            if art.section_name.lower() in self.SKIP_SECTIONS:
+                return Skipped(art.article_id, art.section_name)
+            sapo = soup.select_one("div.sapo_detail")
+            if sapo and sapo.get_text(strip=True):
+                art.body_text = f"{_clean(sapo.get_text(' ', strip=True))}\n\n{art.body_text}"
+        return art
+
+
 SOURCES: dict[str, NewsSource] = {
     s.name: s
     for s in (TuoiTre(), ThanhNien(), VnEconomy(), TuoiTreEn(), VnEconomyEn(), VietnamNet(),
               VietnamNetEn(), VnExpress(), VnExpressEn(), DanTri(), DanTriEn(), Vir(),
-              VietnamFinance(), CongThuong(), Ven())
+              VietnamFinance(), CongThuong(), Ven(), BaoDauTu())
 }
 
 

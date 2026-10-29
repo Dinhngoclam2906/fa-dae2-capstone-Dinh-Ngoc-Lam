@@ -29,6 +29,8 @@ TODAY = date(2026, 10, 24)
     ("What does VEN say about solar power?", ["ven"]),
     ("articles on ven.congthuong.vn about trade", ["ven"]),
     ("the seven biggest exporters", []),             # 'ven' inside a word
+    ("báo Đầu tư viết gì về FDI?", ["baodautu"]),
+    ("đầu tư công tháng này", []),                   # the word (investment), not the paper
 ])
 def test_query_sources(question, sources):
     assert text.query_sources(question) == sources

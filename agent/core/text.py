@@ -162,6 +162,8 @@ _SOURCE_PATTERNS = [
     (r"\bVEN\b|(?i:vietnam economic news|ven\.congthuong)", ["ven"]),
     # "Công Thương" is also the ministry (Bộ Công Thương): only the paper or the domain.
     (r"(?i)báo công thương|bao cong thuong|congthuong|cong thuong newspaper|công thương newspaper", ["congthuong"]),
+    # "đầu tư" is the ordinary word for investment: only the paper or the domain.
+    (r"(?i)báo đầu tư|bao dau tu|baodautu", ["baodautu"]),
     (r"(?i)\bguardian\b", ["guardian"]),
     (r"Tuổi Trẻ|Tuoi Tre|TUỔI TRẺ|(?i:báo tuổi trẻ|báo tuoi tre)", ["tuoitre", "tuoitre_en"]),
     (r"Thanh Niên|Thanh Nien|THANH NIÊN|(?i:báo thanh niên|báo thanh nien)", ["thanhnien"]),

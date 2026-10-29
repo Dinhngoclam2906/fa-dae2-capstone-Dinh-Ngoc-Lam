@@ -72,7 +72,7 @@ SOURCE_NAMES = {"guardian": "The Guardian", "tuoitre": "Tuổi Trẻ", "thanhnie
                 "vietnamnet_en": "VietNamNet Global", "vnexpress_en": "VnExpress International",
                 "dantri_en": "DTiNews", "vir": "Vietnam Investment Review",
                 "vietnamfinance": "VietnamFinance", "congthuong": "Công Thương",
-                "ven": "VEN (Vietnam Economic News)"}
+                "ven": "VEN (Vietnam Economic News)", "baodautu": "Báo Đầu tư"}
 # (phrase, language, window in days back from asked_on). Some are deliberately outside the
 # recency_days patterns ("in the last few days", "mấy ngày qua").
 TIME_PHRASES = [("this week", "en", 7), ("in the last few days", "en", 4), ("latest", "en", 14),
