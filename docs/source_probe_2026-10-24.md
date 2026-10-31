@@ -46,6 +46,13 @@ addresses. Its crawler class stays; production runs without it (`d74d546`). Opti
 from a non-datacenter machine, or ask Dân Trí for access. Not via a proxy / IP rotation
 (that would be circumventing their block).
 
+**Known limitations (accepted 2026-10-31, no work planned):**
+- DTiNews files culture and sport under one section, 'Culture And Sport', with no
+  sub-section on the page, so all of it maps to Culture & Arts (sport articles included).
+- news.tuoitre.vn (`tuoitre_en`): the 5-day sitemap chunks 404 about every other request
+  (handled by 8 attempts, `6f4009b`) and `index.rss` is sometimes unparseable. Log noise
+  only; no articles lost.
+
 **Recommendation (before building):** first wave Dân Trí + DTiNews + VIR (widest Vietnamese audience + two
 English options, ~300/day; fits this month's Pinecone write units); one finance site after
 that (VietnamFinance cheap, CafeF only after the 256 switch and on demand); Công Thương as a
