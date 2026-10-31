@@ -8,7 +8,10 @@
 #   * conversations are listed only within the browser session (no "switch to any
 #     thread ID" box: thread ids are random UUIDs);
 #   * a per-session question limit (AGENT_RATE_LIMIT_PER_HOUR) and per-query BigQuery
-#     byte caps (core/bq.py).
+#     byte caps (core/bq.py);
+#   * when published (core/guards.py, all off by default): a password gate (APP_PASSWORD),
+#     an app-wide daily question limit (AGENT_DAILY_QUESTION_LIMIT) and a daily BigQuery
+#     byte budget (AGENT_MAX_BYTES_PER_DAY).
 import re
 import threading
 import time
@@ -19,10 +22,30 @@ import streamlit as st
 from core import bq
 from core.agent import ask, build_agent
 from core.config import SOURCES, settings
+from core.guards import DailyLimit, password_ok
 from core.memory import create_checkpointer
 
 st.set_page_config(page_title="Daily News AI Assistant", page_icon="📰", layout="centered",
                    initial_sidebar_state="expanded")
+
+
+def password_gate():
+    """Stop the page here until the session has entered APP_PASSWORD (no-op if unset)."""
+    if not settings.app_password or st.session_state.get("authenticated"):
+        return
+    st.markdown("## 📰 Daily News AI Assistant")
+    with st.form("login"):
+        given = st.text_input("Password", type="password")
+        if st.form_submit_button("Enter"):
+            if password_ok(given, settings.app_password):
+                st.session_state.authenticated = True
+                st.rerun()
+            time.sleep(1)  # slows guessing a little
+            st.error("Wrong password.")
+    st.stop()
+
+
+password_gate()
 
 st.markdown("""
 <style>
@@ -42,7 +65,14 @@ def get_agent():
     return build_agent(checkpointer), kind
 
 
+@st.cache_resource
+def get_daily_limit() -> DailyLimit:
+    """One counter per server process, shared by every session."""
+    return DailyLimit(settings.daily_question_limit)
+
+
 agent, memory_kind = get_agent()
+daily_limit = get_daily_limit()
 
 
 # ==================== SESSION STATE ====================
@@ -80,6 +110,9 @@ def answer(question: str) -> str:
     if rate_limited():
         return (f"You've reached the limit of {settings.rate_limit_per_hour} questions per hour "
                 "for this demo. Please try again a bit later.")
+    if not daily_limit.take():
+        return ("This demo has answered its limit of questions for today. "
+                "Please come back tomorrow (it resets at 07:00 Vietnam time).")
     st.session_state.question_times.append(time.time())
     t0 = time.time()
     try:
@@ -188,6 +221,8 @@ with st.sidebar:
         st.info("👋 Ask a question to see how the search works.")
     st.caption(f"BigQuery this server: {bq.usage['queries']} queries, "
                f"{bq.usage['bytes_billed'] / 1e9:.2f} GB billed")
+    if daily_limit.limit > 0:
+        st.caption(f"Questions today (whole app): {daily_limit.used} / {daily_limit.limit}")
 
     st.divider()
     st.markdown("### 💬 Conversations")

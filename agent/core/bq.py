@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
 from google.api_core import exceptions as gexc
@@ -25,6 +25,8 @@ _lock = threading.Lock()
 
 # Process-wide usage counters (shown in the UI's stats panel).
 usage = {"queries": 0, "bytes_billed": 0}
+# Today's bytes, for the optional daily budget (AGENT_MAX_BYTES_PER_DAY).
+_day = {"date": "", "bytes_billed": 0}
 
 
 class QueryTooExpensive(Exception):
@@ -62,6 +64,14 @@ def query(sql: str, params: list | None = None, *, max_bytes: int | None = None,
           timeout: float = 30) -> list[dict]:
     """Run a parameterised query; returns rows as plain dicts (dates as ISO strings).
     Raises QueryTooExpensive if it would bill more than the cap."""
+    if settings.max_bytes_per_day:
+        with _lock:
+            today = datetime.now(timezone.utc).date().isoformat()  # UTC day, like core.guards
+            if _day["date"] != today:
+                _day.update(date=today, bytes_billed=0)
+            if _day["bytes_billed"] >= settings.max_bytes_per_day:
+                raise QueryTooExpensive("Today's search budget for this app is used up. "
+                                        "Please try again tomorrow.")
     cfg = bigquery.QueryJobConfig(
         query_parameters=params or [],
         maximum_bytes_billed=max_bytes or settings.max_bytes_per_query,
@@ -81,5 +91,6 @@ def query(sql: str, params: list | None = None, *, max_bytes: int | None = None,
     with _lock:
         usage["queries"] += 1
         usage["bytes_billed"] += billed
+        _day["bytes_billed"] += billed
     logger.info("bq_query bytes_billed=%d cache_hit=%s rows=%s", billed, job.cache_hit, rows.total_rows)
     return [{k: _plain(v) for k, v in row.items()} for row in rows]

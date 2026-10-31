@@ -82,6 +82,12 @@ class Settings:
     history_turns: int = _int("AGENT_HISTORY_TURNS", 6)
     # Questions per session per hour (public demo guard).
     rate_limit_per_hour: int = _int("AGENT_RATE_LIMIT_PER_HOUR", 30)
+    # Published app guards (0 / empty = off, the local default). A per-session limit alone
+    # is no cap: a new browser tab is a new session. These hold per server process, which
+    # is the whole app when Cloud Run runs one instance.
+    daily_question_limit: int = _int("AGENT_DAILY_QUESTION_LIMIT", 0)
+    max_bytes_per_day: int = _int("AGENT_MAX_BYTES_PER_DAY", 0)
+    app_password: str = os.getenv("APP_PASSWORD", "")
 
     @property
     def articles_table(self) -> str:
