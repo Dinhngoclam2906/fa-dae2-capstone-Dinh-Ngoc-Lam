@@ -1,0 +1,16 @@
+# Minimal deps for the published Streamlit app (infra/docker/Dockerfile.app): what
+# agent/app.py and agent/core/ import. No psycopg: on Cloud Run the history is in memory
+# (core/memory.py falls back to MemorySaver when LANGGRAPH_POSTGRES_PASSWORD is unset).
+streamlit==1.51.0
+langgraph==1.0.4
+langgraph-checkpoint==3.0.1
+langgraph-prebuilt==1.0.5
+langchain-core==1.1.0
+langchain-openai==1.1.0
+openai==2.54.0
+google-cloud-bigquery==3.45.0
+db-dtypes==1.7.2
+google-genai==1.75.0
+pinecone==7.3.0
+flashrank==0.2.10
+python-dotenv==1.1.1
