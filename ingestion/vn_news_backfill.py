@@ -910,6 +910,16 @@ def _next_month(y: int, m: int) -> date:
     return date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
 
 
+def _backlog_floor(y: int, m: int) -> datetime:
+    """Oldest publication date kept while crawling month (y, m): the 1st of the previous
+    month. Monthly sitemap parts also list OLD articles (congthuong's 2026-10 parts held
+    Jun-Aug pages, likely bucketed by update date): loading them put rows outside the OBT's
+    recent-months window, and dbt-build failed assert_raw_articles_in_staging for 1.5 days
+    (incident 2026-11-01). The floor is always inside that window (40 days, month-aligned),
+    and a backfill still gets every article from its own month's sitemap."""
+    return datetime(y - 1, 12, 1) if m == 1 else datetime(y, m - 1, 1)
+
+
 # ------------------------------------------------------------------------- http
 
 
@@ -1165,6 +1175,7 @@ def crawl_month(
     raw_archive.py), unless it is None. Pages that keep failing are counted in
     `failures` and given up after `max_failures` runs (record_failures)."""
     crawl_ts = datetime.now(timezone.utc).replace(tzinfo=None)
+    backlog_floor = _backlog_floor(year, month)
 
     frontier: dict[str, tuple[str, datetime | None]] = {}
     sitemaps_ok = True
@@ -1243,6 +1254,8 @@ def crawl_month(
                     failed_ids.append(futures[fut])
                     continue
                 ok_ids.append(futures[fut])
+                if isinstance(art, Article) and art.web_publication_date < backlog_floor:
+                    art = Skipped(art.article_id, "re-listed old article (backlog)")
                 if isinstance(art, Skipped):
                     skip_ids.append(art.article_id)
                     continue

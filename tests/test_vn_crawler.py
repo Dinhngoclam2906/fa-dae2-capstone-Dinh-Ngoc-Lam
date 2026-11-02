@@ -133,3 +133,24 @@ def test_baodautu_listing_links():
     assert src.listing_links(page) == ["https://baodautu.vn/xuat-nhap-khau-d733491.html",
                                        "https://baodautu.vn/bai-khac-d733416.html"]
     assert len(src.month_sitemap_urls([], 2020, 1)) == 0
+
+
+def test_backlog_floor_is_first_of_previous_month():
+    from datetime import datetime
+    assert vn._backlog_floor(2026, 10) == datetime(2026, 9, 1)
+    assert vn._backlog_floor(2026, 1) == datetime(2025, 12, 1)
+
+
+def test_backlog_floor_stays_inside_the_dbt_window():
+    # Incident 2026-11-01: an article older than the OBT's window (month of today - 40 days,
+    # macro recent_publication_months) fails assert_raw_articles_in_staging. The crawler
+    # reads the current month, plus the previous one during the 2-day tail.
+    from datetime import date, datetime, timedelta
+    day = date(2026, 1, 1)
+    while day < date(2028, 1, 1):
+        w = day - timedelta(days=40)
+        window_start = datetime(w.year, w.month, 1)
+        tail = day - timedelta(days=1)
+        for y, m in {(day.year, day.month), (tail.year, tail.month)}:
+            assert vn._backlog_floor(y, m) >= window_start, (day, y, m)
+        day += timedelta(days=1)
