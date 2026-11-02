@@ -99,6 +99,7 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
 | 2026-10-27 | BigQuery | Physical storage billing + `insert_overwrite` every 4 h: ~80% of the billed bytes were time travel + fail-safe; the cost report (logical bytes) showed a fifth of the bill |
 | 2026-10-27 | Tooling | Python text mode on Windows rewrote LF files as CRLF (a shell script the Linux image runs) |
 | 2026-10-27 | BigQuery | `INFORMATION_SCHEMA.JOBS` lists a script and its child statements: summing all jobs counted dbt's insert_overwrite MERGE twice (+40%) |
+| 2026-11-01 | Ingestion | **Month rollover read congthuong's October sitemap parts: 12 Jun-Aug articles fell outside the OBT window, 10 dbt-builds failed** |
 
 ---
 
@@ -186,6 +187,24 @@ narrative stays in `PROGRESS_LOG.full-history.md`.
   one races on the GCS state: last push wins, and the cursor can regress (the MERGE keeps
   the data correct). Since 2026-10-19 the Workflows DAG runs jobs strictly one after
   another; keep manual runs away from the schedule.
+
+### Month rollover loaded old articles; 10 dbt-builds failed (2026-11-01, `f21cc40`)
+- **Symptom:** every `dbt-build` from 2026-11-01 00:15 to 11-02 12:03 UTC failed (10 runs) on
+  `assert_raw_articles_in_staging` (12 rows), so the OBT and embed-sync froze at 10-31 20:00
+  (~1.6 days of articles not searchable). Ingestion kept loading raw normally.
+- **Cause:** all 12 were `congthuong` articles published 2026-06-02..08-31, first loaded in
+  the 11-01 00:00 run. In October the crawler read only `/news-sitemap.xml` (~2 days); at the
+  rollover October became a past month inside the 2-day tail, so it read the index's
+  `sitemap-article-2026-10-N.xml` parts, which also list old articles (verified: 4 of the 12
+  ids are in parts 1/2/4; the parts look bucketed by update, not publication date). Rows
+  older than the OBT's month-aligned 40-day window are never written to staging. None had
+  ever been served (no vector, no OBT row), so this is not the re-date case of Appendix A.
+- **Fix:** `dbt build --full-refresh` (PASS=47, the 12 are now served). `crawl_month` skips
+  (marks seen) any article published before the 1st of the month before the crawl month, for
+  every source; a test proves that floor stays inside the dbt window for every day of
+  2026-2027. Ingestion image `:f21cc40` on both jobs.
+- **Lesson:** a forward-only source's past-month sitemap is not "that month's articles".
+  Guard the publication date against the serving window at ingestion, not only in dbt.
 
 ### Bronze storage estimates (2026-10-18)
 - My storage estimates for the raw archive were too low, twice. A tuoitre page is ~183 KB
